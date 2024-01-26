@@ -45,29 +45,17 @@ def calculate_spectral_power(epochs, freq, right_sensor, left_sensor):
     time_bandwidth = 2.0
 
     # calculate power spectrum for right and left sensors separately
-    right_power = mne.time_frequency.tfr_multitaper(epochs, 
-                                                    freqs=freqs, 
-                                                    n_cycles=n_cycles,
-                                                    time_bandwidth=time_bandwidth, 
-                                                    picks=right_sensor,
-                                                    use_fft=True, 
-                                                    return_itc=False,
-                                                    average=True, 
-                                                    decim=2,
-                                                    n_jobs=12,
-                                                    verbose=True)
-    left_power = mne.time_frequency.tfr_multitaper(epochs, 
-                                                   freqs=freqs, 
-                                                   n_cycles=n_cycles,
-                                                   time_bandwidth=time_bandwidth, 
-                                                   picks=left_sensor,
-                                                   use_fft=True, 
-                                                   return_itc=False,
-                                                   average=True, 
-                                                   decim=2,
-                                                   n_jobs=12,
-                                                   verbose=True)
-
+    right_power = epochs.compute_psd(fmin=freqs[0], 
+                                     fmax=freqs[1],
+                                     picks=right_sensor,
+                                     n_jobs=12,
+                                     verbose=True)
+    
+    left_power = epochs.compute_psd(fmin=freqs[0], 
+                                    fmax=freqs[1],
+                                    picks=left_sensor,
+                                    n_jobs=12,
+                                    verbose=True)
     return right_power, left_power
 
 def calculate_spectrum_lateralisation(right_power, left_power):
