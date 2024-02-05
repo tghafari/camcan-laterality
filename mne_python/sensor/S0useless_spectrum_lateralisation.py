@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 import mne
 import sys 
-bluebear = True  # are you running on bluebear or windows?
+platform = 'mac'  # are you running on bluebear or windows or mac?
 
 def calculate_spectral_power(epochs, freq, right_sensor, left_sensor):
     if freq > 0.1:
@@ -65,11 +65,11 @@ def calculate_spectrum_lateralisation(right_power, left_power):
     return spectrum_lat_sensor_pairs
 
 # Define where to read and write the data
-if bluebear:
+if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched_data')
     info_dir = op.join(rds_dir, 'dataman/data_information')
-else:
+elif platform == 'windows':
     epoched_dir = r'X:/derivatives/meg/sensor/epoched_data'
     info_dir = r'X:/dataman/data_information'
     output_dir = r'X:/derivatives/meg/sensor/lateralized_index/frequency_bins'
