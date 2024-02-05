@@ -73,6 +73,10 @@ elif platform == 'windows':
     epoched_dir = r'X:/derivatives/meg/sensor/epoched_data'
     info_dir = r'X:/dataman/data_information'
     output_dir = r'X:/derivatives/meg/sensor/lateralized_index/frequency_bins'
+elif platform == 'mac':
+    rds_dir = '/Volume/quinna-camcan'
+    epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched_data')
+    info_dir = op.join(rds_dir, 'dataman/data_information')
 
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
