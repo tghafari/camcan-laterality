@@ -127,10 +127,10 @@ for j, subject_ID in enumerate(good_subject_pd[375:385].index):
                 all_sensor_pairs_all_freqs_one_sub_lat.extend(np.nan)  # put nan for subjects for which we couldn't calculate spectral lat
                 pass
 
-    # Create subject_id column for the main df
-    current_subject_ID = [subject_ID] * len(freqs) * int(len(all_sensors_all_freqs_one_sub_tfr.ch_names)/2)  # ensures correct number of rows
-    all_subject_IDs.extend(current_subject_ID)
-
+        # Create subject_id column for the main df
+        current_subject_ID = [subject_ID] * len(freqs) * int(len(all_sensors_all_freqs_one_sub_tfr.ch_names)/2)  # ensures correct number of rows
+        all_subject_IDs.extend(current_subject_ID)
+    
     except:
         print(f'an error occured while reading subject # {subjectID}, {j}')
         pass
