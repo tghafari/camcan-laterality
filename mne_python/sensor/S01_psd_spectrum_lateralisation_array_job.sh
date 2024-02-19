@@ -11,7 +11,7 @@ module load bear-apps/2022a
 module load MNE-Python/1.3.1-foss-2022a
 
 # Path to the Python script
-python_script="S01_spectrum_lateralisation.py"
+python_script="S01_psd_spectrum_lateralisation.py"
 
 # Execute the Python script with the array index as an argument
 for index in $(seq $SLURM_ARRAY_TASK_MIN $SLURM_ARRAY_TASK_MAX); do
