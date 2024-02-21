@@ -1,0 +1,11 @@
++--------------------------------------------------------------------------+
+| Job on the BlueBEAR cluster:
+| Starting at Wed Feb 21 14:43:39 2024 for ghafarit(667799)
+| Identity jobid 6474249 jobname S01_psd_spectrum_lateralisation_array_job.sh
+| Array Identity 6474249_28
+| Running against project quinna-camcan and in partition cascadelake-hdr-shared
+| Requested cpu=12,mem=48G,node=1,billing=12 - 05:00:00 walltime
+| Assigned to nodes bear-pg0206u36b
+| Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality-1/mne_python/sensor/S01_psd_spectrum_lateralisation_array_job.sh
+| WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality-1/mne_python/sensor
++--------------------------------------------------------------------------+

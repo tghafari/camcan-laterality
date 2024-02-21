@@ -68,17 +68,11 @@ def calculate_spectrum_lateralisation(right_psd, left_psd):
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
-    epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched_data')
-    info_dir = op.join(rds_dir, 'dataman/data_information')
-elif platform == 'windows':
-    epoched_dir = r'X:/derivatives/meg/sensor/epoched_data'
-    info_dir = r'X:/dataman/data_information'
-    output_dir = r'X:/derivatives/meg/sensor/lateralized_index/frequency_bins'
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
-    epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched_data')
-    info_dir = op.join(rds_dir, 'dataman/data_information')
 
+epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched_data')
+info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
 output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/frequency_bins')
@@ -88,8 +82,7 @@ good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
 # frequencies to calculate lateralisaion index for
-# freqs = np.append(0.1, np.arange(1, 51)) 
-freqs = np.arange(1, 5)
+# freqs = np.append(0.1, np.arange(1, 51))  # don't need this if running aray jobs
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
@@ -102,7 +95,7 @@ if __name__ == "__main__":
 
 for freq in freqs:
     # make one folder for each frequency bin
-    output_freq_dir = op.join(output_dir, f'{freq}_test')
+    output_freq_dir = op.join(output_dir, f'{int(freq)}')
     if not op.exists(output_freq_dir):
         os.makedirs(output_freq_dir)
     # read sensor pairs and calculate lateralisation for each
@@ -111,17 +104,17 @@ for freq in freqs:
         spec_lateralisation_all_subs = []
 
         # read subjects one by one and calculate lateralisation index for each pair of sensor
-        for i, subjectID in enumerate(good_subject_pd.head().index):
+        for i, subjectID in enumerate(good_subject_pd.index):
             epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
             epoched_fif = op.join(epoched_dir, epoched_fname)
             sub_IDs.append(subjectID)
 
             try:
-                print(f'calculating lateralisation of {freq} Hz in {row["right_sensors"][1:8]}, {row["left_sensors"][1:8]}\
-                          in subject # {subjectID}')
+                print(f'calculating lateralisation of {freq} Hz in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}\
+                          in subject # {i}')
                           
                 epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # 5-sec epochs
-                right_psd, left_psd = calculate_spectral_power(epochs, freq, row['right_sensors'][1:8], row['left_sensors'][1:8])
+                right_psd, left_psd = calculate_spectral_power(epochs, freq, row['right_sensors'][0:8], row['left_sensors'][0:8])
                 spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(right_psd, left_psd)
                 # append all subjects together in one csv
                 spec_lateralisation_all_subs.append(spectrum_lat_sensor_pairs)
@@ -137,6 +130,6 @@ for freq in freqs:
         spec_lateralisation_all_subs_df = pd.DataFrame(data=data)
 
         # save to disc 
-        output_fname = op.join(output_freq_dir, f'{row["right_sensors"][1:8]}_{row["left_sensors"][1:8]}.csv')
+        output_fname = op.join(output_freq_dir, f'{row["right_sensors"][0:8]}_{row["left_sensors"][0:8]}.csv')
         spec_lateralisation_all_subs_df.to_csv(output_fname)
 

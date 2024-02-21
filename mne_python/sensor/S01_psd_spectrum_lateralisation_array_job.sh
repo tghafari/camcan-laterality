@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --account quinna-camcan
 #SBATCH --qos bbdefault
-#SBATCH --time 300
+#SBATCH --time 1000
 #SBATCH --nodes 1 # ensure the job runs on a single node
-#SBATCH --ntasks 12 # this will give you circa 48G RAM and will ensure faster conversion to the .sif format
-#SBATCH --array=16-51
+#SBATCH --ntasks 30 # nu,ber of cores-this will give you circa 48G RAM 
+#SBATCH --array=1
 
 module purge
 module load bear-apps/2022a

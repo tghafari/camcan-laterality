@@ -1,0 +1,17 @@
++--------------------------------------------------------------------------+
+| Job on the BlueBEAR cluster:
+| Starting at Wed Feb 21 11:15:57 2024 for ghafarit(667799)
+| Identity jobid 6467515 jobname S01_psd_spectrum_lateralisation_array_job.sh
+| Array Identity 6467512_4
+| Running against project quinna-camcan and in partition icelake-shared
+| Requested cpu=12,mem=48G,node=1,billing=12 - 05:00:00 walltime
+| Assigned to nodes bear-pg0105u23b
+| Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality-1/mne_python/sensor/S01_psd_spectrum_lateralisation_array_job.sh
+| WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality-1/mne_python/sensor
++--------------------------------------------------------------------------+
++--------------------------------------------------------------------------+
+| Finished at Wed Feb 21 16:16:14 2024 for ghafarit(667799) on the BlueBEAR Cluster
+| Required (00:05.204 cputime, 1257560K memory used) - 05:00:17 walltime
+| JobState COMPLETING - Reason TimeLimit
+| Exitcode 0:15
++--------------------------------------------------------------------------+
