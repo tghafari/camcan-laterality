@@ -47,13 +47,13 @@ def calculate_spectral_power(epochs, freq, right_sensor, left_sensor):
     right_psd = epochs.compute_psd(fmin=freqs[0], 
                                      fmax=freqs[1],
                                      picks=right_sensor,
-                                     n_jobs=12,
+                                     n_jobs=30,
                                      verbose=True)
     
     left_psd = epochs.compute_psd(fmin=freqs[0], 
                                     fmax=freqs[1],
                                     picks=left_sensor,
-                                    n_jobs=12,
+                                    n_jobs=30,
                                     verbose=True)
     return right_psd, left_psd
 
