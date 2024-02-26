@@ -99,7 +99,7 @@ for freq in freqs:
     if not op.exists(output_freq_dir):
         os.makedirs(output_freq_dir)
     # read sensor pairs and calculate lateralisation for each
-    for _, row in sensors_layout_names_df.iterrows():
+    for _, row in sensors_layout_names_df.head(75).iterrows():
         sub_IDs = []
         spec_lateralisation_all_subs = []
 
