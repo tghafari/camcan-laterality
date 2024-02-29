@@ -105,7 +105,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.head(10).index):
+for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -118,7 +118,7 @@ for i, subjectID in enumerate(good_subject_pd.head(10).index):
         epochspectrum = calculate_spectral_power(epochs, n_fft=2000, fmin=1, fmax=60)   
 
          # Read sensor pairs and calculate lateralisation for each
-        for _, row in sensors_layout_names_df.head(15).iterrows():
+        for _, row in sensors_layout_names_df.iterrows():
              print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
