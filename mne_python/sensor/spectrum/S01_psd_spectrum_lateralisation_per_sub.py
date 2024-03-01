@@ -32,6 +32,8 @@ import pandas as pd
 import numpy as np
 import mne
 import sys 
+import matplotlib.pyplot as plt
+
 platform = 'mac'  # are you running on bluebear or windows or mac?
 
 
@@ -137,7 +139,6 @@ for i, subjectID in enumerate(good_subject_pd.index):
         spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
         sub_IDs.append(subjectID)
 
-
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass
@@ -152,3 +153,23 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
     # Save the dataframe as a CSV file
     sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
+
+
+# Sanity check with plot_topos
+to_tests = np.arange(0,6)
+to_test_output_dir = '/Volumes/jenseno-avtemporal-attention/Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos'
+
+for _ in to_tests:
+    random_index = np.random.randint(0, len(good_subject_pd))
+    # Get the subject ID at the random index
+    subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
+    epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+    epoched_fif = op.join(epoched_dir, epoched_fname)
+    epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
+    epochspectrum = calculate_spectral_power(epochs, n_fft=2000, fmin=1, fmax=60)   
+
+    # Plot the EpochSpectrum
+    fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)
+    plt.title(f'Sub_{subjectID}', y=0.9)
+    fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
+
