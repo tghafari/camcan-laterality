@@ -38,6 +38,30 @@ import scipy.stats as stats
 
 platform = 'mac'
 
+def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
+    # Navigate to the sensor_pair folder
+    spec_lat_index_fname = op.join(spectra_dir, f'{left_sensor}_{right_sensor}.csv')
+
+    # Load lateralisation index for each pair
+    spectrum_pair_lat_df = pd.read_csv(spec_lat_index_fname)
+    spectrum_pair_lat_df = spectrum_pair_lat_df.rename(columns={'Unnamed: 0':'subject_ID'})
+    
+    # Merge and match the subject_ID column and remove nans
+    working_df = spectrum_pair_lat_df.merge(substr_lat_df, on=['subject_ID'])
+    working_df = working_df.dropna()
+
+    # Get the freqs of spectrum from spec_pair_lat
+    freqs = spectrum_pair_lat_df.columns.values[1:]  # remove subject_ID column
+    [float(freq) for freq in freqs]  # convert strings to floats
+    return working_df, freqs
+
+def pearson_calculator(working_df, freq, substr, ls_corrs, ls_pvals):
+    print(f'Calculating pearson correlation for {freq} and {substr}')
+    temp_corr, temp_pvalue = stats.pearsonr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
+    ls_corrs.append(temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
+    ls_pvals.append(temp_pvalue)
+    return ls_corrs, ls_pvals
+
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -47,81 +71,56 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(deriv_dir, 'meg/sensor/lateralized_index/frequency_bins')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load substr file
 substr_lat_df = pd.read_csv(substr_sheet_fname)
-substr_lat_df = substr_lat_df.rename(columns={'SubID':'subject_ID'})
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-freqs = np.array([1,2])
-# freqs = np.append(0.1, np.arange(1,51)) # freqs start from 0.1 (not 0)
 substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
-def working_df_maker(freq, spectra_dir, right_sensor, left_sensor, substr_lat_df):
-    # Navigate to the folder
-    lat_index_dir = op.join(spectra_dir, f'{str(float(freq))}')
+for i, row in sensors_layout_names_df.iterrows():
+    print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
 
-    # Load lateralisation index for each pair
-    spectrum_pair_lat_df = pd.read_csv(op.join(lat_index_dir, f'{right_sensor}_{left_sensor}.csv'))
-    print(f'creating working df for {right_sensor}_{left_sensor}')
-    # Remove brackets and convert to float
-    spectrum_pair_lat_df['lateralised_spec'] = spectrum_pair_lat_df['lateralised_spec'].str.strip('[]').astype(float)
+    # Get the frequencies of spectrum (only once enough)
+    _, freqs = working_df_maker(spectra_dir, row["left_sensors"][0:8], row["right_sensors"][0:8], substr_lat_df) if i == 0 else (None, freqs)
 
-    # merge and match the subject_ID column
-    working_df = spectrum_pair_lat_df.merge(substr_lat_df, on=['subject_ID'])
-    working_df = working_df.dropna()
-
-    return working_df
-
-def pearson_calculator(working_df, substr, ls_corrs, ls_pvals):
-    print(f'calculating pearson correlation for {substr}')
-    temp_corr, temp_pvalue = stats.pearsonr(working_df['lateralised_spec'].to_numpy(), working_df[substr].to_numpy()) 
-    ls_corrs.append(temp_corr)
-    ls_pvals.append(temp_pvalue)
-    return ls_corrs, ls_pvals
-
-for _, row in sensors_layout_names_df.head(2).iterrows():
-    print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
-
-    # Predefine lists
-    ls_corrs = []
-    ls_pvals = []
-    list_of_freqs = []
-    ls_corrs_arr = []
-    ls_pvals_arr = []
-    
     output_corr_dir = op.join(deriv_dir, 'correlations', 'sensor_pairs', f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
     if not op.exists(output_corr_dir):
         os.makedirs(output_corr_dir)
+ 
+    # Calculate correlation in each substr
+    for substr in substrs:
+        print(f'Working on {substr}')
 
-    pearsonrs_csv_file = op.join(output_corr_dir, 'lat_spectra_substr_pearsonr.csv')
-    pvals_csv_file = op.join(output_corr_dir, 'lat_spectra_substr_pvals.csv')
+        # Predefine lists
+        ls_corrs = []
+        ls_pvals = []
+        list_of_freqs = []
+        ls_corrs_arr = []
+        ls_pvals_arr = []
+        
+        output_corr_substr_dir = op.join(output_corr_dir, f'{substr}')
+        if not op.exists(output_corr_substr_dir):
+            os.makedirs(output_corr_substr_dir)
 
-    for freq in freqs:
-        print(f'calculating correlations for {freq} Hz')
-        list_of_freqs.append(freq)
-        working_df = working_df_maker(freq, spectra_dir, row["right_sensors"][0:8], row["left_sensors"][0:8], substr_lat_df)
+        # Calculate correlation with each freq 
+        for freq in freqs:
+            print(f'Calculating correlations for {freq} Hz')
+            working_df, _ = working_df_maker(spectra_dir, row["left_sensors"][0:8], row["right_sensors"][0:8], substr_lat_df)
+            ls_corrs, ls_pvals = pearson_calculator(working_df, freq, substr, ls_corrs, ls_pvals)
 
-        # Calculate correlation with each substr
-        for substr in substrs:
-            ls_corrs, ls_pvals = pearson_calculator(working_df, substr, ls_corrs, ls_pvals)
-
-    # Preparing the lists
-    ls_corrs_arr = np.asarray(ls_corrs).reshape(-1, 7)
-    ls_pvals_arr = np.asarray(ls_pvals).reshape(-1, 7)
-    output_pearr_df = pd.DataFrame(ls_corrs_arr, columns=['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu'], index=list_of_freqs)
-    output_pvalue_df = pd.DataFrame(ls_pvals_arr, columns=['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu'], index=list_of_freqs)
+        # Save correlation values of each sensor pair and each substr with all freqs separately
+        substr_spec_corr_all_freqs_df = pd.DataFrame(ls_corrs, index=freqs)
+        substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, 'lat_spectra_substr_pearsonr.csv'))
+        substr_spec_pval_all_freqs_df = pd.DataFrame(ls_pvals, index=freqs)
+        substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, 'lat_spectra_substr_pvals.csv'))
     
-    # Save
-    output_pearr_df.to_csv(pearsonrs_csv_file)
-    output_pvalue_df.to_csv(pvals_csv_file)
-
-    # Freshen the variables for the next frequency band
-    del output_pearr_df
-    del output_pvalue_df
+        # Freshen the variables for the next substr
+        del substr_spec_corr_all_freqs_df
+        del substr_spec_pval_all_freqs_df
