@@ -47,7 +47,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
       n_fft=2000, fmin=1, fmax=60"""
     
    # define constant parameters
-    welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft = n_fft, n_overlap = int(n_fft/2))
+    welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
 
     # calculate power spectrum for right and left sensors separately
     """the returned array will have the same
