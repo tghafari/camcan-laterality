@@ -46,7 +46,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
 substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
-for _, row in sensors_layout_names_df.head(1).iterrows():
+for _, row in sensors_layout_names_df.head(10).iterrows():
     print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
 
     pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
