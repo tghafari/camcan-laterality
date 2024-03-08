@@ -77,7 +77,7 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralised_index/all_sensors_all_subs_all_freqs')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
@@ -88,10 +88,9 @@ substr_lat_df = pd.read_csv(substr_sheet_fname)
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-substrs = ['Thal']
-#, 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
-for i, row in sensors_layout_names_df.head(5).iterrows():
+for i, row in sensors_layout_names_df.iterrows():
     print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
 
     # Get the frequencies of spectrum (only once enough)
@@ -127,7 +126,7 @@ for i, row in sensors_layout_names_df.head(5).iterrows():
             os.makedirs(output_corr_substr_dir)
     
         # Calculate correlation with each freq 
-        for freq in freqs[:10]:
+        for freq in freqs:
             print(f'Calculating correlations for {freq} Hz')
             ls_corrs_all_freqs, ls_pvals_all_freqs = pearson_calculator(working_df, 
                                                                         freq, 
@@ -139,7 +138,7 @@ for i, row in sensors_layout_names_df.head(5).iterrows():
         substr_spec_corr_all_freqs_df = pd.DataFrame(ls_corrs_all_freqs, index=freqs)
         substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_pearsonr.csv'))
         substr_spec_pval_all_freqs_df = pd.DataFrame(ls_pvals_all_freqs, index=freqs)
-        substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_pvals.csv'))
+        substr_spec_pval_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_pvals.csv'))
     
         # Freshen the variables for the next substr
         del substr_spec_corr_all_freqs_df
