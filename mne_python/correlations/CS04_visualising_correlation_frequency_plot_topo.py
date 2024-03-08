@@ -53,12 +53,12 @@ substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 # Create a placeholder for correlation values of all sensor pairs
 freqs = np.arange(1,60.125,0.125)
-correlation_df = pd.DataFrame(index=freqs)  # frequencies of correlations = index of pearsonr_freq_substr_df
 
 for substr in substrs:
     print(f'working on {substr}')
-    
-    for _, row in sensors_layout_names_df.iterrows():
+    correlation_df = pd.DataFrame(index=freqs)  # frequencies of correlations = index of pearsonr_freq_substr_df
+
+    for _, row in sensors_layout_names_df.head(5).iterrows():
         print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
 
         pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
@@ -109,7 +109,7 @@ for substr in substrs:
             os.makedirs(fig_output_path)
 
         fig_output_fname = op.join(fig_output_path, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}.png')
-        plt.savefig(fig_output_fname)
+        #plt.savefig(fig_output_fname)
         plt.close()
         
         # Put all correlations of sensor pairs in one df to create evoekd object for evoked_plot_topo
@@ -117,7 +117,7 @@ for substr in substrs:
         correlation_df = pd.concat([correlation_df, pearsonr_freq_substr_df],axis=1)
 
     # Rename columns with sensor pair names
-    all_right_names = [f'{row["right_sensors"][0:8]}' for _, row in sensors_layout_names_df.iterrows()]
+    all_right_names = [f'{row["right_sensors"][0:8]}' for _, row in sensors_layout_names_df.head(5).iterrows()]
     correlation_df.columns = all_right_names
 
     # Create an EvokedArray object from the DataFrame
