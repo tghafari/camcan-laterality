@@ -32,14 +32,16 @@ platform = 'mac'
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
     
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs')
-fig_output_dir = op.join(deriv_dir, 'correlations/figures/substr_correlation_freqs')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_0803_final')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -58,13 +60,13 @@ for substr in substrs:
     print(f'working on {substr}')
     correlation_df = pd.DataFrame(index=freqs)  # frequencies of correlations = index of pearsonr_freq_substr_df
 
-    for _, row in sensors_layout_names_df.head(5).iterrows():
+    for _, row in sensors_layout_names_df.iterrows():
         print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
 
         pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
-                                f'{substr}', 'lat_spectra_substr_pearsonr.csv')
+                                f'{substr}', f'{substr}_lat_spectra_substr_pearsonr.csv')
         pval_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
-                                f'{substr}', 'lat_spectra_substr_pvals.csv')
+                                f'{substr}', f'{substr}_lat_spectra_substr_pvals.csv')
         pearsonr_freq_substr_df = pd.read_csv(pearsonr_fname)
         pearsonr_freq_substr_df = pearsonr_freq_substr_df.set_index('Unnamed: 0')  # set freqs as the index
         pearsonr_freq_substr_df.index.names = ['freqs']
@@ -88,10 +90,9 @@ for substr in substrs:
         plt.figure(figsize=(10, 6))
         plt.plot(freq_substr, corr_val_substr, marker='o', color='lightgrey', label='Correlation Values', zorder=1)
         plt.plot(freq_substr, poly_line, linewidth=2, color='darkgrey', label='Polynomial Line (degree=4)', zorder=2)
-        plt.title(f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
         plt.legend()
         
-        """
+        
         # Highlight frequencies with p-values smaller than 0.05  - needs p-values to be calculated again
         significant_freqs = freq_substr[pval_substr < 0.05]
         for freq in significant_freqs:
@@ -99,17 +100,18 @@ for substr in substrs:
 
         plt.xlabel('Frequencies')
         plt.ylabel('Correlation Values')
-        plt.title(f'Correlation Values for {substr}')
+        plt.title(f'Correlation Values for {substr} in {row["right_sensors"][0:8]}_{row["left_sensors"][0:8]}')
         plt.legend()
         plt.grid(True)
-        """
+        
         # Save the figure
         fig_output_path = op.join(fig_output_dir, f'{substr}')
         if not op.exists(fig_output_path):
             os.makedirs(fig_output_path)
 
         fig_output_fname = op.join(fig_output_path, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}.png')
-        #plt.savefig(fig_output_fname)
+        #plt.show()
+        plt.savefig(fig_output_fname)
         plt.close()
         
         # Put all correlations of sensor pairs in one df to create evoekd object for evoked_plot_topo
