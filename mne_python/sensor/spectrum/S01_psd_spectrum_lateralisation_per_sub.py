@@ -34,17 +34,17 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
 
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     """
-    The data are divided into sections being 2 s long 
-      (n_fft = 2000 samples) with a 1 s overlap 
-      (1000 samples). This results in a 0.5 Hz 
+    The data are divided into sections being 2 s long. 
+      (n_fft = 500 samples) with a 1 s overlap 
+      (250 samples). This results in a 0.5 Hz 
       resolution Prior to calculating the FFT of each 
       section a Hamming taper is multiplied.
-      n_fft=2000, fmin=1, fmax=60"""
+      n_fft=500, fmin=1, fmax=60"""
     
    # define constant parameters
     welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
@@ -87,8 +87,10 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
 
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
@@ -117,7 +119,7 @@ for i, subjectID in enumerate(good_subject_pd.index):
         print(f'Reading subject # {i}')
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-        epochspectrum = calculate_spectral_power(epochs, n_fft=2000, fmin=1, fmax=60)   
+        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
@@ -154,10 +156,11 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     # Save the dataframe as a CSV file
     sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
 
+"""
 
 # Sanity check with plot_topos
 to_tests = np.arange(0,6)
-to_test_output_dir = '/Volumes/jenseno-avtemporal-attention/Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos'
+to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos')
 
 for _ in to_tests:
     random_index = np.random.randint(0, len(good_subject_pd))
@@ -166,10 +169,15 @@ for _ in to_tests:
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
     epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-    epochspectrum = calculate_spectral_power(epochs, n_fft=2000, fmin=1, fmax=60)   
+    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   
 
     # Plot the EpochSpectrum
-    fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)
-    plt.title(f'Sub_{subjectID}', y=0.9)
-    fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
+    # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
+    # plt.title(f'Sub_{subjectID}', y=0.9)
+    # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
 
+    # Plot a couple sensors
+    fig_sens = epochspectrum.plot(picks=['MEG1923','MEG2343'])
+    plt.title(f'Sub_{subjectID}, sensor MEG1923 and MEG2343]')
+    fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
+"""
