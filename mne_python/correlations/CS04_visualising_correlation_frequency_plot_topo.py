@@ -27,7 +27,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'mac'
+platform = 'bluebear'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -40,7 +40,7 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_0803_final')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_1103_final')
 fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
@@ -54,7 +54,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 # Create a placeholder for correlation values of all sensor pairs
-freqs = np.arange(1,60.125,0.125)
+freqs = np.arange(1,60.5,0.5)
 
 for substr in substrs:
     print(f'working on {substr}')
@@ -119,7 +119,7 @@ for substr in substrs:
         correlation_df = pd.concat([correlation_df, pearsonr_freq_substr_df],axis=1)
 
     # Rename columns with sensor pair names
-    all_right_names = [f'{row["right_sensors"][0:8]}' for _, row in sensors_layout_names_df.head(5).iterrows()]
+    all_right_names = [f'{row["right_sensors"][0:8]}' for _, row in sensors_layout_names_df.iterrows()]
     correlation_df.columns = all_right_names
 
     # Create an EvokedArray object from the DataFrame
@@ -127,6 +127,8 @@ for substr in substrs:
     evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'pearsonr')
 
     # Plot the correlation values with similar format as plot_topo
-    evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
+    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results', f'{substr}.png'))
+    evoked_fig = evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
+    evoked_fig.savefig(evoked_fig_output_fname)
 
 

@@ -62,8 +62,8 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
         from epochspectrum (output of previous function).
-        the shape of psd is (1, 1, 473) = #epochs, #sensors, #freqs
-        freqs = np.arange(1, 60.125, 0.125)"""
+        the shape of psd is (1, 1, 119) = #epochs, #sensors, #freqs
+        freqs = np.arange(1, 60.5, 0.5)"""
     
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()

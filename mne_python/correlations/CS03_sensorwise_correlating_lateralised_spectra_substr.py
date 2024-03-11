@@ -36,7 +36,7 @@ import os.path as op
 import os
 import scipy.stats as stats
 
-platform = 'mac'
+platform = 'bluebear'
 
 def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     """This definition merges the dataframes containing spectrum lateralisation values and 
@@ -105,7 +105,7 @@ for i, row in sensors_layout_names_df.iterrows():
                                     row["right_sensors"][0:8], 
                                     substr_lat_df)
     
-    output_corr_dir = op.join(deriv_dir, 'correlations', 'sensor_pairs_0803_final',
+    output_corr_dir = op.join(deriv_dir, 'correlations', 'sensor_pairs_1103_final',
                                f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
     if not op.exists(output_corr_dir):
         os.makedirs(output_corr_dir)
