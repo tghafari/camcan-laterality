@@ -34,7 +34,7 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
+platform = 'mac'  # are you running on bluebear or windows or mac?
 
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -109,7 +109,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.index):
+for i, subjectID in enumerate(good_subject_pd.head(2).index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -122,7 +122,7 @@ for i, subjectID in enumerate(good_subject_pd.index):
         epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
          # Read sensor pairs and calculate lateralisation for each
-        for _, row in sensors_layout_names_df.iterrows():
+        for _, row in sensors_layout_names_df.head(2).iterrows():
              print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
@@ -154,9 +154,9 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     df_name = f"{sensors_layout_names_df.iloc[idx, 0]}_{sensors_layout_names_df.iloc[idx, 1]}"
     sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
     # Save the dataframe as a CSV file
-    sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
+    #sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
 
-"""
+
 
 # Sanity check with plot_topos
 to_tests = np.arange(0,6)
@@ -169,7 +169,7 @@ for _ in to_tests:
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
     epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   
+    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=100)   
 
     # Plot the EpochSpectrum
     # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
@@ -177,7 +177,7 @@ for _ in to_tests:
     # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
 
     # Plot a couple sensors
-    fig_sens = epochspectrum.plot(picks=['MEG1923','MEG2343'])
-    plt.title(f'Sub_{subjectID}, sensor MEG1923 and MEG2343]')
+    fig_sens = epochspectrum.plot()
+    plt.title(f'sub_{subjectID}')
     fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
-"""
+

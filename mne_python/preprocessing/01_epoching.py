@@ -24,7 +24,7 @@ Questions:
 import os.path as op
 import pandas as pd
 import mne
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
+platform = 'mac'  # are you running on bluebear or windows or mac?
 
 # Define where to read and write the data
 if platform == 'bluebear':
