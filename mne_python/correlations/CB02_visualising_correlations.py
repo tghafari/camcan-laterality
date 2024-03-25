@@ -72,7 +72,7 @@ for f, band in enumerate(bands):
                             cmap='RdBu_r', vlim=(min(metrics), max(metrics)), 
                             axes=ax, mask=mask[::2],
                             image_interp='nearest')
-                            #names=raw.ch_names)
+                            # names=raw.ch_names)
                             # mask_params={'marker': '*'},
         ax.set_title(substr)
         ax.set_xlim(0, )

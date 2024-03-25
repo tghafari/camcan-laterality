@@ -45,7 +45,7 @@ fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-s
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
-meg_fname =  op.join(rds_dir, r'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
+meg_fname =  op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
 raw = mne.io.read_raw_fif(meg_fname)
 
 # Read sensor layout sheet
