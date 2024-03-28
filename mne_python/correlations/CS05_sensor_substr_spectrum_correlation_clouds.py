@@ -137,6 +137,7 @@ for i, row in sensors_layout_names_df.iterrows():
             plt.xlabel(f'Lateralised Power in {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
             plt.ylabel(f'Lateralisation Index of {substr}')
             plt.title(f'Lateralisation Indices in {freq} Hz')
+            plt.grid(True)
 
             #plt.show()
             fig_output_fname = op.join(output_cloud_substr_dir, f'{freq}.png')
