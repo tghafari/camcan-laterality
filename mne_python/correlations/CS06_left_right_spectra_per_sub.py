@@ -1,20 +1,19 @@
-# -*- coding: utf-8 -*-
+
 """
 ===============================================
-S01. Spectrum lateralisation
+CS06_left_right_spectra_per_sub
+
+the aim of this code is to plot the spectra for 
+a few participants that were selected from 
+the cloud plots on right and left, separately.
+
 
 This code will:
-    1. calculate the psd for all frequencies
-    and all sensors for one subject
-    2. pick right and corresponding left sensors 
-    from the spectrum based on sensor-layout-sheet
-    3. calculate LI for all freqs 
-    4. loop over sensor pairs and append all sensor pairs
-     for one subject to save and separate later
-    5. loop over subjects
-    6. change the structure from all sensor pairs all freqs
-     one subject to all freqs all subjects one sensor pair
- 
+    1. inputs participnats id
+    2. input a list of sensors for which
+    we'd want to plot the spectrum
+    3. plot right and left spectra, separately
+    4. plot both side spectra 
 
 
 written by Tara Ghafari
@@ -25,6 +24,7 @@ Issues/ contributions to community:
   
 Questions:
 """
+
 # import libraries
 import os.path as op
 import os
@@ -34,7 +34,7 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
+platform = 'mac'
 
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -67,6 +67,20 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
+
+    # Create a figure with two subplots
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Plot PSD for the right sensor
+    psd_right_plot = epochspectrum.copy().pick(picks=right_sensor).plot(axes=axes[1])
+    axes[1].set_title(f'Right sensor {right_sensor}')
+
+    # Plot PSD for the left sensor
+    psd_left_plot = epochspectrum.copy().pick(picks=left_sensor).plot(axes=axes[0])
+    axes[0].set_title(f'Left sensor {left_sensor}')
+
+    plt.tight_layout()
+    plt.show()
 
     return psd_right_sensor, psd_left_sensor, freqs
 
@@ -106,57 +120,43 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
 # Preallocate lists
+subjectIDs_to_plot = [321506, 620935]
+sensor_pairs_to_plot = [['MEG0422', 'MEG1112'],['MEG0233','MEG1343']]
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.head(2).index):
+for subjectID in subjectIDs_to_plot:
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
     stacked_sensors = []
 
     try:
-        print(f'Reading subject # {i}')
+        print(f'Reading subject # {subjectID}')
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
         epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
          # Read sensor pairs and calculate lateralisation for each
-        for _, row in sensors_layout_names_df.iterrows():
-             print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
-                   
+        for i in range(0, len(sensor_pairs_to_plot), 2):
+             working_pair = sensor_pairs_to_plot[i]
+
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
-                                                                                   row['right_sensors'][0:8], 
-                                                                                   row['left_sensors'][0:8])
+                                                                                           working_pair[1], 
+                                                                                           working_pair[0])     
              spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
-
-             # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs.reshape(-1,1)
-             # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-             stacked_sensors.append(spectrum_lat_sensor_pairs)
-
-        # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
-        spec_lateralisation_all_sens = np.hstack(stacked_sensors)
-        # Append all subjects together
-        spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
-        sub_IDs.append(subjectID)
+             
+             # Plot spectrum lateralisation of these sensors vs. frequency
+             _, ax = plt.subplots()
+             ax.plot(freqs, spectrum_lat_sensor_pairs)
+             ax.set(title=f"lateralisation spectrum for {working_pair[1]}_{working_pair[0]}",
+                    xlabel="Frequency (Hz)",
+                    ylabel="Lateralisation Index",
+                    )
 
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass
-
-# Prepare for enumerate over sensor pairs - #sensor_pairs, #subs, #freqs
-all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1))  
-
-sensor_dataframes = {}
-for idx, array in enumerate(all_freq_all_subs_transposed):
-    # Extract the slice along the third dimensio
-    df_name = f"{sensors_layout_names_df.iloc[idx, 0]}_{sensors_layout_names_df.iloc[idx, 1]}"
-    sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
-    # Save the dataframe as a CSV file
-    #sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
-
-
 
 # Sanity check with plot_topos
 to_tests = np.arange(0,6)
