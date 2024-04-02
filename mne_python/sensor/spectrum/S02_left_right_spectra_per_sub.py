@@ -68,14 +68,10 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, ou
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
 
-    # Create a figure with two subplots
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    # Plot PSD for the right sensor
     psd_right_plot = epochspectrum.copy().pick(picks=right_sensor).plot(axes=axes[1])
     axes[1].set_title(f'Right sensor {right_sensor}')
 
-    # Plot PSD for the left sensor
     psd_left_plot = epochspectrum.copy().pick(picks=left_sensor).plot(axes=axes[0])
     axes[0].set_title(f'Left sensor {left_sensor}')
 
@@ -83,6 +79,27 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, ou
     plt.tight_layout()
     fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}.png'))
     plt.close()
+
+    # Plot PSDs with no log transform
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    axes[1].plot(freqs, psd_right_sensor.squeeze())
+    axes[1].set_title(f'Right sensor {right_sensor}')
+    axes[1].set(title=f"{subjectID} in {right_sensor}",
+            xlabel="Frequency (Hz)",
+            ylabel="Power",
+            )
+
+    axes[0].plot(freqs, psd_left_sensor.squeeze())
+    axes[0].set_title(f'Left sensor {left_sensor}')
+    axes[0].set(title=f"{subjectID} in {left_sensor}",
+            xlabel="Frequency (Hz)",
+            ylabel="Power",
+            )
+
+    fig.suptitle(f'Single sensor spectra for {subjectID}')
+    plt.tight_layout()
+    fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_nolog.png'))
+    plt.close()    
 
     return psd_right_sensor, psd_left_sensor, freqs
 
@@ -122,37 +139,33 @@ for subjectID in subjectIDs_to_plot:
     epoched_fif = op.join(epoched_dir, epoched_fname)
     stacked_sensors = []
 
-    try:
-        print(f'Reading subject # {subjectID}')
-                    
-        epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
+    print(f'Reading subject # {subjectID}')
+                
+    epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
+    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
-         # Read sensor pairs and calculate lateralisation for each
-        for i in range(0, len(sensor_pairs_to_plot)):
-             print(f'plotting {sensor_pairs_to_plot[i]}')
+        # Read sensor pairs and calculate lateralisation for each
+    for i in range(0, len(sensor_pairs_to_plot)):
+            print(f'plotting {sensor_pairs_to_plot[i]}')
 
-             working_pair = sensor_pairs_to_plot[i]
+            working_pair = sensor_pairs_to_plot[i]
 
-             psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
-                                                                                        working_pair[1], 
-                                                                                        working_pair[0],
-                                                                                        output_dir,
-                                                                                        subjectID)     
-             spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, 
-                                                                           psd_left_sensor)
-             
-             # Plot spectrum lateralisation of these sensors vs. frequency
-             fig, ax = plt.subplots(figsize=(7, 5))
-             ax.plot(freqs, spectrum_lat_sensor_pairs)
-             ax.set(title=f"lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
-             xlabel="Frequency (Hz)",
-             ylabel="Lateralisation Index",
-             )
+            psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
+                                                                                    working_pair[1], 
+                                                                                    working_pair[0],
+                                                                                    output_dir,
+                                                                                    subjectID) 
+        
+            spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, 
+                                                                        psd_left_sensor)
+            
+            # Plot spectrum lateralisation of these sensors vs. frequency
+            fig, ax = plt.subplots(figsize=(7, 5))
+            ax.plot(freqs, spectrum_lat_sensor_pairs)
+            ax.set(title=f"lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            xlabel="Frequency (Hz)",
+            ylabel="Lateralisation Index",
+            )
 
-             fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_lateralisation_spectra.png'))
-             plt.close()
-
-    except:
-        print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
-        pass
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_lateralisation_spectra.png'))
+            plt.close()
