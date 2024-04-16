@@ -58,15 +58,23 @@ def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     freqs = [float(freq) for freq in freqs]  # convert strings to floats
     return working_df, freqs
 
-def pearson_calculator(working_df, freq, substr, ls_corrs_all_freqs, ls_pvals_all_freqs):
+def pearson_spearman_calculator(working_df, freq, substr, 
+                                pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs,
+                                spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs):
     """This definition takes working df, reads lateralised value of one freq and one substr and calculates
-    pearson correlation for all subjects"""
+    pearson correlation as well as spearman for all subjects"""
 
     print(f'Calculating pearson correlation for {freq} and {substr}')
-    temp_corr, temp_pvalue = stats.pearsonr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
-    ls_corrs_all_freqs.append(temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
-    ls_pvals_all_freqs.append(temp_pvalue)
-    return ls_corrs_all_freqs, ls_pvals_all_freqs
+    pear_temp_corr, pear_temp_pvalue = stats.pearsonr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
+    pear_ls_corrs_all_freqs.append(pear_temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
+    pear_ls_pvals_all_freqs.append(pear_temp_pvalue)
+
+    print(f'Calculating spearman correlation for {freq} and {substr}')
+    spear_temp_corr, spear_temp_pvalue = stats.spearmanr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
+    spear_ls_corrs_all_freqs.append(spear_temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
+    spear_ls_pvals_all_freqs.append(spear_temp_pvalue)
+
+    return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -77,7 +85,7 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_logarithm')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
@@ -105,7 +113,7 @@ for i, row in sensors_layout_names_df.iterrows():
                                     row["right_sensors"][0:8], 
                                     substr_lat_df)
     
-    output_corr_dir = op.join(deriv_dir, 'correlations', 'sensor_pairs_1103_final',
+    output_corr_dir = op.join(deriv_dir, 'correlations', 'sensor_pairs_log',
                                f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
     if not op.exists(output_corr_dir):
         os.makedirs(output_corr_dir)
@@ -128,11 +136,12 @@ for i, row in sensors_layout_names_df.iterrows():
         # Calculate correlation with each freq 
         for freq in freqs:
             print(f'Calculating correlations for {freq} Hz')
-            ls_corrs_all_freqs, ls_pvals_all_freqs = pearson_calculator(working_df, 
-                                                                        freq, 
-                                                                        substr, 
-                                                                        ls_corrs_all_freqs, 
-                                                                        ls_pvals_all_freqs)
+            _, _, ls_corrs_all_freqs, ls_pvals_all_freqs = pearson_spearman_calculator(working_df,  # first two vars are pearson, second two are spearman 
+                                                                                        freq, 
+                                                                                        substr, 
+                                                                                        spear_ls_corrs_all_freqs=ls_corrs_all_freqs, 
+                                                                                        spear_ls_pvals_all_freqs=ls_pvals_all_freqs
+                                                                                        )
 
         # Save correlation values of each sensor pair and each substr with all freqs separately
         substr_spec_corr_all_freqs_df = pd.DataFrame(ls_corrs_all_freqs, index=freqs)

@@ -97,11 +97,13 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs')
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_logarithm')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+
+sanity_check = False  # do you want to plot sanity check figures?
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
@@ -110,7 +112,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.head(12).index):
+for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -129,10 +131,10 @@ for i, subjectID in enumerate(good_subject_pd.head(12).index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             spectrum_lat_sensor_pairs1 = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
-             # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs.reshape(-1,1)
+             # Reshape the array to have shape (119 (#freqs), 1) for stacking
+             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs1.reshape(-1,1)
              # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
              stacked_sensors.append(spectrum_lat_sensor_pairs)
 
@@ -155,44 +157,49 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     df_name = f"{sensors_layout_names_df.iloc[idx, 0]}_{sensors_layout_names_df.iloc[idx, 1]}"
     sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
     # Save the dataframe as a CSV file
-    #sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
+    sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
 
 # Plot lateralisation indices for sanity check
-to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
+if sanity_check:
 
-for i in range(spec_lateralisation_all_sens.shape[0]):
-    participant_data = spec_lateralisation_all_sens_all_subs[i]  # Data for current participant
-    sub = sub_IDs[i]
+    to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
 
-    # Plot data for each sensor (dimension 2)
-    for j in range(participant_data.shape[1]):
-        plt.plot(freqs, participant_data[:, j])
+    for i in range(spec_lateralisation_all_sens.shape[0]):
+        participant_data = spec_lateralisation_all_sens_all_subs[i]  # data for current participant
+        sub = sub_IDs[i]
 
-    plt.title(f'Participant {sub}')
-    plt.xlabel('Frequency')
-    plt.ylabel('Spec log lateralisation')
-    plt.savefig(op.join(to_test_output_dir, f'sub_{sub}_log_lat_psd.png'))
-    plt.show()
+        # Plot data for each sensor (dimension 2)
+        for j in range(participant_data.shape[1]):
+            #plt.figure()  # only added for checking sensor pairs separately
+            plt.plot(freqs, participant_data[:, j])
+            #plt.savefig(op.join(to_test_output_dir, f'sensor_{j}_log_lat_one_sensor_psd.png'))  # only added for checking sensor pairs separately
+            #plt.close()  # only added for checking sensor pairs separately
 
-# Sanity check with plot_topos
-to_tests = np.arange(0,6)
+        plt.title(f'Participant {sub}')
+        plt.xlabel('Frequency')
+        plt.ylabel('Spec log lateralisation')
+        plt.savefig(op.join(to_test_output_dir, f'sub_{sub}_log_unnorm_lat_psd.png'))
+        plt.close()
 
-for _ in to_tests:
-    random_index = np.random.randint(0, len(good_subject_pd))
-    # Get the subject ID at the random index
-    subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
-    epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
-    epoched_fif = op.join(epoched_dir, epoched_fname)
-    epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=100)   
+    # Sanity check with plot_topos
+    to_tests = np.arange(0,6)
 
-    # Plot the EpochSpectrum
-    # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
-    # plt.title(f'Sub_{subjectID}', y=0.9)
-    # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
+    for _ in to_tests:
+        random_index = np.random.randint(0, len(good_subject_pd))
+        # Get the subject ID at the random index
+        subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
+        epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+        epoched_fif = op.join(epoched_dir, epoched_fname)
+        epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
+        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=100)   
 
-    # Plot a couple sensors
-    fig_sens = epochspectrum.plot()
-    plt.title(f'sub_{subjectID}')
-    fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
+        # Plot the EpochSpectrum
+        fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
+        plt.title(f'Sub_{subjectID}', y=0.9)
+        fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
+
+        # Plot a couple sensors
+        fig_sens = epochspectrum.plot()
+        plt.title(f'sub_{subjectID}')
+        fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
 

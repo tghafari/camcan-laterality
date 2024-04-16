@@ -116,7 +116,7 @@ for substr in substrs:
         
         # Put all correlations of sensor pairs in one df to create evoekd object for evoked_plot_topo
         # Concatenate correlation values along columns
-        correlation_df = pd.concat([correlation_df, pearsonr_freq_substr_df],axis=1)
+        correlation_df = pd.concat([correlation_df, pearsonr_freq_substr_df], axis=1)
 
     # Rename columns with sensor pair names
     all_right_names = [f'{row["right_sensors"][0:8]}' for _, row in sensors_layout_names_df.iterrows()]
