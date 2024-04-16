@@ -1,6 +1,6 @@
 """
 ====================================
-C04_correlation_frequency_topo_plot:
+CS04_correlation_frequency_topo_plot:
     this script:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
@@ -27,7 +27,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'bluebear'
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -40,8 +40,8 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_1103_final')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_log')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_log')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -64,9 +64,9 @@ for substr in substrs:
         print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
 
         pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
-                                f'{substr}', f'{substr}_lat_spectra_substr_pearsonr.csv')
+                                f'{substr}', f'{substr}_lat_spectra_substr_spearmanr.csv')
         pval_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
-                                f'{substr}', f'{substr}_lat_spectra_substr_pvals.csv')
+                                f'{substr}', f'{substr}_lat_spectra_substr_spearman_pvals.csv')
         pearsonr_freq_substr_df = pd.read_csv(pearsonr_fname)
         pearsonr_freq_substr_df = pearsonr_freq_substr_df.set_index('Unnamed: 0')  # set freqs as the index
         pearsonr_freq_substr_df.index.names = ['freqs']
@@ -124,10 +124,10 @@ for substr in substrs:
 
     # Create an EvokedArray object from the DataFrame
     rightraw = raw.copy().pick(all_right_names)
-    evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'pearsonr')
+    evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'spearmanr')
 
     # Plot the correlation values with similar format as plot_topo
-    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results', f'{substr}.png'))
+    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/logs', f'{substr}.png'))
     evoked_fig = evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
     evoked_fig.savefig(evoked_fig_output_fname)
 

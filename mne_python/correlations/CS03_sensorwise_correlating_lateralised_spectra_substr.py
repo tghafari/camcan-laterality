@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ====================================
-C03a_sensorwise_correlating_lateralised_spectra_substr:
+CS03_sensorwise_correlating_lateralised_spectra_substr:
     this script is in use:
     1. reads lateralised indices of one 
     pair of sensors (one csv file)
@@ -36,8 +36,6 @@ import os.path as op
 import os
 import scipy.stats as stats
 
-platform = 'bluebear'
-
 def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     """This definition merges the dataframes containing spectrum lateralisation values and 
     substr lateralisation values together"""
@@ -64,17 +62,24 @@ def pearson_spearman_calculator(working_df, freq, substr,
     """This definition takes working df, reads lateralised value of one freq and one substr and calculates
     pearson correlation as well as spearman for all subjects"""
 
-    print(f'Calculating pearson correlation for {freq} and {substr}')
+    if pear_ls_corrs_all_freqs and pear_ls_pvals_all_freqs:
+        print(f'Calculating pearson correlation for {freq} and {substr}')
+    elif spear_ls_corrs_all_freqs and spear_ls_pvals_all_freqs:
+        print(f'Calculating spearman correlation for {freq} and {substr}')
+
+    #print(f'Calculating pearson correlation for {freq} and {substr}')
     pear_temp_corr, pear_temp_pvalue = stats.pearsonr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
     pear_ls_corrs_all_freqs.append(pear_temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
     pear_ls_pvals_all_freqs.append(pear_temp_pvalue)
 
-    print(f'Calculating spearman correlation for {freq} and {substr}')
+    #print(f'Calculating spearman correlation for {freq} and {substr}')
     spear_temp_corr, spear_temp_pvalue = stats.spearmanr(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy()) 
     spear_ls_corrs_all_freqs.append(spear_temp_corr)  # try to append horizontally- all subs in one freq and one substr = 1 corr and 1 p-value
     spear_ls_pvals_all_freqs.append(spear_temp_pvalue)
 
     return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
+
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -139,15 +144,16 @@ for i, row in sensors_layout_names_df.iterrows():
             _, _, ls_corrs_all_freqs, ls_pvals_all_freqs = pearson_spearman_calculator(working_df,  # first two vars are pearson, second two are spearman 
                                                                                         freq, 
                                                                                         substr, 
-                                                                                        spear_ls_corrs_all_freqs=ls_corrs_all_freqs, 
-                                                                                        spear_ls_pvals_all_freqs=ls_pvals_all_freqs
+                                                                                        [],[],  # discard pearson
+                                                                                        ls_corrs_all_freqs, 
+                                                                                        ls_pvals_all_freqs
                                                                                         )
 
         # Save correlation values of each sensor pair and each substr with all freqs separately
         substr_spec_corr_all_freqs_df = pd.DataFrame(ls_corrs_all_freqs, index=freqs)
-        substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_pearsonr.csv'))
+        substr_spec_corr_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_spearmanr.csv'))
         substr_spec_pval_all_freqs_df = pd.DataFrame(ls_pvals_all_freqs, index=freqs)
-        substr_spec_pval_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_pvals.csv'))
+        substr_spec_pval_all_freqs_df.to_csv(op.join(output_corr_substr_dir, f'{substr}_lat_spectra_substr_spearman_pvals.csv'))
     
         # Freshen the variables for the next substr
         del substr_spec_corr_all_freqs_df
