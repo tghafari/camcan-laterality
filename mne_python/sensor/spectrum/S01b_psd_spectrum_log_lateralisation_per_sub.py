@@ -35,7 +35,7 @@ import sys
 import matplotlib.pyplot as plt
 import math
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
 
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -83,7 +83,7 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     multiplication = (psd_right_sensor*psd_left_sensor)
     log_lat_sensor_pairs = np.log(division/multiplication)
 
-    return log_lat_sensor_pairs
+    return division
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -131,10 +131,10 @@ for i, subjectID in enumerate(good_subject_pd.index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             spectrum_lat_sensor_pairs1 = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
              # Reshape the array to have shape (119 (#freqs), 1) for stacking
-             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs1.reshape(-1,1)
+             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs.reshape(-1,1)
              # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
              stacked_sensors.append(spectrum_lat_sensor_pairs)
 

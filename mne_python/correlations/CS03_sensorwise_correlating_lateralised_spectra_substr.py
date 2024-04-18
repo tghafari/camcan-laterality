@@ -79,7 +79,7 @@ def pearson_spearman_calculator(working_df, freq, substr,
 
     return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
 
-platform = 'mac'
+platform = 'bluebear'
 
 # Define where to read and write the data
 if platform == 'bluebear':

@@ -1,7 +1,7 @@
 
 """
 ===============================================
-CS06_left_right_spectra_per_sub
+S02_left_right_spectra_per_sub
 
 the aim of this code is to plot the spectra for 
 a few participants that were selected from 
@@ -34,7 +34,7 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'mac'
+platform = 'bluebear'
 
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -115,7 +115,9 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     sum_element = psd_right_sensor + psd_left_sensor
     spectrum_lat_sensor_pairs = subtraction / sum_element
 
-    return spectrum_lat_sensor_pairs
+    log_division = np.log(psd_right_sensor/psd_left_sensor)
+    
+    return spectrum_lat_sensor_pairs, log_division
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -156,16 +158,27 @@ for subjectID in subjectIDs_to_plot:
                                                                                     output_dir,
                                                                                     subjectID) 
         
-            spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, 
+            spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, 
                                                                         psd_left_sensor)
             
             # Plot spectrum lateralisation of these sensors vs. frequency
             fig, ax = plt.subplots(figsize=(7, 5))
             ax.plot(freqs, spectrum_lat_sensor_pairs)
-            ax.set(title=f"lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            ax.set(title=f"old lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index",
             )
 
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_lateralisation_spectra.png'))
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_old_lateralisation_spectra.png'))
+            plt.close()
+            
+            # Plot spectrum log lateralisation of these sensors vs. frequency
+            fig, ax = plt.subplots(figsize=(7, 5))
+            ax.plot(freqs, log_lateralisation)
+            ax.set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            xlabel="Frequency (Hz)",
+            ylabel="Lateralisation Index",
+            )
+
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_log_lateralisation_spectra.png'))
             plt.close()
