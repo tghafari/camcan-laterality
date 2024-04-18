@@ -80,10 +80,11 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
 
     # Perform element-wise subtraction and division
     division = (psd_right_sensor/psd_left_sensor)
+    log_division = np.log(division)
     multiplication = (psd_right_sensor*psd_left_sensor)
     log_lat_sensor_pairs = np.log(division/multiplication)
 
-    return division
+    return log_division
 
 # Define where to read and write the data
 if platform == 'bluebear':
