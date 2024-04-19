@@ -80,28 +80,31 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, ou
     fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_epochspectrum.png'))
     plt.close()
 
+    # Squeeze for easier calculations later
+    psd_right_sensor_squeeze = psd_right_sensor.squeeze()  # squeezable as there's only one sensor and one epoch
+    psd_left_sensor_squeeze = psd_left_sensor.squeeze()
     # Plot PSDs with no log transform
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    axes[0,1].plot(freqs, psd_right_sensor.squeeze())
+    axes[0,1].plot(freqs, psd_right_sensor_squeeze)
     axes[0,1].set_title(f'Right sensor {right_sensor}')
     axes[0,1].set(title=f"{subjectID} in {right_sensor}",
             xlabel="Frequency (Hz)",
             ylabel="Power",
             )
-    axes[1,1].plot(freqs, np.log(psd_right_sensor.squeeze()), color='darkorange')
+    axes[1,1].plot(freqs, np.log(psd_right_sensor_squeeze), color='darkorange')
     axes[1,1].set_title(f'Log-Right sensor {right_sensor}')
     axes[1,1].set(title=f"{subjectID} in {right_sensor}",
             xlabel="Frequency (Hz)",
             ylabel="log Power",
             )
 
-    axes[0,0].plot(freqs, psd_left_sensor.squeeze())
+    axes[0,0].plot(freqs, psd_left_sensor_squeeze)
     axes[0,0].set_title(f'Left sensor {left_sensor}')
     axes[0,0].set(title=f"{subjectID} in {left_sensor}",
             xlabel="Frequency (Hz)",
             ylabel="Power",
             )
-    axes[1,0].plot(freqs, np.log(psd_left_sensor.squeeze()), color='darkorange')
+    axes[1,0].plot(freqs, np.log(psd_left_sensor_squeeze), color='darkorange')
     axes[1,0].set_title(f'Log-Left sensor {left_sensor}')
     axes[1,0].set(title=f"{subjectID} in {left_sensor}",
             xlabel="Frequency (Hz)",
@@ -113,23 +116,20 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, ou
     fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_get_data_log.png'))
     plt.close()    
 
-    return psd_right_sensor, psd_left_sensor, freqs
+    return psd_right_sensor_squeeze, psd_left_sensor_squeeze, freqs
 
 
 def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     """ calculates lateralisation index for each pair of sensors."""
-
-    psd_right_sensor = psd_right_sensor.squeeze()  # squeezable as there's only one sensor and one epoch
-    psd_left_sensor = psd_left_sensor.squeeze()
 
     # Perform element-wise subtraction and division
     subtraction = psd_right_sensor - psd_left_sensor
     sum_element = psd_right_sensor + psd_left_sensor
     spectrum_lat_sensor_pairs = subtraction / sum_element
 
-    log_division = np.log(psd_right_sensor/psd_left_sensor)/np.log(psd_right_sensor*psd_left_sensor)
+    log_lateralisation = np.log(psd_right_sensor/psd_left_sensor)
     
-    return spectrum_lat_sensor_pairs, log_division
+    return spectrum_lat_sensor_pairs, log_lateralisation
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -143,8 +143,8 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
 
 # Preallocate lists
-subjectIDs_to_plot = [321506, 620935, 721704]  # manually add subjects to plot
-sensor_pairs_to_plot = [['MEG0422', 'MEG1112'],['MEG0233','MEG1343']]  # first is left sensor, second is right sensor in each pair
+subjectIDs_to_plot = [620935, 321506, 620935, 721704]  # manually add subjects to plot
+sensor_pairs_to_plot = [['MEG0233','MEG1343'], ['MEG0422', 'MEG1112']]  # first is left sensor, second is right sensor in each pair
 
 
 for subjectID in subjectIDs_to_plot:
@@ -156,7 +156,7 @@ for subjectID in subjectIDs_to_plot:
     print(f'Reading subject # {subjectID}')
                 
     epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
+    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
         # Read sensor pairs and calculate lateralisation for each
     for i in range(0, len(sensor_pairs_to_plot)):

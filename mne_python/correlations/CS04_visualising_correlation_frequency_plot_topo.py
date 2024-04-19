@@ -27,7 +27,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'bluebear'
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':

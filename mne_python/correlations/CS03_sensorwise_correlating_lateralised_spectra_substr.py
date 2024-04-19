@@ -36,6 +36,8 @@ import os.path as op
 import os
 import scipy.stats as stats
 
+platform = 'bluebear'
+
 def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     """This definition merges the dataframes containing spectrum lateralisation values and 
     substr lateralisation values together"""
@@ -78,8 +80,6 @@ def pearson_spearman_calculator(working_df, freq, substr,
     spear_ls_pvals_all_freqs.append(spear_temp_pvalue)
 
     return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
-
-platform = 'bluebear'
 
 # Define where to read and write the data
 if platform == 'bluebear':
