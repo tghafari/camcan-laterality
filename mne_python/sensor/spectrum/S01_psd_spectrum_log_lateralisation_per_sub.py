@@ -159,11 +159,9 @@ for i, subjectID in enumerate(good_subject_pd.head(4).index):
                 bias_removed_log_lat = remove_noise_bias(spectrum_lat_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
                 # Reshape the array to have shape (239 (#freqs), 1) for stacking
-                spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs.reshape(-1,1)  #temp
-                #bias_removed_log_lat = bias_removed_log_lat.reshape(-1,1)
+                bias_removed_log_lat = bias_removed_log_lat.reshape(-1,1)
                 # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-                stacked_sensors.append(spectrum_lat_sensor_pairs)  #temp
-                #stacked_sensors.append(bias_removed_log_lat)
+                stacked_sensors.append(bias_removed_log_lat)
 
         # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
         spec_lateralisation_all_sens = np.hstack(stacked_sensors)
