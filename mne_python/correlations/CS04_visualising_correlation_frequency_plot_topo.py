@@ -40,8 +40,8 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_log')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_log')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_log_nosie')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_log_noise')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -89,7 +89,7 @@ for substr in substrs:
         # Plot correlation values
         plt.figure(figsize=(10, 6))
         plt.plot(freq_substr, corr_val_substr, marker='o', color='lightgrey', label='Correlation Values', zorder=1)
-        plt.plot(freq_substr, poly_line, linewidth=2, color='darkgrey', label='Polynomial Line (degree=4)', zorder=2)
+        #plt.plot(freq_substr, poly_line, linewidth=2, color='darkgrey', label='Polynomial Line (degree=4)', zorder=2)
         plt.legend()
         
         
@@ -127,7 +127,7 @@ for substr in substrs:
     evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'spearmanr')
 
     # Plot the correlation values with similar format as plot_topo
-    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/logs', f'{substr}.png'))
+    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/log_noise', f'{substr}.png'))
     evoked_fig = evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
     evoked_fig.savefig(evoked_fig_output_fname)
 
