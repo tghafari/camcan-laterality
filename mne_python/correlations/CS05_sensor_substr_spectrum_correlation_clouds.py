@@ -88,14 +88,14 @@ substrs = ['Thal', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 random_selection = False  # do you want to plot only a subgroup of participants?
 random_subject_num = 20  # if random_selection == True, how many participants you want in the subgroup?
 
-for i, row in sensors_layout_names_df.iterrows():
+for i, row in sensors_layout_names_df.tail(76).iterrows():
     print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
 
     # Get the frequencies of spectrum (only once enough)
     _, freqs = working_df_maker(spectra_dir, 
                                 row["left_sensors"][0:8], 
                                 row["right_sensors"][0:8], 
-                                substr_lat_df) if i == 0 else (None, freqs)
+                                substr_lat_df) if i == 77 else (None, freqs)
 
     # Make the working df containing lateralised value of the current sensor pair
     working_df, _ = working_df_maker(spectra_dir,  # shape: #subject by #freqs + #substr + 1(for subject_ID column) = 560 * 481
