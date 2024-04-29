@@ -49,7 +49,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
       section a Hamming taper is multiplied.
       n_fft=500, fmin=1, fmax=120"""
     
-   # define constant parameters
+    # define constant parameters
     welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
 
     # calculate power spectrum for right and left sensors separately
@@ -83,9 +83,7 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     # Perform element-wise subtraction and division
     division = (psd_right_sensor/psd_left_sensor)
     spectrum_lat_sensor_pairs = np.log(division)
-    multiplication = (psd_right_sensor*psd_left_sensor)
-    log_lat_sensor_pairs = np.log(division/multiplication)
-
+ 
     return spectrum_lat_sensor_pairs
 
 def remove_noise_bias(spectrum_lat_sensor_pairs, freqs, h_fmin, h_fmax):
