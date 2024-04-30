@@ -173,28 +173,24 @@ for subjectID in subjectIDs_to_plot:
                                                                                                             psd_left_sensor)
             # Plot spectrum subtraction of these sensors vs. frequency
             fig, axes = plt.subplots(3, 1, figsize=(20, 10))
-            axes[0,0].plot(freqs, spectrum_lat_sensor_pairs)
-            axes[0,0].set(title=f"subsum lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            axes[0].plot(freqs, spectrum_lat_sensor_pairs)
+            axes[0].set(title=f"subsum lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subsum)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_subsum_lateralisation_spectra.png'))
-            plt.close()
 
             # Plot spectrum lateralisation of these sensors vs. frequency
-            axes[0,1].plot(freqs, subtraction, color='firebrick')
-            axes[0,1].set(title=f"subtraction lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            axes[1].plot(freqs, subtraction, color='firebrick')
+            axes[1].set(title=f"subtraction lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subtraction)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_subtraction_lateralisation_spectra.png'))
-            plt.close()
             
             # Plot spectrum log lateralisation of these sensors vs. frequency
-            axes[0,2].plot(freqs, log_lateralisation, color='darkorange')
-            axes[0,2].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            axes[2].plot(freqs, log_lateralisation, color='darkorange')
+            axes[2].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (log)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_log_lateralisation_spectra.png'))
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_three_lateralisation_spectra.png'))
             plt.close()
