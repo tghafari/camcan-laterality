@@ -2,7 +2,7 @@
 """
 ===============================================
 CS03. Sensor pair lateralisation index vs substr
-laterlisation
+laterlisation (cloud plots)
 
 the aim of this code is to plot lateralised power
 of each sensor pair vs lateralised index of each 
