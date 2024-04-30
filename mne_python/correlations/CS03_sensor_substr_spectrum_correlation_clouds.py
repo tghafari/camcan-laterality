@@ -1,7 +1,7 @@
 
 """
 ===============================================
-CS05. Sensor pair lateralisation index vs substr
+CS03. Sensor pair lateralisation index vs substr
 laterlisation
 
 the aim of this code is to plot lateralised power

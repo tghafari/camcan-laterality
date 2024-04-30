@@ -34,8 +34,8 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
-
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
+test_plot = False  # do you want sanity check plots?
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     """
@@ -44,7 +44,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
       (250 samples). This results in a 0.5 Hz 
       resolution Prior to calculating the FFT of each 
       section a Hamming taper is multiplied.
-      n_fft=500, fmin=1, fmax=60"""
+      n_fft=500, fmin=1, fmax=120"""
     
    # define constant parameters
     welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
@@ -82,7 +82,7 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     sum_element = psd_right_sensor + psd_left_sensor
     spectrum_lat_sensor_pairs = subtraction / sum_element
 
-    return spectrum_lat_sensor_pairs
+    return subtraction, spectrum_lat_sensor_pairs
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -96,7 +96,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs')
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
@@ -109,7 +109,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.head(2).index):
+for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -119,7 +119,7 @@ for i, subjectID in enumerate(good_subject_pd.head(2).index):
         print(f'Reading subject # {i}')
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=60)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
+        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
@@ -128,12 +128,12 @@ for i, subjectID in enumerate(good_subject_pd.head(2).index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             spectrum_lat_sensor_pairs = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             subtraction, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
              # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             spectrum_lat_sensor_pairs = spectrum_lat_sensor_pairs.reshape(-1,1)
+             subtraction = subtraction.reshape(-1,1)
              # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-             stacked_sensors.append(spectrum_lat_sensor_pairs)
+             stacked_sensors.append(subtraction)
 
         # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
         spec_lateralisation_all_sens = np.hstack(stacked_sensors)
@@ -154,30 +154,30 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     df_name = f"{sensors_layout_names_df.iloc[idx, 0]}_{sensors_layout_names_df.iloc[idx, 1]}"
     sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
     # Save the dataframe as a CSV file
-    #sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
+    sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
 
+if test_plot:
 
+    # Sanity check with plot_topos
+    to_tests = np.arange(0,6)
+    to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos')
 
-# Sanity check with plot_topos
-to_tests = np.arange(0,6)
-to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos')
+    for _ in to_tests:
+        random_index = np.random.randint(0, len(good_subject_pd))
+        # Get the subject ID at the random index
+        subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
+        epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+        epoched_fif = op.join(epoched_dir, epoched_fname)
+        epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
+        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=100)   
 
-for _ in to_tests:
-    random_index = np.random.randint(0, len(good_subject_pd))
-    # Get the subject ID at the random index
-    subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
-    epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
-    epoched_fif = op.join(epoched_dir, epoched_fname)
-    epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=100)   
+        # Plot the EpochSpectrum
+        # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
+        # plt.title(f'Sub_{subjectID}', y=0.9)
+        # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
 
-    # Plot the EpochSpectrum
-    # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
-    # plt.title(f'Sub_{subjectID}', y=0.9)
-    # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
-
-    # Plot a couple sensors
-    fig_sens = epochspectrum.plot()
-    plt.title(f'sub_{subjectID}')
-    fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
+        # Plot a couple sensors
+        fig_sens = epochspectrum.plot()
+        plt.title(f'sub_{subjectID}')
+        fig_sens.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_psd.png'))
 

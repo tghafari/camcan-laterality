@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================
-S01. Spectrum log lateralisation
+S01a. Spectrum log lateralisation
 
 This code will:
     1. calculate the psd for all frequencies

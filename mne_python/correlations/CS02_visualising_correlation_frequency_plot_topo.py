@@ -1,6 +1,6 @@
 """
 ====================================
-CS04_correlation_frequency_topo_plot:
+CS02_correlation_frequency_topo_plot:
     this script:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
@@ -40,8 +40,8 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_log_nosie')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_log_noise')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -54,7 +54,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 # Create a placeholder for correlation values of all sensor pairs
-freqs = np.arange(1,60.5,0.5)
+freqs = np.arange(1, 120.5, 0.5)
 
 for substr in substrs:
     print(f'working on {substr}')
@@ -63,7 +63,7 @@ for substr in substrs:
     for _, row in sensors_layout_names_df.iterrows():
         print(f'working on pair {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
 
-        pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
+        pearsonr_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}',   # this can also be spearmanr (spearman is most up to date)
                                 f'{substr}', f'{substr}_lat_spectra_substr_spearmanr.csv')
         pval_fname = op.join(corr_dir, f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}', 
                                 f'{substr}', f'{substr}_lat_spectra_substr_spearman_pvals.csv')
@@ -127,7 +127,7 @@ for substr in substrs:
     evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'spearmanr')
 
     # Plot the correlation values with similar format as plot_topo
-    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/log_noise', f'{substr}.png'))
+    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/subtraction', f'{substr}.png'))
     evoked_fig = evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
     evoked_fig.savefig(evoked_fig_output_fname)
 
