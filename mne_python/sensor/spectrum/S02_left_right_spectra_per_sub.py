@@ -59,7 +59,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
     return epochspectrum
 
-def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, output_dir, subjectID):
+def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
         from epochspectrum (output of previous function).
         the shape of psd is (1, 1, 119) = #epochs, #sensors, #freqs
@@ -68,53 +68,21 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor, ou
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    epochspectrum.copy().pick(picks=right_sensor).plot(axes=axes[1])
-    axes[1].set_title(f'Right sensor {right_sensor}')
+    #fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    #epochspectrum.copy().pick(picks=right_sensor).plot(axes=axes[1])
+    #axes[1].set_title(f'Right sensor {right_sensor}')
 
-    epochspectrum.copy().pick(picks=left_sensor).plot(axes=axes[0])
-    axes[0].set_title(f'Left sensor {left_sensor}')
+    #epochspectrum.copy().pick(picks=left_sensor).plot(axes=axes[0])
+    #axes[0].set_title(f'Left sensor {left_sensor}')
 
-    fig.suptitle(f'Single sensor spectra for {subjectID}')
-    plt.tight_layout()
-    fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_epochspectrum.png'))
-    plt.close()
+    #fig.suptitle(f'Single sensor spectra from epochspectra.plot() for {subjectID}')
+    #plt.tight_layout()
+    #fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_epochspectrum.png'))
+    #plt.close()
 
     # Squeeze for easier calculations later
     psd_right_sensor_squeeze = psd_right_sensor.squeeze()  # squeezable as there's only one sensor and one epoch
     psd_left_sensor_squeeze = psd_left_sensor.squeeze()
-    # Plot PSDs with no log transform
-    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-    axes[0,1].plot(freqs, psd_right_sensor_squeeze)
-    axes[0,1].set_title(f'Right sensor {right_sensor}')
-    axes[0,1].set(title=f"{subjectID} in {right_sensor}",
-            xlabel="Frequency (Hz)",
-            ylabel="Power",
-            )
-    axes[1,1].plot(freqs, np.log(psd_right_sensor_squeeze), color='darkorange')
-    axes[1,1].set_title(f'Log-Right sensor {right_sensor}')
-    axes[1,1].set(title=f"{subjectID} in {right_sensor}",
-            xlabel="Frequency (Hz)",
-            ylabel="log Power",
-            )
-
-    axes[0,0].plot(freqs, psd_left_sensor_squeeze)
-    axes[0,0].set_title(f'Left sensor {left_sensor}')
-    axes[0,0].set(title=f"{subjectID} in {left_sensor}",
-            xlabel="Frequency (Hz)",
-            ylabel="Power",
-            )
-    axes[1,0].plot(freqs, np.log(psd_left_sensor_squeeze), color='darkorange')
-    axes[1,0].set_title(f'Log-Left sensor {left_sensor}')
-    axes[1,0].set(title=f"{subjectID} in {left_sensor}",
-            xlabel="Frequency (Hz)",
-            ylabel="log Power",
-            )
-
-    fig.suptitle(f'Single sensor spectra for {subjectID}')
-    plt.tight_layout()
-    fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_get_data_log.png'))
-    plt.close()    
 
     return psd_right_sensor_squeeze, psd_left_sensor_squeeze, freqs
 
@@ -129,7 +97,7 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
 
     log_lateralisation = np.log(psd_right_sensor/psd_left_sensor)
     
-    return spectrum_lat_sensor_pairs, log_lateralisation
+    return subtraction, spectrum_lat_sensor_pairs, log_lateralisation
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -140,10 +108,10 @@ elif platform == 'mac':
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
 
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
+output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/sanity-checks')
 
 # Preallocate lists
-subjectIDs_to_plot = [620935, 321506, 620935, 721704]  # manually add subjects to plot
+subjectIDs_to_plot = [620935, 321506] #, 620935, 721704]  # manually add subjects to plot
 sensor_pairs_to_plot = [['MEG0233','MEG1343'], ['MEG0422', 'MEG1112']]  # first is left sensor, second is right sensor in each pair
 
 
@@ -165,30 +133,68 @@ for subjectID in subjectIDs_to_plot:
             working_pair = sensor_pairs_to_plot[i]
 
             psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
-                                                                                    working_pair[1], 
-                                                                                    working_pair[0],
-                                                                                    output_dir,
-                                                                                    subjectID) 
-        
-            spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, 
-                                                                                              psd_left_sensor)
-            
-            # Plot spectrum lateralisation of these sensors vs. frequency
-            fig, ax = plt.subplots(figsize=(7, 5))
-            ax.plot(freqs, spectrum_lat_sensor_pairs)
-            ax.set(title=f"old lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+                                                                                      working_pair[1], 
+                                                                                      working_pair[0],
+                                                                                      ) 
+            # Plot PSDs 
+            fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+            axes[0,1].plot(freqs, psd_right_sensor)
+            axes[0,1].set_title(f'Right sensor {working_pair[1]}')
+            axes[0,1].set(title=f"{subjectID} in {working_pair[1]}",
+                    xlabel="Frequency (Hz)",
+                    ylabel="Power",
+                    )
+            axes[1,1].plot(freqs, np.log(psd_right_sensor), color='darkorange')
+            axes[1,1].set_title(f'Log-Right sensor {working_pair[1]}')
+            axes[1,1].set(title=f"{subjectID} in {working_pair[1]}",
+                    xlabel="Frequency (Hz)",
+                    ylabel="log Power",
+                    )
+            # Plot PSDs with log transform
+            axes[0,0].plot(freqs, psd_left_sensor)
+            axes[0,0].set_title(f'Left sensor {working_pair[0]}')
+            axes[0,0].set(title=f"{subjectID} in {working_pair[0]}",
+                    xlabel="Frequency (Hz)",
+                    ylabel="Power",
+                    )
+            axes[1,0].plot(freqs, np.log(psd_left_sensor), color='darkorange')
+            axes[1,0].set_title(f'Log-Left sensor {working_pair[0]}')
+            axes[1,0].set(title=f"{subjectID} in {working_pair[0]}",
+                    xlabel="Frequency (Hz)",
+                    ylabel="log Power",
+                    )
+
+            fig.suptitle(f'Single sensor spectra for {subjectID}')
+            plt.tight_layout()
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}.png'))
+            plt.close()    
+
+            subtraction, spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, 
+                                                                                                            psd_left_sensor)
+            # Plot spectrum subtraction of these sensors vs. frequency
+            fig, axes = plt.subplots(3, 1, figsize=(20, 10))
+            axes[0,0].plot(freqs, spectrum_lat_sensor_pairs)
+            axes[0,0].set(title=f"subsum lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
-            ylabel="Lateralisation Index",
+            ylabel="Lateralisation Index (subsum)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_old_lateralisation_spectra.png'))
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_subsum_lateralisation_spectra.png'))
+            plt.close()
+
+            # Plot spectrum lateralisation of these sensors vs. frequency
+            axes[0,1].plot(freqs, subtraction, color='firebrick')
+            axes[0,1].set(title=f"subtraction lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            xlabel="Frequency (Hz)",
+            ylabel="Lateralisation Index (subtraction)",
+            )
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_subtraction_lateralisation_spectra.png'))
             plt.close()
             
             # Plot spectrum log lateralisation of these sensors vs. frequency
-            fig, ax = plt.subplots(figsize=(7, 5))
-            ax.plot(freqs, log_lateralisation)
-            ax.set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            axes[0,2].plot(freqs, log_lateralisation, color='darkorange')
+            axes[0,2].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
-            ylabel="Lateralisation Index",
+            ylabel="Lateralisation Index (log)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_normlog_lateralisation_spectra.png'))
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_log_lateralisation_spectra.png'))
             plt.close()
