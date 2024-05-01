@@ -8,7 +8,8 @@ This code will:
     and all sensors for one subject
     2. pick right and corresponding left sensors 
     from the spectrum based on sensor-layout-sheet
-    3. calculate LI for all freqs 
+    3. calculate LI with three methods (subtraction, 
+    sum over sub, and log transform) for all freqs 
     4. loop over sensor pairs and append all sensor pairs
      for one subject to save and separate later
     5. loop over subjects
@@ -78,11 +79,37 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     psd_left_sensor = psd_left_sensor.squeeze()
 
     # Perform element-wise subtraction and division
-    subtraction = psd_right_sensor - psd_left_sensor
+    subtraction_sensor_pairs = psd_right_sensor - psd_left_sensor
     sum_element = psd_right_sensor + psd_left_sensor
-    spectrum_lat_sensor_pairs = subtraction / sum_element
+    sumsub_lat_sensor_pairs = subtraction / sum_element
 
-    return subtraction, spectrum_lat_sensor_pairs
+    # Log transformation
+    division = (psd_right_sensor/psd_left_sensor)
+    log_lat_sensor_pairs = np.log(division)
+
+    return subtraction_sensor_pairs, sumsub_lat_sensor_pairs, log_lat_sensor_pairs
+
+def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
+    """to eliminate noise bias in sensors, this definition 
+    calculates the average of lateralised power in high 
+    frequencies (between h_fmin=90, h_fmax=120), where we don't 
+    expect much brain signal, and then subtracts
+    that bias from the lateralisation index for each sensor pair
+    lateralised_power: output of calculate_spectrum_lateralisation
+    (works for all methods, i.e, subtraction, sumsub and log)
+    freqs: output of pick_sensor_pairs_epochspectrum
+    fmin and fmax: the high frequency section to use for nosie bias """
+    
+    print(f'Removing noise of {h_fmin} and {h_fmax} from lateralised power')
+
+    # Calculate average power in the specified frequency range
+    average_power_high_freqs = np.mean(lateralised_power[(freqs >= h_fmin) & (freqs <= h_fmax)])
+
+    # Subtract the average power from all power values 
+    bias_removed_log_lat = lateralised_power.copy()  
+    bias_removed_log_lat -= average_power_high_freqs    
+
+    return bias_removed_log_lat
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -96,7 +123,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction')
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
@@ -128,12 +155,12 @@ for i, subjectID in enumerate(good_subject_pd.index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             subtraction, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             subtraction_lat, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
              # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             subtraction = subtraction.reshape(-1,1)
+             subtraction_lat = subtraction_lat.reshape(-1,1)
              # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-             stacked_sensors.append(subtraction)
+             stacked_sensors.append(subtraction_lat)
 
         # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
         spec_lateralisation_all_sens = np.hstack(stacked_sensors)
@@ -161,6 +188,23 @@ if test_plot:
     # Sanity check with plot_topos
     to_tests = np.arange(0,6)
     to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/PSD_plot_topos')
+    
+    for i in range(np.shape(spec_lateralisation_all_sens_all_subs)[0]):
+        participant_data = spec_lateralisation_all_sens_all_subs[i]  # data for current participant
+        sub = sub_IDs[i]
+
+        # Plot data for each sensor (dimension 2)
+        for j in range(participant_data.shape[1]):
+            #plt.figure()  # only added for checking sensor pairs separately
+            plt.plot(freqs, participant_data[:, j])
+            #plt.savefig(op.join(to_test_output_dir, f'sensor_{j}_log_lat_one_sensor_psd.png'))  # only added for checking sensor pairs separately
+            #plt.close()  # only added for checking sensor pairs separately
+
+        plt.title(f'Participant {sub}')
+        plt.xlabel('Frequency')
+        plt.ylabel('Spec lateralisation')
+        plt.savefig(op.join(to_test_output_dir, f'sub_{sub}_lat_psd.png'))
+        plt.close()
 
     for _ in to_tests:
         random_index = np.random.randint(0, len(good_subject_pd))
