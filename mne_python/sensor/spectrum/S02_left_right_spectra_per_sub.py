@@ -68,18 +68,6 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
 
-    #fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    #epochspectrum.copy().pick(picks=right_sensor).plot(axes=axes[1])
-    #axes[1].set_title(f'Right sensor {right_sensor}')
-
-    #epochspectrum.copy().pick(picks=left_sensor).plot(axes=axes[0])
-    #axes[0].set_title(f'Left sensor {left_sensor}')
-
-    #fig.suptitle(f'Single sensor spectra from epochspectra.plot() for {subjectID}')
-    #plt.tight_layout()
-    #fig.savefig(op.join(output_dir, f'sub_{subjectID}_{right_sensor}_{left_sensor}_epochspectrum.png'))
-    #plt.close()
-
     # Squeeze for easier calculations later
     psd_right_sensor_squeeze = psd_right_sensor.squeeze()  # squeezable as there's only one sensor and one epoch
     psd_left_sensor_squeeze = psd_left_sensor.squeeze()
