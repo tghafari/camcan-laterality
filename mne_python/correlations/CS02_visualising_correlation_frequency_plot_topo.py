@@ -27,7 +27,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'mac'
+platform = 'bluebear'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -79,12 +79,10 @@ for substr in substrs:
         pval_substr = pval_freq_substr_df.values.flatten()
         corr_val_substr = pearsonr_freq_substr_df.values.flatten()
         
-        # Fit a quadratic polynomial (degree=2)
-        poly_fit = np.polyfit(freq_substr, corr_val_substr, 4)
-        poly_line_func = np.poly1d(poly_fit)
-
-        # Evaluate polynomial function at frequencies
-        poly_line = poly_line_func(freq_substr)
+        ## Fit a quadratic polynomial (degree=2)
+        #poly_fit = np.polyfit(freq_substr, corr_val_substr, 4)
+        #poly_line_func = np.poly1d(poly_fit)
+        #poly_line = poly_line_func(freq_substr)
 
         # Plot correlation values
         plt.figure(figsize=(10, 6))

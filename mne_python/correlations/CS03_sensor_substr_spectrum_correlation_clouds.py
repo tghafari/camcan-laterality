@@ -36,6 +36,7 @@ import os.path as op
 import os
 import scipy.stats as stats
 import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
 
 def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     """This definition merges the dataframes containing spectrum lateralisation values and 
@@ -59,6 +60,9 @@ def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     return working_df, freqs
 
 platform = 'bluebear'
+all_sensors = False  # do you want to plot all sensors?
+random_selection = False  # do you want to plot only a subgroup of participants?
+correlation_method = 'linear_regression'  # linear_regression of spearman?
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -71,31 +75,44 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_logarithm_noise_bias_removed')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-substr-freq-cloud-plots-log-noise')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-substr-freq-cloud-subtraction-regression')
 
 # Load substr file
 substr_lat_df = pd.read_csv(substr_sheet_fname)
 
-# Read sensor layout sheet
-sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
-
-substrs = ['Thal', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-#, 'Caud'
-random_selection = False  # do you want to plot only a subgroup of participants?
+sensor_pairs_to_plot = [   # first is left sensor, second is right sensor in each pair
+    ['MEG0233','MEG1343'], 
+    ['MEG0422','MEG1112']
+]#,
+#  ['MEG1933','MEG2333'],
+# ['MEG1941','MEG2321']
+#] 
 random_subject_num = 20  # if random_selection == True, how many participants you want in the subgroup?
 
-for i, row in sensors_layout_names_df.tail(76).iterrows():
+
+# Read sensor layout sheet
+if all_sensors:
+    sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
+else:
+    sensors_layout_names_df = pd.DataFrame(sensor_pairs_to_plot,
+                                           columns=['left_sensors', 'right_sensors'])  # first is left sensor, second is right sensor in each pair
+
+substrs = ['Caud']
+#['Thal', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+
+
+for i, row in sensors_layout_names_df.iterrows():
     print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
 
     # Get the frequencies of spectrum (only once enough)
     _, freqs = working_df_maker(spectra_dir, 
                                 row["left_sensors"][0:8], 
                                 row["right_sensors"][0:8], 
-                                substr_lat_df) if i == 77 else (None, freqs)
+                                substr_lat_df) if i == 0 else (None, freqs)
 
     # Make the working df containing lateralised value of the current sensor pair
     working_df, _ = working_df_maker(spectra_dir,  # shape: #subject by #freqs + #substr + 1(for subject_ID column) = 560 * 481
@@ -122,7 +139,7 @@ for i, row in sensors_layout_names_df.tail(76).iterrows():
             os.makedirs(output_cloud_substr_dir)
     
         # Calculate correlation with each freq 
-        for freq in freqs:
+        for freq in freqs[:120]:
             print(f'Plotting clouds for {freq} Hz')
 
             # Plot each point with a different color
@@ -131,18 +148,27 @@ for i, row in sensors_layout_names_df.tail(76).iterrows():
                 plt.plot(x, y, marker='o', linestyle=' ', color=colors[i], label=f'{freq}')
                 plt.text(x, y, str(working_df['subject_ID'][i]), fontsize=4, verticalalignment='bottom', horizontalalignment='right')  # add subject id next to its dot
         
-            #plt.plot(working_df[f'{freq}'].to_numpy(), working_df[substr].to_numpy(), marker='o', linestyle=' ', label=f'{freq}')
-            # Calculate the regression line
-            coeffs = np.polyfit(working_df[f'{freq}'], working_df[substr], 1)  # Linear regression
-            regression_line = np.poly1d(coeffs)
+                if correlation_method == 'linear_regression':
+                    coeffs = np.polyfit(working_df[f'{freq}'], working_df[substr], 1)  # Linear regression
+                    regression_line = np.poly1d(coeffs)
+                    
+                    x_values = np.linspace(min(working_df[f'{freq}']), max(working_df[f'{freq}']), 100)
+                    plt.plot(x_values, regression_line(x_values), color='red', label='Regression Line')
+                    
+                    # Add linear regression equation as text
+                    eq_str = f'Y = {coeffs[0]:.4f} * X + {coeffs[1]:.4f}'
+                    plt.text(0.1, 0.9, eq_str, transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
 
-            # Plot the regression line
-            x_values = np.linspace(min(working_df[f'{freq}']), max(working_df[f'{freq}']), 100)
-            plt.plot(x_values, regression_line(x_values), color='red', label='Regression Line')
+                elif correlation_method == 'spearman':  # Calculate Spearman correlation
+                    correlation, _ = spearmanr(working_df[f'{freq}'], working_df[substr])
 
-            # Add linear regression equation as text
-            eq_str = f'Y = {coeffs[0]:.2f} * X + {coeffs[1]:.2f}'
-            plt.text(0.1, 0.9, eq_str, transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+                    # Plot a line representing the Spearman correlation
+                    x_values = np.linspace(min(working_df[f'{freq}']), max(working_df[f'{freq}']), 100)
+                    y_values = correlation * x_values  # Spearman correlation line
+                    plt.plot(x_values, y_values, color='red', label='Spearman Correlation Line')
+
+                    # Add Spearman correlation coefficient as text
+                    plt.text(0.1, 0.9, f'Spearman Correlation: {correlation:.4f}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
 
             # Add labels and title
             plt.xlabel(f'Lateralised Power in {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
