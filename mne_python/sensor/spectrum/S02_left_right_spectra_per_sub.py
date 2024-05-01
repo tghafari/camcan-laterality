@@ -87,6 +87,28 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     
     return subtraction, spectrum_lat_sensor_pairs, log_lateralisation
 
+def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
+    """to eliminate noise bias in sensors, this definition 
+    calculates the average of lateralised power in high 
+    frequencies (between h_fmin=90, h_fmax=120), where we don't 
+    expect much brain signal, and then subtracts
+    that bias from the lateralisation index for each sensor pair
+    lateralised_power: output of calculate_spectrum_lateralisation
+    (works for all methods, i.e, subtraction, sumsub and log)
+    freqs: output of pick_sensor_pairs_epochspectrum
+    fmin and fmax: the high frequency section to use for nosie bias """
+    
+    print(f'Removing noise of {h_fmin} and {h_fmax} from lateralised power')
+
+    # Calculate average power in the specified frequency range
+    average_power_high_freqs = np.mean(lateralised_power[(freqs >= h_fmin) & (freqs <= h_fmax)])
+
+    # Subtract the average power from all power values 
+    bias_removed_log_lat = lateralised_power.copy()  
+    bias_removed_log_lat -= average_power_high_freqs    
+
+    return bias_removed_log_lat
+
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -157,28 +179,44 @@ for subjectID in subjectIDs_to_plot:
             fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}.png'))
             plt.close()    
 
-            subtraction, spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, 
-                                                                                                            psd_left_sensor)
-            # Plot spectrum subtraction of these sensors vs. frequency
-            fig, axes = plt.subplots(3, 1, figsize=(20, 10))
+            subtraction, spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+            sub_bias_removed_lat = remove_noise_bias(subtraction, freqs, h_fmin=90, h_fmax=120)
+            log_bias_removed_lat = remove_noise_bias(log_lateralisation, freqs, h_fmin=90, h_fmax=120)
+            
+            # Plot spectrum sumsub of these sensors vs. frequency
+            fig, axes = plt.subplots(5, 1, figsize=(20, 10))
             axes[0].plot(freqs, spectrum_lat_sensor_pairs)
             axes[0].set(title=f"subsum lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subsum)",
             )
 
-            # Plot spectrum lateralisation of these sensors vs. frequency
+            # Plot spectrum subtraction lateralisation of these sensors vs. frequency
             axes[1].plot(freqs, subtraction, color='firebrick')
             axes[1].set(title=f"subtraction lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subtraction)",
             )
+
+            # Plot spectrum subtraction lateralisation noise removed of these sensors vs. frequency
+            axes[2].plot(freqs, sub_bias_removed_lat)
+            axes[2].set(title=f"subtraction lateralisation no noise spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            xlabel="Frequency (Hz)",
+            ylabel="Lateralisation Index (sub-nonoise)",
+            )
             
             # Plot spectrum log lateralisation of these sensors vs. frequency
-            axes[2].plot(freqs, log_lateralisation, color='darkorange')
-            axes[2].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            axes[3].plot(freqs, log_lateralisation, color='darkorange')
+            axes[3].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (log)",
             )
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_three_lateralisation_spectra.png'))
+
+            # Plot spectrum log lateralisation noise removed of these sensors vs. frequency
+            axes[4].plot(freqs, log_bias_removed_lat, color='darkorange')
+            axes[4].set(title=f"log lateralisation spectrum no noise for {subjectID} in {working_pair[0]}_{working_pair[1]}",
+            xlabel="Frequency (Hz)",
+            ylabel="Lateralisation Index (log-nonoise)",
+            )
+            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_five_lateralisation_spectra.png'))
             plt.close()
