@@ -22,11 +22,11 @@ from mne.channels import read_layout
 import matplotlib.pyplot as plt
 
 # Define the directory  
-base_deriv_dir = r'/rds/projects/q/quinna-camcan/derivatives'
+base_deriv_dir = '/rds/projects/q/quinna-camcan/derivatives'
 correlation_path = op.join(base_deriv_dir, 'correlations')
 
 # Load one sample meg file for channel names
-meg_fname =  r'/rds/projects/q/quinna-camcan/cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'
+meg_fname =  '/rds/projects/q/quinna-camcan/cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'
 raw = mne.io.read_raw_fif(meg_fname)
 magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative values on topoplot
 raw.pick_types(meg='grad')

@@ -79,7 +79,7 @@ spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sen
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-substr-freq-cloud-subtraction-regression')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/cloud-substr-freq-subtraction-regression')
 
 # Load substr file
 substr_lat_df = pd.read_csv(substr_sheet_fname)
