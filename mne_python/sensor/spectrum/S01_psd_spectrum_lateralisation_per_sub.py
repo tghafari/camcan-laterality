@@ -81,7 +81,7 @@ def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     # Perform element-wise subtraction and division
     subtraction_sensor_pairs = psd_right_sensor - psd_left_sensor
     sum_element = psd_right_sensor + psd_left_sensor
-    sumsub_lat_sensor_pairs = subtraction / sum_element
+    sumsub_lat_sensor_pairs = subtraction_sensor_pairs / sum_element
 
     # Log transformation
     division = (psd_right_sensor/psd_left_sensor)
@@ -157,10 +157,18 @@ for i, subjectID in enumerate(good_subject_pd.index):
                                                                                    row['left_sensors'][0:8])
              subtraction_lat, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
+             # Remove noise bias
+             bias_removed_log_lat = remove_noise_bias(subtraction_lat, freqs, h_fmin=90, h_fmax=120)
+
              # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             subtraction_lat = subtraction_lat.reshape(-1,1)
+             bias_removed_log_lat = bias_removed_log_lat.reshape(-1,1)
              # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-             stacked_sensors.append(subtraction_lat)
+             stacked_sensors.append(bias_removed_log_lat)
+            
+            # # Reshape the array to have shape (473 (#freqs), 1) for stacking
+            # subtraction_lat = subtraction_lat.reshape(-1,1)
+            # # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
+            # stacked_sensors.append(subtraction_lat)
 
         # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
         spec_lateralisation_all_sens = np.hstack(stacked_sensors)
