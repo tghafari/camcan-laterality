@@ -34,8 +34,8 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'mac'
-
+platform = 'bluebear'
+plot_psds = False  # do you want to plot the PSDs or only the lat spectra?
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     """
@@ -121,7 +121,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/sanity-checks')
 
 # Preallocate lists
-subjectIDs_to_plot = [620935, 321506] #, 620935, 721704]  # manually add subjects to plot
+subjectIDs_to_plot = [620935, 721704] #[321506] # manually add subjects to plot
 sensor_pairs_to_plot = [['MEG0233','MEG1343'], ['MEG0422', 'MEG1112']]  # first is left sensor, second is right sensor in each pair
 
 
@@ -146,38 +146,39 @@ for subjectID in subjectIDs_to_plot:
                                                                                       working_pair[1], 
                                                                                       working_pair[0],
                                                                                       ) 
-            # Plot PSDs 
-            fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-            axes[0,1].plot(freqs, psd_right_sensor)
-            axes[0,1].set_title(f'Right sensor {working_pair[1]}')
-            axes[0,1].set(title=f"{subjectID} in {working_pair[1]}",
-                    xlabel="Frequency (Hz)",
-                    ylabel="Power",
-                    )
-            axes[1,1].plot(freqs, np.log(psd_right_sensor), color='darkorange')
-            axes[1,1].set_title(f'Log-Right sensor {working_pair[1]}')
-            axes[1,1].set(title=f"{subjectID} in {working_pair[1]}",
-                    xlabel="Frequency (Hz)",
-                    ylabel="log Power",
-                    )
-            # Plot PSDs with log transform
-            axes[0,0].plot(freqs, psd_left_sensor)
-            axes[0,0].set_title(f'Left sensor {working_pair[0]}')
-            axes[0,0].set(title=f"{subjectID} in {working_pair[0]}",
-                    xlabel="Frequency (Hz)",
-                    ylabel="Power",
-                    )
-            axes[1,0].plot(freqs, np.log(psd_left_sensor), color='darkorange')
-            axes[1,0].set_title(f'Log-Left sensor {working_pair[0]}')
-            axes[1,0].set(title=f"{subjectID} in {working_pair[0]}",
-                    xlabel="Frequency (Hz)",
-                    ylabel="log Power",
-                    )
+            if plot_psds:
+                # Plot PSDs 
+                fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+                axes[0,1].plot(freqs, psd_right_sensor)
+                axes[0,1].set_title(f'Right sensor {working_pair[1]}')
+                axes[0,1].set(title=f"{subjectID} in {working_pair[1]}",
+                        xlabel="Frequency (Hz)",
+                        ylabel="Power",
+                        )
+                axes[1,1].plot(freqs, np.log(psd_right_sensor), color='darkorange')
+                axes[1,1].set_title(f'Log-Right sensor {working_pair[1]}')
+                axes[1,1].set(title=f"{subjectID} in {working_pair[1]}",
+                        xlabel="Frequency (Hz)",
+                        ylabel="log Power",
+                        )
+                # Plot PSDs with log transform
+                axes[0,0].plot(freqs, psd_left_sensor)
+                axes[0,0].set_title(f'Left sensor {working_pair[0]}')
+                axes[0,0].set(title=f"{subjectID} in {working_pair[0]}",
+                        xlabel="Frequency (Hz)",
+                        ylabel="Power",
+                        )
+                axes[1,0].plot(freqs, np.log(psd_left_sensor), color='darkorange')
+                axes[1,0].set_title(f'Log-Left sensor {working_pair[0]}')
+                axes[1,0].set(title=f"{subjectID} in {working_pair[0]}",
+                        xlabel="Frequency (Hz)",
+                        ylabel="log Power",
+                        )
 
-            fig.suptitle(f'Single sensor spectra for {subjectID}')
-            plt.tight_layout()
-            fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}.png'))
-            plt.close()    
+                fig.suptitle(f'Single sensor spectra for {subjectID}')
+                plt.tight_layout()
+                fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}.png'))
+                plt.close()    
 
             subtraction, spectrum_lat_sensor_pairs, log_lateralisation = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
             sub_bias_removed_lat = remove_noise_bias(subtraction, freqs, h_fmin=90, h_fmax=120)
@@ -185,38 +186,41 @@ for subjectID in subjectIDs_to_plot:
             
             # Plot spectrum sumsub of these sensors vs. frequency
             fig, axes = plt.subplots(5, 1, figsize=(20, 10))
-            axes[0].plot(freqs, spectrum_lat_sensor_pairs)
+            axes[0].plot(freqs, spectrum_lat_sensor_pairs, label='sumsub')
             axes[0].set(title=f"subsum lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subsum)",
             )
 
             # Plot spectrum subtraction lateralisation of these sensors vs. frequency
-            axes[1].plot(freqs, subtraction, color='firebrick')
+            axes[1].plot(freqs, subtraction, color='firebrick', label='subtraction')
             axes[1].set(title=f"subtraction lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (subtraction)",
             )
 
             # Plot spectrum subtraction lateralisation noise removed of these sensors vs. frequency
-            axes[2].plot(freqs, sub_bias_removed_lat, color='tomato')
+            axes[2].plot(freqs, sub_bias_removed_lat, color='tomato', label='subtraction noise removed')
             axes[2].set(title=f"subtraction lateralisation no noise spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (sub-nonoise)",
             )
             
             # Plot spectrum log lateralisation of these sensors vs. frequency
-            axes[3].plot(freqs, log_lateralisation, color='darkorange')
+            axes[3].plot(freqs, log_lateralisation, color='darkorange', label='log transformed')
             axes[3].set(title=f"log lateralisation spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
-            ylabel="Lateralisation Index (log)",
+            ylabel="Lateralisation Index (log)",           
             )
 
             # Plot spectrum log lateralisation noise removed of these sensors vs. frequency
-            axes[4].plot(freqs, log_bias_removed_lat, color='burlywood')
+            axes[4].plot(freqs, log_bias_removed_lat, color='burlywood', label='log transformed noise removed')
             axes[4].set(title=f"log lateralisation spectrum no noise for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (log-nonoise)",
             )
+            
+            for ax in axes:
+                ax.legend()
             fig.savefig(op.join(output_dir, f'sub_{subjectID}_{working_pair[1]}_{working_pair[0]}_five_lateralisation_spectra.png'))
             plt.close()
