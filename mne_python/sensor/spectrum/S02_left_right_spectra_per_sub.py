@@ -199,7 +199,7 @@ for subjectID in subjectIDs_to_plot:
             )
 
             # Plot spectrum subtraction lateralisation noise removed of these sensors vs. frequency
-            axes[2].plot(freqs, sub_bias_removed_lat)
+            axes[2].plot(freqs, sub_bias_removed_lat, color='tomato')
             axes[2].set(title=f"subtraction lateralisation no noise spectrum for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (sub-nonoise)",
@@ -213,7 +213,7 @@ for subjectID in subjectIDs_to_plot:
             )
 
             # Plot spectrum log lateralisation noise removed of these sensors vs. frequency
-            axes[4].plot(freqs, log_bias_removed_lat, color='darkorange')
+            axes[4].plot(freqs, log_bias_removed_lat, color='burlywood')
             axes[4].set(title=f"log lateralisation spectrum no noise for {subjectID} in {working_pair[0]}_{working_pair[1]}",
             xlabel="Frequency (Hz)",
             ylabel="Lateralisation Index (log-nonoise)",
