@@ -34,7 +34,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'bluebear'
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -52,46 +52,65 @@ fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-s
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # List of the things for which you want topoplots
-substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-freqs = [10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
+substrs = ['Caud']
+#['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+freqs = [10,10.5]
+#[10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
 # np.arange(1,120.5,0.5)  # all frequencies available in spectra
 
-# Initialize a dictionary to store correlation values for each sensor pair
-metrics = {}
+# Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
+correlations_dfs = {}
+pvals_dfs = {}
 
-# Loop through each sensor pair folder
-for sensor_pair_folder in os.listdir(corr_dir):
-    sensor_pair_path = os.path.join(corr_dir, sensor_pair_folder)
-    
-    # Check if the current item is a directory
-    if os.path.isdir(sensor_pair_path):
-        for substr in substrs:
-            substr_folder_path = os.path.join(sensor_pair_path, f'{substr}')
-        
-        # Check if the 'caudate' folder exists
-        if os.path.exists(caudate_folder_path):
-            # Initialize a list to store correlation values for the current sensor pair
-            correlation_values = []
-            
-            # Loop through each frequency file in the 'caudate' folder
-            for filename in os.listdir(caudate_folder_path):
-                # Check if the file is a CSV file
-                if filename.endswith(".csv"):
-                    # Read the correlation table into a DataFrame
-                    correlation_table = pd.read_csv(os.path.join(caudate_folder_path, filename))
-                    
-                    # Get the correlation value for the desired frequency (e.g., 10Hz)
-                    # Assuming the frequency column in the correlation table is named 'Frequency'
-                    correlation_value = correlation_table.loc[correlation_table['Frequency'] == '10Hz', 'Correlation'].values[0]
-                    
-                    # Append the correlation value to the list
-                    correlation_values.append(correlation_value)
-            
-            # Store the correlation values for the current sensor pair in the dictionary
-            metrics[sensor_pair_folder] = correlation_values
+for freq in freqs:
 
-# Convert the dictionary to a DataFrame
-metrics_df = pd.DataFrame(metrics)
+    # Initialize a list to store correlation values for the current frequency
+    correlations_all_pairs = {}
+    pvals_all_pairs = {}
+    correlation_values = []
+    p_values = []
+
+    for substr in substrs:
+        # Loop through each sensor pair folder
+        for sensor_pair_fname in os.listdir(corr_dir):
+            if sensor_pair_fname.startswith('MEG'):  # check if the folder name starts with 'MEG'
+                index = sensor_pair_fname
+                sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
+                substr_folder_path = os.path.join(sensor_pair_path, f'{substr}')
+             
+                # Loop through each correlation table in the substr folder
+                for filename in os.listdir(substr_folder_path):
+                    
+                    if filename.endswith("spearmanr.csv") and not filename.startswith('._'):  # to ensure not reading hidden files
+                        correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+                
+                    if filename.endswith("pvals.csv") and not filename.startswith('._'):              
+                        pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+
+                # Get the correlation value for the desired frequency 
+                correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
+                p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
+
+                # Append the correlation value to the list
+                correlation_values.append(correlation_value)
+                p_values.append(p_value)
+
+                # Store the correlation values for the current sensor pair in the dictionary
+                correlations_all_pairs[sensor_pair_fname] = correlation_value
+                pvals_all_pairs[sensor_pair_fname] = p_value
+
+            else:
+                print(f'{sensor_pair_path} does not exist')
+
+    # Convert the dictionary to a DataFrame
+    correlations_df = pd.DataFrame(correlations_all_pairs, index=index, columns=['Correlation'])
+    pvals_df = pd.DataFrame(pvals_all_pairs)
+
+    # Name the DataFrame with the frequency value
+    correlations_dfs[f'df_{freq}Hz'] = correlations_df
+    pvals_dfs[f'df_{freq}Hz'] = pvals_df
+
+    del correlations_df, pvals_df
 
 
 
