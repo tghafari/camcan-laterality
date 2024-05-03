@@ -34,6 +34,50 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
+def freq_substr_corr_p_values(corr_dir, substr, correlation_values, p_values):    
+    """this definition inputs corr_dir that contains all sensor pair folders and
+    all substr folders for which we calculated correlation and pvalues.
+    then creates a list of those values for each substr, each frequency,
+    and all sensor pairs
+        # example
+    corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise') 
+    substr = 'Caud'
+    correlations_all_pairs = {}
+    pvals_all_pairs = {}"""
+
+    for sensor_pair_fname in os.listdir(corr_dir):
+        if sensor_pair_fname.startswith('MEG'):  # check if the folder name starts with 'MEG'
+            channel_index.append(sensor_pair_fname[0:7])  
+            channel_drop.append(sensor_pair_fname[-7:])
+            sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
+            substr_folder_path = os.path.join(sensor_pair_path, f'{substr}')
+            
+            # Loop through each correlation table in the substr folder
+            for filename in os.listdir(substr_folder_path):
+                
+                if filename.endswith("spearmanr.csv") and not filename.startswith('._'):  # to ensure not reading hidden files
+                    correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+            
+                if filename.endswith("pvals.csv") and not filename.startswith('._'):              
+                    pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+
+            # Get the correlation value for the desired frequency 
+            correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
+            p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
+
+            # Append the correlation value to the list
+            correlation_values.append(correlation_value)
+            p_values.append(p_value)
+
+            # Store the correlation values for the current sensor pair in the dictionary - don't think it's needed
+            # correlations_all_pairs[sensor_pair_fname] = correlation_value
+            # pvals_all_pairs[sensor_pair_fname] = p_value
+
+        else:
+            print(f'{sensor_pair_path} does not exist')
+
+    return correlation_values, p_values, channel_index, channel_drop
+    
 platform = 'mac'
 
 # Define where to read and write the data
@@ -65,46 +109,20 @@ pvals_dfs = {}
 for freq in freqs:
 
     # Initialize a list to store correlation values for the current frequency
-    correlations_all_pairs = {}
-    pvals_all_pairs = {}
+    #correlations_all_pairs = {}
+    #pvals_all_pairs = {}
     correlation_values = []
     p_values = []
+    channel_index = [] 
+    channel_drop = []  # sensor names to drop from info object (plotting)
 
-    for substr in substrs:
+    #for substr in substrs:
         # Loop through each sensor pair folder
-        for sensor_pair_fname in os.listdir(corr_dir):
-            if sensor_pair_fname.startswith('MEG'):  # check if the folder name starts with 'MEG'
-                index = sensor_pair_fname
-                sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
-                substr_folder_path = os.path.join(sensor_pair_path, f'{substr}')
-             
-                # Loop through each correlation table in the substr folder
-                for filename in os.listdir(substr_folder_path):
-                    
-                    if filename.endswith("spearmanr.csv") and not filename.startswith('._'):  # to ensure not reading hidden files
-                        correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
-                
-                    if filename.endswith("pvals.csv") and not filename.startswith('._'):              
-                        pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename))
 
-                # Get the correlation value for the desired frequency 
-                correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
-                p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
-
-                # Append the correlation value to the list
-                correlation_values.append(correlation_value)
-                p_values.append(p_value)
-
-                # Store the correlation values for the current sensor pair in the dictionary
-                correlations_all_pairs[sensor_pair_fname] = correlation_value
-                pvals_all_pairs[sensor_pair_fname] = p_value
-
-            else:
-                print(f'{sensor_pair_path} does not exist')
 
     # Convert the dictionary to a DataFrame
-    correlations_df = pd.DataFrame(correlations_all_pairs, index=index, columns=['Correlation'])
-    pvals_df = pd.DataFrame(pvals_all_pairs)
+    correlations_df = pd.DataFrame(correlation_values, index=channel_index, columns=['Correlation'])
+    pvals_df = pd.DataFrame(p_values, index=channel_index, columns=['Correlation'])
 
     # Name the DataFrame with the frequency value
     correlations_dfs[f'df_{freq}Hz'] = correlations_df
@@ -125,14 +143,14 @@ for freq in freqs:
 meg_fname =  op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
 raw = mne.io.read_raw_fif(meg_fname)
 
-magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative values on topoplot
+halfraw = raw.copy().drop_channels(channel_drop)  # this is to be able to show negative values on topoplot
 raw.pick_types(meg='grad')
 
 
+
+
 for f, band in enumerate(freqs):
-    correlation_band_path = op.join(correlation_path, band)
-    pearsonrs_csv_file = op.join(correlation_band_path, 'lat_spectra_substr_pearsonr.csv')
-    pvals_csv_file = op.join(correlation_band_path, 'lat_spectra_substr_pvals.csv')
+
 
     # Load correlation files and rename first column
     
@@ -142,7 +160,8 @@ for f, band in enumerate(freqs):
     print(f'opening correlations csv file for {band} band and reading channel names')
 
     # Here we read both channel names from each pair
-    ch_names = [chs.split(' - ')[0] for chs in pearson_df['ch_names']] + [chs.split(' - ')[1] for chs in pearson_df['ch_names']]
+    ch_names = channel_index
+    #[chs.split(' - ')[0] for chs in pearson_df['ch_names']] + [chs.split(' - ')[1] for chs in pearson_df['ch_names']]
 
     plt.figure(f)
     for ind, substr in enumerate(substrs):
@@ -152,8 +171,8 @@ for f, band in enumerate(freqs):
         metrics = np.zeros((204,))
         pvals = np.zeros((204,))
         for idx, chan in enumerate(ch_names):
-            ind_chan = mne.pick_channels(raw.ch_names, [chan])
-            ind_val = np.where(np.array([name.find(chan) for name in pearson_df['ch_names']]) > -1 )[0]
+            ind_chan = mne.pick_channels(halfraw.ch_names, [chan])
+            ind_val = np.where(np.array([name.find(chan) for name in pearson_df.index]) > -1 )[0]
             metrics[ind_chan] = pearson_df[substr].values[ind_val]
             pvals[ind_chan] = pval_df[substr].values[ind_val]
         
