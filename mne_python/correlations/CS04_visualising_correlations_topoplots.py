@@ -34,7 +34,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-def freq_substr_corr_p_values(corr_dir, substr, correlation_values, p_values):    
+def freq_substr_corr_p_values(corr_dir, substr, freq, correlation_values, p_values):    
     """this definition inputs corr_dir that contains all sensor pair folders and
     all substr folders for which we calculated correlation and pvalues.
     then creates a list of those values for each substr, each frequency,
@@ -91,12 +91,12 @@ elif platform == 'mac':
 # Define directories 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise')  # containing all sensor pair folders
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction')  # containing all sensor pair folders
 fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction-nonoise')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # List of the things for which you want topoplots
-substrs = ['Caud']
+substrs = ['Thal', 'Caud']
 #['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 freqs = [10,10.5]
 #[10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
@@ -108,27 +108,28 @@ pvals_dfs = {}
 
 for freq in freqs:
 
-    # Initialize a list to store correlation values for the current frequency
-    #correlations_all_pairs = {}
-    #pvals_all_pairs = {}
-    correlation_values = []
-    p_values = []
-    channel_index = [] 
-    channel_drop = []  # sensor names to drop from info object (plotting)
-
-    #for substr in substrs:
+    for substr in substrs:
+        # Initialize lists to store values for the current frequency and substr
+        correlation_values = [] 
+        p_values = []
+        channel_index = [] 
+        channel_drop = []  # sensor names to drop from info object (plotting)
         # Loop through each sensor pair folder
+        correlation_values, p_values, channel_index, channel_drop = freq_substr_corr_p_values(corr_dir, 
+                                                                                                substr, 
+                                                                                                freq, 
+                                                                                                correlation_values, 
+                                                                                                p_values)
 
+        # Convert the dictionary to a DataFrame
+        correlations_df = pd.DataFrame(correlation_values, index=channel_index, columns=['Correlation'])
+        pvals_df = pd.DataFrame(p_values, index=channel_index, columns=['Correlation'])
 
-    # Convert the dictionary to a DataFrame
-    correlations_df = pd.DataFrame(correlation_values, index=channel_index, columns=['Correlation'])
-    pvals_df = pd.DataFrame(p_values, index=channel_index, columns=['Correlation'])
+        # Name the DataFrame with the frequency value
+        correlations_dfs[f'{freq}Hz_{substr}'] = correlations_df
+        pvals_dfs[f'{freq}Hz_{substr}'] = pvals_df
 
-    # Name the DataFrame with the frequency value
-    correlations_dfs[f'df_{freq}Hz'] = correlations_df
-    pvals_dfs[f'df_{freq}Hz'] = pvals_df
-
-    del correlations_df, pvals_df
+    del correlations_df, pvals_df  # refresh for next freq
 
 
 
