@@ -191,7 +191,7 @@ if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
 elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan-1'
+    rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
     
 # Define directories 
@@ -249,7 +249,7 @@ raw = mne.io.read_raw_fif(meg_fname)
 halfgradraw = raw.copy().pick(channel_index_grad)
 
 magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative values on topoplot for grads
-halfmagraw = magraw.copy().drop_channels(channel_drop_mag)  # channels for plotting grads
+halfmagraw = raw.copy().pick(channel_index_mag)  # channels for plotting grads
 
 for substr in substrs:
     plt.figure(figsize=(12, 12))  # create a figure for each substr
@@ -259,20 +259,20 @@ for substr in substrs:
         corr_grad_ls = corr_df_grad['Correlation'].to_list()
         pval_df_grad = pvals_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
         pval_grad_ls = [float(val) for val in pval_df_grad['Correlation']]
-        mask_grad = [val < 0.05 for val in pval_grad_ls]
+        mask_grad = np.array([val < 0.05 for val in pval_grad_ls], dtype=bool)
         
         # Get correlation and p-value DataFrames for mag sensors
         corr_df_mag = correlations_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
         corr_mag_ls = corr_df_mag['Correlation'].to_list()
         pval_df_mag = pvals_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
         pval_mag_ls = [float(val) for val in pval_df_mag['Correlation']]
-        mask_mag = [val < 0.05 for val in pval_mag_ls]
+        mask_mag = np.array([val < 0.05 for val in pval_mag_ls], dtype=bool)
 
         # Plot grad sensors correlation
         plt.subplot(2, len(freqs), freqs.index(freq) + 1)
-        im, _ = mne.viz.plot_topomap(corr_grad_ls, halfmagraw.info, contours=0,
+        im, _ = mne.viz.plot_topomap(corr_grad_ls, halfgradraw.info, contours=0,
                             cmap='RdBu_r', vlim=(min(corr_grad_ls), max(corr_grad_ls)), 
-                            #mask=mask_grad, 
+                            mask=mask_grad, 
                             image_interp='nearest')
         plt.title(f'Grad: {freq}Hz')
 
@@ -280,7 +280,7 @@ for substr in substrs:
         plt.subplot(2, len(freqs), len(freqs) + freqs.index(freq) + 1)
         im, _ = mne.viz.plot_topomap(corr_mag_ls, halfmagraw.info, contours=0,
                             cmap='RdBu_r', vlim=(min(corr_mag_ls), max(corr_mag_ls)), 
-                            #mask=mask_mag, 
+                            mask=mask_mag, 
                             image_interp='nearest')
         plt.title(f'Mag: {freq}Hz')
 
