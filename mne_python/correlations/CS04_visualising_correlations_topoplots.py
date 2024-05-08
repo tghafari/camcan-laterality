@@ -226,7 +226,7 @@ for substr in substrs:
                             show=False)  # use the axes for mag
 
         axes[1].set_title(f'{substr} with mag: {freq}Hz')
-        axes[1].set_xlim(0, )  # remove the right half of topoplot
+        axes[1].set_xlim(0, )  # remove the left half of topoplot
         cbar = fig.colorbar(im, ax=axes.ravel().tolist(), orientation='horizontal', location='bottom')
         cbar.ax.tick_params(labelsize=5)
         cbar.set_label('Correlation Values')
