@@ -252,8 +252,9 @@ magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative
 halfmagraw = raw.copy().pick(channel_index_mag)  # channels for plotting grads
 
 for substr in substrs:
-    plt.figure(figsize=(12, 12))  # create a figure for each substr
-    for freq in freqs:
+    fig, axes = plt.subplots(len(freqs), 2, figsize=(12, 12))  # create subplots for each frequency, with 2 columns for mag and grad
+    for i, freq in enumerate(freqs):
+        
         # Get correlation and p-value DataFrames for grad sensors
         corr_df_grad = correlations_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
         corr_grad_ls = corr_df_grad['Correlation'].to_list()
@@ -268,21 +269,22 @@ for substr in substrs:
         pval_mag_ls = [float(val) for val in pval_df_mag['Correlation']]
         mask_mag = np.array([val < 0.05 for val in pval_mag_ls], dtype=bool)
 
+        
         # Plot grad sensors correlation
-        plt.subplot(2, len(freqs), freqs.index(freq) + 1)
-        im, _ = mne.viz.plot_topomap(corr_grad_ls, halfgradraw.info, contours=0,
+        axes[i, 0] = mne.viz.plot_topomap(corr_grad_ls, magraw.info, contours=0,
                             cmap='RdBu_r', vlim=(min(corr_grad_ls), max(corr_grad_ls)), 
                             mask=mask_grad, 
-                            image_interp='nearest')
-        plt.title(f'Grad: {freq}Hz')
+                            image_interp='nearest', axes=axes[i, 0])  # use the axes for grad
+
+        axes[i, 0].set_title(f'Grad: {freq}Hz')
 
         # Plot mag sensors correlation
-        plt.subplot(2, len(freqs), len(freqs) + freqs.index(freq) + 1)
-        im, _ = mne.viz.plot_topomap(corr_mag_ls, halfmagraw.info, contours=0,
+        axes[i,1] = mne.viz.plot_topomap(corr_mag_ls, halfmagraw.info, contours=0,
                             cmap='RdBu_r', vlim=(min(corr_mag_ls), max(corr_mag_ls)), 
                             mask=mask_mag, 
-                            image_interp='nearest')
-        plt.title(f'Mag: {freq}Hz')
+                            image_interp='nearest', axes=axes[i, 1])  # use the axes for mag
+
+        axes[i, 1].set_title(f'Mag: {freq}Hz')
 
     # Adjust subplot layout
     plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95, 
