@@ -165,7 +165,7 @@ def freq_substr_corr_p_values(corr_dir, substr, freq):
 
             # Read correlation and p-value tables
             correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
-            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'pvals')))
+            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'spearman_pvals')))
             
             # Get the correlation value for the desired frequency
             correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
@@ -191,22 +191,20 @@ if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
 elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan'
+    rds_dir = '/Volumes/quinna-camcan-1'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
     
 # Define directories 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
 corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction')  # containing all sensor pair folders
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction-nonoise')
-sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation topomaps/freqs/subtraction')
 
 # List of the things for which you want topoplots
 substrs = ['Thal', 'Caud']
 #['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 freqs = [10,10.5]
 #[10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
-# np.arange(1,120.5,0.5)  # all frequencies available in spectra
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
 correlations_dfs_grad = {}
@@ -239,7 +237,7 @@ for freq in freqs:
         correlations_dfs_grad[f'{freq}Hz_{substr}'] = correlations_df_grad
         correlations_dfs_mag[f'{freq}Hz_{substr}'] = correlations_df_mag
         pvals_dfs_grad[f'{freq}Hz_{substr}'] = pvals_df_grad
-        pvals_dfs_grad[f'{freq}Hz_{substr}'] = pvals_df_mag
+        pvals_dfs_mag[f'{freq}Hz_{substr}'] = pvals_df_mag
 
     del (correlations_df_grad, correlations_df_mag, 
          pvals_df_grad, pvals_df_mag)  # refresh for next freq
@@ -248,77 +246,53 @@ for freq in freqs:
 # Load one sample meg file for channel names
 meg_fname =  op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
 raw = mne.io.read_raw_fif(meg_fname)
+halfgradraw = raw.copy().pick(channel_index_grad)
 
 magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative values on topoplot for grads
 halfmagraw = magraw.copy().drop_channels(channel_drop_mag)  # channels for plotting grads
 
-for freq in freqs:
-    for substr in substrs:
-        for idx, chan in enumerate(channel_index_grad):
-            corr_r_grad = np.zeros((102,))
-            corr_df_grad = correlations_dfs_grad[f'{freq}Hz_{substr}']
-            ind_chan = mne.pick_channels(raw.ch_names, [channel_index_grad])
-            ind_val = np.where(np.array([name.find(chan) for name in corr_df_grad['ch_names']]) > -1 )[0]
-            corr_r_grad[ind_chan] = corr_df_grad[substr].values[ind_val]
-
-
-    print(substr)
-    print(freq)
-
-
-
-
-
-
-for f, band in enumerate(freqs):
-
-
-    # Load correlation files and rename first column
-    
-    pearson_df = pearson_df.rename(columns={'Unnamed: 0': 'ch_names'})
-    pval_df = pd.read_csv(pvals_csv_file)
-    pval_df = pval_df.rename(columns={'Unnamed: 0': 'ch_names'})
-    print(f'opening correlations csv file for {band} band and reading channel names')
-
-    # Here we read both channel names from each pair
-    ch_names = channel_index
-    #[chs.split(' - ')[0] for chs in pearson_df['ch_names']] + [chs.split(' - ')[1] for chs in pearson_df['ch_names']]
-
-    plt.figure(f)
-    for ind, substr in enumerate(substrs):
-        print(f' plotting correlation values for {substr}')
-
-        # Read channel indices of the correlation table from loaded fif file
-        metrics = np.zeros((204,))
-        pvals = np.zeros((204,))
-        for idx, chan in enumerate(ch_names):
-            ind_chan = mne.pick_channels(halfraw.ch_names, [chan])
-            ind_val = np.where(np.array([name.find(chan) for name in pearson_df.index]) > -1 )[0]
-            metrics[ind_chan] = pearson_df[substr].values[ind_val]
-            pvals[ind_chan] = pval_df[substr].values[ind_val]
+for substr in substrs:
+    plt.figure(figsize=(12, 12))  # create a figure for each substr
+    for freq in freqs:
+        # Get correlation and p-value DataFrames for grad sensors
+        corr_df_grad = correlations_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
+        corr_grad_ls = corr_df_grad['Correlation'].to_list()
+        pval_df_grad = pvals_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
+        pval_grad_ls = [float(val) for val in pval_df_grad['Correlation']]
+        mask_grad = [val < 0.05 for val in pval_grad_ls]
         
-        # Define those correlations that are significant - average across grads to halve the number of channels
-        mask = pvals < 0.05
-        metrics_grad = (metrics[::2] + metrics[1::2]) / 2 
+        # Get correlation and p-value DataFrames for mag sensors
+        corr_df_mag = correlations_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
+        corr_mag_ls = corr_df_mag['Correlation'].to_list()
+        pval_df_mag = pvals_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
+        pval_mag_ls = [float(val) for val in pval_df_mag['Correlation']]
+        mask_mag = [val < 0.05 for val in pval_mag_ls]
 
-        # Subplot each substr
-        ax = plt.subplot(2, 4, ind+1)
-        im, _ = mne.viz.plot_topomap(metrics_grad, halfraw.info, contours=0,
-                            cmap='RdBu_r', vlim=(min(metrics), max(metrics)), 
-                            axes=ax, mask=mask[::2],
+        # Plot grad sensors correlation
+        plt.subplot(2, len(freqs), freqs.index(freq) + 1)
+        im, _ = mne.viz.plot_topomap(corr_grad_ls, halfmagraw.info, contours=0,
+                            cmap='RdBu_r', vlim=(min(corr_grad_ls), max(corr_grad_ls)), 
+                            #mask=mask_grad, 
                             image_interp='nearest')
-                            # names=raw.ch_names)
-                            # mask_params={'marker': '*'},
-        ax.set_title(substr)
-        ax.set_xlim(0, )
-        cbar = plt.colorbar(im, orientation='horizontal', location='bottom')
-        cbar.ax.tick_params(labelsize=5)
-        if ind > 3:
-            cbar.set_label('Correlation Values')
+        plt.title(f'Grad: {freq}Hz')
+
+        # Plot mag sensors correlation
+        plt.subplot(2, len(freqs), len(freqs) + freqs.index(freq) + 1)
+        im, _ = mne.viz.plot_topomap(corr_mag_ls, halfmagraw.info, contours=0,
+                            cmap='RdBu_r', vlim=(min(corr_mag_ls), max(corr_mag_ls)), 
+                            #mask=mask_mag, 
+                            image_interp='nearest')
+        plt.title(f'Mag: {freq}Hz')
+
+    # Adjust subplot layout
     plt.subplots_adjust(left=0.05, bottom=0.05, right=0.95, top=0.95, 
                         wspace=0.4, hspace=0.2)
-    plt.figure(f).figsize=(12, 12)
-    #plt.show()
-    plt.savefig(op.join(correlation_path, f'{band}_correlations.svg'), format='svg', dpi=300)
-    plt.savefig(op.join(correlation_path, f'{band}_correlations.tiff'), format='tiff', dpi=300)
-    plt.savefig(op.join(correlation_path, f'{band}_correlations.jpg'), format='jpg', dpi=300)
+
+    plt.show()
+    
+    
+    if not op.exists(op.join(fig_output_dir, substr)):
+        os.mkdir(op.join(fig_output_dir, substr))
+    #plt.savefig(op.join(correlation_path, f'{band}_correlations.svg'), format='svg', dpi=300)
+    #plt.savefig(op.join(correlation_path, f'{band}_correlations.tiff'), format='tiff', dpi=300)
+    plt.savefig(op.join(fig_output_dir, substr, f'{freq}_correlations.jpg'), format='jpg', dpi=300)
