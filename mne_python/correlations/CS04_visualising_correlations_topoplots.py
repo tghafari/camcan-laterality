@@ -133,9 +133,10 @@ corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction')  # contai
 fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation topomaps/freqs/subtraction')
 
 # List of the things for which you want topoplots
-substrs = ['Thal', 'Caud']
+substrs = ['Caud']
 #['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-freqs = [10,10.5,11,11.5,12,12.5]
+freqs = np.arange(6,14,0.5)
+#[10,10.5,11,11.5,12,12.5]
 #[10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
@@ -231,7 +232,7 @@ for substr in substrs:
         cbar.set_label('Correlation Values')
 
         fig.set_size_inches(12, 12)
-        plt.show()
+        plt.close()
     
     
         if not op.exists(op.join(fig_output_dir, substr)):
