@@ -1,97 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-====================================
-CS04_visualising_correlations_topoplots:
-    this script:
-    the goal is to creat topo plots using 
-    correlation values instead of power
-
-    1. navigates to the correlation directory
-    2. then lists all the folders (with 
-    sensor pair names)
-    3. then navigates to each of the sensor
-    pair folders 
-    4. then inside each of the subcortical
-    structure folders
-    5. then opens the correlation table
-    6. finds the correlation value for
-    the frequency of interest
-    7. put it in a list of all correlation
-    values for that substr and all sensor pairs
-    8. does the same for p-value
-    
-
-Written by Andrew Quinn
-Adapted by Tara Ghafari
-t.ghafari@bham.ac.uk
-=====================================
-"""
-
-import pandas as pd
-import numpy as np
-import os.path as op
-import os
-import matplotlib.pyplot as plt
-import mne
-
-
-def freq_substr_corr_p_values(corr_dir, substr, freq, correlation_values_grad, correlation_values_mag, p_values_grad, p_values_mag, channel_index_grad, channel_index_mag, channel_drop_grad, channel_drop_mag):    
-    """this definition inputs corr_dir that contains all sensor pair folders and
-    all substr folders for which we calculated correlation and pvalues.
-    then creates a list of those values for each substr, each frequency,
-    and all sensor pairs
-        # example
-    corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise') 
-    substr = 'Caud'
-    correlations_values = []
-    p_values = []"""
-    
-    for sensor_pair_fname in os.listdir(corr_dir):
-        if not sensor_pair_fname.startswith('MEG'):
-            continue
-        
-        sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
-        substr_folder_path = os.path.join(sensor_pair_path, substr)
-
-        if not os.path.isdir(substr_folder_path):
-            print(f'{substr_folder_path} does not exist')
-            continue
-        
-        print(f'Working on {sensor_pair_fname}')
-        
-        # Determine whether the sensor pair is a magnetometer or a gradiometer
-        is_magnetometer = sensor_pair_fname.endswith('1')
-
-        # Update channel index and drop lists
-        channel_index = channel_index_mag if is_magnetometer else channel_index_grad
-        channel_drop = channel_drop_mag if is_magnetometer else channel_drop_grad
-        channel_index.append(sensor_pair_fname[0:7])  
-        channel_drop.append(sensor_pair_fname[-7:])
-        
-        # Loop through each correlation table in the substr folder
-        for filename in os.listdir(substr_folder_path):
-            if not filename.endswith("spearmanr.csv") or filename.startswith('._'):
-                continue
-
-            # Read correlation and p-value tables
-            correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
-            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'pvals')))
-            
-            # Get the correlation value for the desired frequency
-            correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
-            p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
-
-            # Update the corresponding lists
-            if is_magnetometer:
-                correlation_values_mag.append(correlation_value)
-                p_values_mag.append(p_value)
-            else:
-                correlation_values_grad.append(correlation_value)
-                p_values_grad.append(p_value)
-
-    return correlation_values_grad, correlation_values_mag, p_values_grad, p_values_mag, channel_index_grad, channel_index_mag, channel_drop_grad, channel_drop_mag
-
-"""
 def freq_substr_corr_p_values(corr_dir, substr, freq, correlation_values_grad, correlation_values_mag, p_values_grad, p_values_mag, channel_index_grad, channel_index_mag, channel_drop_grad, channel_drop_mag):    
     """"""this definition inputs corr_dir that contains all sensor pair folders and
     all substr folders for which we calculated correlation and pvalues.
@@ -158,6 +66,124 @@ def freq_substr_corr_p_values(corr_dir, substr, freq, correlation_values_grad, c
     return correlation_values_grad, correlation_values_mag, p_values_grad, p_values_mag, channel_index_grad, channel_index_mag, channel_drop_grad, channel_drop_mag
 """
 
+
+"""
+====================================
+CS04_visualising_correlations_topoplots:
+    this script:
+    the goal is to creat topo plots using 
+    correlation values instead of power
+
+    1. navigates to the correlation directory
+    2. then lists all the folders (with 
+    sensor pair names)
+    3. then navigates to each of the sensor
+    pair folders 
+    4. then inside each of the subcortical
+    structure folders
+    5. then opens the correlation table
+    6. finds the correlation value for
+    the frequency of interest
+    7. put it in a list of all correlation
+    values for that substr and all sensor pairs
+    8. does the same for p-value
+    
+
+Written by Andrew Quinn
+Adapted by Tara Ghafari
+t.ghafari@bham.ac.uk
+=====================================
+"""
+
+import pandas as pd
+import numpy as np
+import os.path as op
+import os
+import matplotlib.pyplot as plt
+import mne
+
+
+def freq_substr_corr_p_values(corr_dir, substr, freq):    
+    """
+    This definition inputs corr_dir that contains all sensor pair folders and
+    all substr folders for which we calculated correlation and pvalues.
+    then creates a list of those values for each substr, each frequency,
+    and all sensor pairs
+    
+    Parameters:
+        corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise') 
+        substr(str) = 'Caud'
+        freq(int) = Frequency for which to retrieve correlation and p-values
+    Returns:
+        tuple: Tuple containing correlation and p-values for gradiometers and magnetometers, channel indices, and channel drops.
+            - correlation_values_grad (list): Correlation values for gradiometers.
+            - correlation_values_mag (list): Correlation values for magnetometers.
+            - p_values_grad (list): P-values for gradiometers.
+            - p_values_mag (list): P-values for magnetometers.
+            - channel_index_grad (list): Channel indices for gradiometers.
+            - channel_index_mag (list): Channel indices for magnetometers.
+            - channel_drop_grad (list): Channel drops for gradiometers.
+            - channel_drop_mag (list): Channel drops for magnetometers.
+    """
+    correlation_values_grad = []
+    correlation_values_mag = []
+    p_values_grad = []
+    p_values_mag = []
+    channel_index_grad = []
+    channel_index_mag = []
+    channel_drop_grad = []
+    channel_drop_mag = []
+    
+    for sensor_pair_fname in os.listdir(corr_dir):
+        if not sensor_pair_fname.startswith('MEG'):
+            continue
+        
+        sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
+        substr_folder_path = os.path.join(sensor_pair_path, substr)
+
+        if not os.path.isdir(substr_folder_path):
+            print(f'{substr_folder_path} does not exist')
+            continue
+        
+        print(f'Working on {sensor_pair_fname}')
+        
+        # Determine whether the sensor pair is a magnetometer or a gradiometer
+        is_magnetometer = sensor_pair_fname.endswith('1')
+
+        # Update channel index and drop lists
+        if is_magnetometer:
+            channel_index_mag.append(sensor_pair_fname[0:7])  
+            channel_drop_mag.append(sensor_pair_fname[-7:])
+        else:
+            channel_index_grad.append(sensor_pair_fname[0:7])  
+            channel_drop_grad.append(sensor_pair_fname[-7:])
+        
+        # Loop through each correlation table in the substr folder
+        for filename in os.listdir(substr_folder_path):
+            if not filename.endswith("spearmanr.csv") or filename.startswith('._'):
+                continue
+
+            # Read correlation and p-value tables
+            correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'pvals')))
+            
+            # Get the correlation value for the desired frequency
+            correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
+            p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
+
+            # Update the corresponding lists
+            if is_magnetometer:
+                correlation_values_mag.append(correlation_value)
+                p_values_mag.append(p_value)
+            else:
+                correlation_values_grad.append(correlation_value)
+                p_values_grad.append(p_value)
+
+    return (correlation_values_grad, correlation_values_mag, 
+            p_values_grad, p_values_mag, 
+            channel_index_grad, channel_index_mag, 
+            channel_drop_grad, channel_drop_mag)
+
 platform = 'mac'
 
 # Define where to read and write the data
@@ -183,47 +209,57 @@ freqs = [10,10.5]
 # np.arange(1,120.5,0.5)  # all frequencies available in spectra
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
-correlations_dfs = {}
-pvals_dfs = {}
+correlations_dfs_grad = {}
+correlations_dfs_mag = {}
+pvals_dfs_grad = {}
+pvals_dfs_mag = {}
 
 for freq in freqs:
-
     for substr in substrs:
-        # Initialize lists to store values for the current frequency and substr
-        correlation_values = [] 
-        p_values = []
-        channel_index = [] 
-        channel_drop = []  # sensor names to drop from info object (plotting)
         # Loop through each sensor pair folder
-        correlation_values, p_values, channel_index, channel_drop = freq_substr_corr_p_values(corr_dir, 
-                                                                                                substr, 
-                                                                                                freq, 
-                                                                                                correlation_values, 
-                                                                                                p_values)
-
+        (correlation_values_grad, correlation_values_mag, 
+            p_values_grad, p_values_mag, 
+            channel_index_grad, channel_index_mag, 
+            channel_drop_grad, channel_drop_mag) = freq_substr_corr_p_values(corr_dir, substr, freq)
+        
         # Convert the dictionary to a DataFrame
-        correlations_df = pd.DataFrame(correlation_values, index=channel_index, columns=['Correlation'])
-        pvals_df = pd.DataFrame(p_values, index=channel_index, columns=['Correlation'])
-
+        correlations_df_grad = pd.DataFrame(correlation_values_grad, 
+                                            index=channel_index_grad, 
+                                            columns=['Correlation'])
+        correlations_df_mag = pd.DataFrame(correlation_values_mag, 
+                                            index=channel_index_mag, 
+                                            columns=['Correlation'])
+        pvals_df_grad = pd.DataFrame(p_values_grad, 
+                                     index=channel_index_grad, 
+                                     columns=['Correlation'])
+        pvals_df_mag = pd.DataFrame(p_values_mag, 
+                                    index=channel_index_mag, 
+                                    columns=['Correlation'])
         # Name the DataFrame with the frequency value
-        correlations_dfs[f'{freq}Hz_{substr}'] = correlations_df
-        pvals_dfs[f'{freq}Hz_{substr}'] = pvals_df
+        correlations_dfs_grad[f'{freq}Hz_{substr}'] = correlations_df_grad
+        correlations_dfs_mag[f'{freq}Hz_{substr}'] = correlations_df_mag
+        pvals_dfs_grad[f'{freq}Hz_{substr}'] = pvals_df_grad
+        pvals_dfs_grad[f'{freq}Hz_{substr}'] = pvals_df_mag
 
-    del correlations_df, pvals_df  # refresh for next freq
+    del (correlations_df_grad, correlations_df_mag, 
+         pvals_df_grad, pvals_df_mag)  # refresh for next freq
 
 
 # Load one sample meg file for channel names
 meg_fname =  op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
 raw = mne.io.read_raw_fif(meg_fname)
 
-halfraw = raw.copy().drop_channels(channel_drop)  # this is to be able to show negative values on topoplot
-
+magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative values on topoplot for grads
+halfmagraw = magraw.copy().drop_channels(channel_drop_mag)  # channels for plotting grads
 
 for freq in freqs:
     for substr in substrs:
-        corr_r = np.zeros((153,))
-        corr_df = correlations_dfs[f'{freq}Hz_{substr}']
-        corr_r[ind_chan] = 
+        for idx, chan in enumerate(channel_index_grad):
+            corr_r_grad = np.zeros((102,))
+            corr_df_grad = correlations_dfs_grad[f'{freq}Hz_{substr}']
+            ind_chan = mne.pick_channels(raw.ch_names, [channel_index_grad])
+            ind_val = np.where(np.array([name.find(chan) for name in corr_df_grad['ch_names']]) > -1 )[0]
+            corr_r_grad[ind_chan] = corr_df_grad[substr].values[ind_val]
 
 
     print(substr)
