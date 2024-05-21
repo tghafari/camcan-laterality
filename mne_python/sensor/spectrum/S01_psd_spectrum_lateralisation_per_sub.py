@@ -50,7 +50,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
    # define constant parameters
     welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
 
-    # calculate power spectrum for right and left sensors separately
+    # calculate power spectrum
     """the returned array will have the same
       shape as the input data plus an additional frequency dimension"""
     epochspectrum = epochs.compute_psd(method='welch',  
