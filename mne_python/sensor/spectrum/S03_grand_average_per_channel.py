@@ -27,6 +27,7 @@ This code will:
 written by Tara Ghafari
 ==============================================
 ToDos:
+    show freqs instead of times in plot_topos
 
 Issues/ contributions to community:
   
