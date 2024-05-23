@@ -168,7 +168,7 @@ plt.legend(handles, labels, loc='upper right')
 # Adding title and adjusting plot properties
 plt.title('Grand Average PSD Right vs Left Sensors')
 ax.grid(True)
-plt.show()
+#plt.show()
 
 # Save
 grand_avg_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots', 'grand_average_plot_topo_60.tiff')
