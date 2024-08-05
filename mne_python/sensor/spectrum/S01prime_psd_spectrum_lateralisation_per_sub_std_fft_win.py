@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================
-S01. Spectrum lateralisation
+S01prime. Spectrum lateralisation with std
 
 This code will:
     1. calculate the psd for all frequencies
@@ -35,10 +35,21 @@ import mne
 import sys 
 import matplotlib.pyplot as plt
 
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
+platform = 'mac'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
-def calculate_spectral_power(epochs, n_fft, fmin, fmax):
+def pick_sensor_pairs_epochs_array(epochs, right_sensor, left_sensor):
+    """this code will pick sensor pairs for calculating lateralisation 
+        from epochspectrum (output of previous function).
+        the shape of psd is (1, 1, 129) = #epochs, #sensors, #freqs
+        freqs = np.arange(1, 60.5, 0.5)"""
+    
+    array_right_sensor = epochs.copy().pick(picks=right_sensor).get_data()  # freqs is just for a reference
+    array_left_sensor = epochs.copy().pick(picks=left_sensor).get_data()
+
+    return array_right_sensor, array_left_sensor
+
+def calculate_win_std(epochs, n_fft, fmin, fmax):
     """
     The data are divided into sections being 2 s long. 
       (n_fft = 500 samples) with a 1 s overlap 
@@ -48,68 +59,43 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
       n_fft=500, fmin=1, fmax=120"""
     
    # define constant parameters
-    welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
+    welch_params = dict(fmin=fmin, fmax=fmax, n_fft=n_fft, 
+                        n_overlap=int(n_fft/2), window='hamming', 
+                        remove_dc=True, average=None)
 
     # calculate power spectrum
     """the returned array will have the same
-      shape as the input data plus an additional frequency dimension"""
-    epochspectrum = epochs.compute_psd(method='welch',  
+      shape as the input data plus an additional frequency dimension.
+      this returns psds and freqs in a tuple"""
+    epochs_welch_power = epochs.mne.time_frequency.psd_array_welch(epochs,  
                                         **welch_params,
                                         n_jobs=30,
                                         verbose=True)
-
-    return epochspectrum
-
-def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
-    """this code will pick sensor pairs for calculating lateralisation 
-        from epochspectrum (output of previous function).
-        the shape of psd is (1, 1, 119) = #epochs, #sensors, #freqs
-        freqs = np.arange(1, 60.5, 0.5)"""
     
-    psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
-    psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
+    epochs_psd_wins = epochs_welch_power[0]  # Shape: (1, 347, 129, 458)
+    epochs_freqs_wins = epochs_welch_power[1] # Shape: (129,)
 
-    return psd_right_sensor, psd_left_sensor, freqs
+    # Calculate the standard deviation along the welch_windows axis (axis=3) and squeeze epoch dimension (which is 1)
+    epochs_std_wins = np.std(epochs_psd_wins, axis=3)  # Shape: (1, 347, 129) -> #epochs, #channels, #frequencies
 
+    return epochs_welch_power, epochs_psd_wins, epochs_freqs_wins, epochs_std_wins
 
-def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
+def calculate_std_lateralisation(std_right_sensor, std_left_sensor):
     """ calculates lateralisation index for each pair of sensors."""
 
-    psd_right_sensor = psd_right_sensor.squeeze()  # squeezable as there's only one sensor and one epoch
-    psd_left_sensor = psd_left_sensor.squeeze()
+    std_right_sensor = std_right_sensor.squeeze()  # squeezable as there's only one epoch
+    std_left_sensor = std_left_sensor.squeeze()
 
     # Perform element-wise subtraction and division
-    subtraction_sensor_pairs = psd_right_sensor - psd_left_sensor
-    sum_element = psd_right_sensor + psd_left_sensor
+    subtraction_sensor_pairs = std_right_sensor - std_left_sensor
+    sum_element = std_right_sensor + std_left_sensor
     sumsub_lat_sensor_pairs = subtraction_sensor_pairs / sum_element
 
     # Log transformation
-    division = (psd_right_sensor/psd_left_sensor)
+    division = (std_right_sensor/std_left_sensor)
     log_lat_sensor_pairs = np.log(division)
 
     return subtraction_sensor_pairs, sumsub_lat_sensor_pairs, log_lat_sensor_pairs
-
-def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
-    """to eliminate noise bias in sensors, this definition 
-    calculates the average of lateralised power in high 
-    frequencies (between h_fmin=90, h_fmax=120), where we don't 
-    expect much brain signal, and then subtracts
-    that bias from the lateralisation index for each sensor pair
-    lateralised_power: output of calculate_spectrum_lateralisation
-    (works for all methods, i.e, subtraction, sumsub and log)
-    freqs: output of pick_sensor_pairs_epochspectrum
-    fmin and fmax: the high frequency section to use for nosie bias """
-    
-    print(f'Removing noise of {h_fmin} and {h_fmax} from lateralised power')
-
-    # Calculate average power in the specified frequency range
-    average_power_high_freqs = np.mean(lateralised_power[(freqs >= h_fmin) & (freqs <= h_fmax)])
-
-    # Subtract the average power from all power values 
-    bias_removed_log_lat = lateralised_power.copy()  
-    bias_removed_log_lat -= average_power_high_freqs    
-
-    return bias_removed_log_lat
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -146,19 +132,27 @@ for i, subjectID in enumerate(good_subject_pd.index):
         print(f'Reading subject # {i}')
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-        epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
              print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
-             psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
-                                                                                   row['right_sensors'][0:8], 
-                                                                                   row['left_sensors'][0:8])
-             subtraction_lat, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             array_right_sensor, array_left_sensor = pick_sensor_pairs_epochs_array(epochs,
+                                                                                    row['right_sensors'][0:8], 
+                                                                                    row['left_sensors'][0:8])
+             _, _, _, epochs_std_wins_right = calculate_win_std(array_right_sensor, 
+                                                                      n_fft=500, 
+                                                                      fmin=1, 
+                                                                      fmax=120)  # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
+             _, _, _, epochs_std_wins_left = calculate_win_std(array_left_sensor, 
+                                                                      n_fft=500, 
+                                                                      fmin=1, 
+                                                                      fmax=120)
+             
+             subtraction_lat, sumsub_lat_sensor_pairs, _  = calculate_std_lateralisation(epochs_std_wins_right, epochs_std_wins_left)
+ 
+### DONE UNTIL HERE ###
 
-             # Remove noise bias
-             bias_removed_lat = remove_noise_bias(subtraction_lat, freqs, h_fmin=90, h_fmax=120)
 
              # Reshape the array to have shape (473 (#freqs), 1) for stacking
              bias_removed_lat = bias_removed_lat.reshape(-1,1)
