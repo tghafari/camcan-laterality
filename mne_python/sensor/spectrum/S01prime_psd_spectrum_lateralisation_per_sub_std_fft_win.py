@@ -82,7 +82,7 @@ def calculate_std_segs(sensor_array, sfreq, fmin, fmax):
     sensor_array_psds_segs = sensor_array_welch_power[0]  # psds-> Shape: (1, 1, 239, 469)  #epochs, #channels, #freqs, #segments
     sensor_array_freqs_segs = sensor_array_welch_power[1] # freqs-> Shape: (239,)
 
-    # Calculate the standard deviation along the welch_windows axis (axis=3) and squeeze epoch dimension (which is 1)
+    # Calculate the standard deviation along the welch_windows axis (axis=3) 
     print('calculating std over segments')
     sensor_std_segs = np.std(sensor_array_psds_segs, axis=3)  # Shape: (1, 1, 239) -> #epochs, #channels, #freqs
 
@@ -205,7 +205,7 @@ if test_plot:
         plt.title(f'Participant {sub}')
         plt.xlabel('Frequency')
         plt.ylabel('STD lateralisation')
-        plt.savefig(op.join(to_test_output_dir, f'sub_{sub}_lat_std.png'))
+        plt.savefig(op.join(to_test_output_dir, f'sub_{sub}_lat_std.tiff'), dpi=500)
         plt.close()
 
     for _ in to_tests:
@@ -216,39 +216,36 @@ if test_plot:
         epoched_fif = op.join(epoched_dir, epoched_fname)
         try:
             epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-            array_right_sensor, array_left_sensor = pick_sensor_pairs_epochs_array(epochs,
-                                                                                row['right_sensors'][0:8], 
-                                                                                row['left_sensors'][0:8])
-            epochs_std_wins_right, _, _, _  = calculate_std_segs(array_right_sensor, 
-                                                            sfreq=epochs.info['sfreq'], # 250.0Hz
-                                                            fmin=1, 
-                                                            fmax=120) 
-            epochs_std_wins_left, _, _, sensor_array_freqs_segs = calculate_std_segs(array_left_sensor, 
-                                                                                sfreq=epochs.info['sfreq'], 
-                                                                                fmin=1, 
-                                                                                fmax=120)            
+            for _, row in sensors_layout_names_df.head(5).iterrows():
+                array_right_sensor, array_left_sensor = pick_sensor_pairs_epochs_array(epochs,
+                                                                                    row['right_sensors'][0:8], 
+                                                                                    row['left_sensors'][0:8])
+                epochs_std_wins_right, _, _, _  = calculate_std_segs(array_right_sensor, 
+                                                                sfreq=epochs.info['sfreq'], # 250.0Hz
+                                                                fmin=1, 
+                                                                fmax=120) 
+                epochs_std_wins_left, _, _, sensor_array_freqs_segs = calculate_std_segs(array_left_sensor, 
+                                                                                    sfreq=epochs.info['sfreq'], 
+                                                                                    fmin=1, 
+                                                                                    fmax=120)            
 
-            # Plot the EpochSpectrum
-            # fig = epochspectrum.plot_topo(color='k', fig_facecolor='w', axis_facecolor='w', show=False)  # raising a size error for no reason?
-            # plt.title(f'Sub_{subjectID}', y=0.9)
-            # fig.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_epochspectrum_topo.png'))
+                # Plot right and left sensors
+                plt.subplot(1, 2, 2)
+                plt.plot(sensor_array_freqs_segs, np.squeeze(epochs_std_wins_right))
+                plt.title(f'right sensor - {row["right_sensors"][0:8]}')
+                plt.xlabel('Frequency')
+                plt.ylabel(f'STD of welch segments')
 
-            # Plot right and left sensors
-            plt.subplot(1, 2, 2)
-            plt.plot(sensor_array_freqs_segs, np.squeeze(epochs_std_wins_right))
-            plt.title(f'right sensor - {row["right_sensors"][0:8]}')
-            plt.xlabel('Frequency')
-            plt.ylabel(f'STD of welch segments')
+                plt.subplot(1, 2, 1)
+                plt.plot(sensor_array_freqs_segs, np.squeeze(epochs_std_wins_left))
+                plt.title(f'left sensor - {row["left_sensors"][0:8]}')
+                plt.xlabel('Frequency')
+                plt.ylabel(f'STD of welch segments')
 
-            plt.subplot(1, 2, 1)
-            plt.plot(sensor_array_freqs_segs, np.squeeze(epochs_std_wins_left))
-            plt.title(f'left sensor - {row["left_sensors"][0:8]}')
-            plt.xlabel('Frequency')
-            plt.ylabel(f'STD of welch segments')
-
-            plt.suptitle(f'sub_{subjectID}')
-            plt.show()
-            plt.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_stdspectrum_psd.png'))
+                plt.suptitle(f'sub_{subjectID}')
+                #plt.show()
+                plt.savefig(op.join(to_test_output_dir, f'sub_{subjectID}_stdspectrum_psd_{row[0]}{row[1]}.tiff'), dpi=500)
+                plt.close()
         except:
             print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass           
