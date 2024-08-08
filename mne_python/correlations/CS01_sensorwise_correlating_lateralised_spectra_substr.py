@@ -79,7 +79,7 @@ def pearson_spearman_calculator(working_df, freq, substr,
 
     return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
 
-platform = 'bluebear'  # bluebear or mac?
+platform = 'mac'  # bluebear or mac?
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -90,7 +90,7 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_std-subtraction')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
@@ -118,7 +118,7 @@ for i, row in sensors_layout_names_df.iterrows():
                                     row["right_sensors"][0:8], 
                                     substr_lat_df)
     
-    output_corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise',
+    output_corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_std-subtraction',
                                f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
     if not op.exists(output_corr_dir):
         os.makedirs(output_corr_dir)

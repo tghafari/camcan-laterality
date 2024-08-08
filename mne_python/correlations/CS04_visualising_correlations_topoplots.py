@@ -116,7 +116,7 @@ def freq_substr_corr_p_values(corr_dir, substr, freq):
             channel_index_grad, channel_index_mag, 
             channel_drop_grad, channel_drop_mag)
 
-platform = 'bluebear'
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -129,15 +129,15 @@ elif platform == 'mac':
 # Define directories 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction')  # containing all sensor pair folders
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation topomaps/freqs/subtraction')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_std-subtraction')  # containing all sensor pair folders
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/freqs/std-subtraction')
 
 # List of the things for which you want topoplots
 substrs = ['Caud']
 #['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-freqs = np.arange(6,14,0.5)
+# freqs = np.arange(6,14,0.5)
 #[10,10.5,11,11.5,12,12.5]
-#[10,10.5,11,11.5,12,12.5,60,60.5,61,61.5]
+freqs=[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,60,60.5,61,61.5]
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
 correlations_dfs_grad = {}
@@ -232,7 +232,7 @@ for substr in substrs:
         cbar.set_label('Correlation Values')
 
         fig.set_size_inches(12, 12)
-        plt.close()
+
     
     
         if not op.exists(op.join(fig_output_dir, substr)):
@@ -240,3 +240,4 @@ for substr in substrs:
         #plt.savefig(op.join(correlation_path, f'{band}_correlations.svg'), format='svg', dpi=300)
         #plt.savefig(op.join(correlation_path, f'{band}_correlations.tiff'), format='tiff', dpi=300)
         plt.savefig(op.join(fig_output_dir, substr, f'{freq}_correlations.jpg'), format='jpg', dpi=300)
+        plt.close()

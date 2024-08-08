@@ -139,8 +139,8 @@ stds_all_sens_all_subs = np.stack(stds_all_sens_all_subs, axis=0)  # shape: #sub
 grand_average_std = np.mean(stds_all_sens_all_subs, axis=0)  # shape: #channels, #freqs
 
 # Filter out frequencies below 60 Hz - to show low amplitudes in high freqs better
-min_freq = 0
-freq_mask = np.where(freqs > min_freq)[0]
+min_freq = 30
+freq_mask = np.where(freqs < min_freq)[0]
 filtered_freqs = freqs[freq_mask]
 
 # Create Evoked objects for right and left
@@ -171,12 +171,11 @@ handles = [plt.Line2D([0], [0], color='orange', lw=2),
            plt.Line2D([0], [0], color='blue', lw=2)]
 labels = ['Right Sensors', 'Left Sensors']
 plt.legend(handles, labels, loc='upper right')
-plt.title('Grand Average STD Right vs Left Sensors')
+plt.title('Grand Average STD Right and Left Sensors')
 ax.grid(True)
 #plt.show()
 
-# Save
-grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'grand_average_std_plot_topo_120.tiff'))
+grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'grand_average_std_plot_topo_0-30.tiff'))
 grand_avg_fig.savefig(grand_avg_fig_output_fname, dpi=1500)
 
 # Plotting stds of sensor pairs on right side
@@ -194,10 +193,9 @@ handles = [plt.Line2D([0], [0], color='orange', lw=2),
            plt.Line2D([0], [0], color='blue', lw=2)]
 labels = ['Right Sensors', 'Left Sensors']
 plt.legend(handles, labels, loc='upper right')
-plt.title('Grand Average STD Right vs Left Sensors')
+plt.title('Grand Average STD Right vs Left Sensors (0-30Hz)')
 ax.grid(True)
 #plt.show()
 
-# Save
-grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'grand_average_std_right_plot_topo_120.tiff'))
+grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'grand_average_std_right_plot_topo_0-30.tiff'))
 grand_avg_fig.savefig(grand_avg_fig_output_fname, dpi=1500)

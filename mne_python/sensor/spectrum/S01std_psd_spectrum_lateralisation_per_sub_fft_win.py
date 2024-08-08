@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================
-S01prime. Spectrum lateralisation with std
+S01std. Spectrum lateralisation with std
 
 This code will:
     1. pick right and corresponding left sensors 
