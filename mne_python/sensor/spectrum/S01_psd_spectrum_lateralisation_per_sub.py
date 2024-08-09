@@ -154,10 +154,10 @@ for i, subjectID in enumerate(good_subject_pd.index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             _, sumsub_lat_sensor_pairs, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
              # Remove noise bias
-             bias_removed_lat = remove_noise_bias(sumsub_lat_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
+             bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
              # Reshape the array to have shape (473 (#freqs), 1) for stacking
              bias_removed_lat = bias_removed_lat.reshape(-1,1)
@@ -189,7 +189,7 @@ if test_plot:
 
     # Sanity check with plot_topos
     to_tests = np.arange(0,6)
-    to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/tes_plots')
+    to_test_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
     
     for i in range(np.shape(spec_lateralisation_all_sens_all_subs)[0]):
         participant_data = spec_lateralisation_all_sens_all_subs[i]  # data for current participant
