@@ -129,8 +129,8 @@ elif platform == 'mac':
 # Define directories 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_std-subtraction')  # containing all sensor pair folders
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/freqs/std-subtraction')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise')  # containing all sensor pair folders
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/freqs/subtraction_nonoise')
 
 # List of the things for which you want topoplots
 substrs = ['Caud']
@@ -233,8 +233,6 @@ for substr in substrs:
 
         fig.set_size_inches(12, 12)
 
-    
-    
         if not op.exists(op.join(fig_output_dir, substr)):
             os.mkdir(op.join(fig_output_dir, substr))
         #plt.savefig(op.join(correlation_path, f'{band}_correlations.svg'), format='svg', dpi=300)
