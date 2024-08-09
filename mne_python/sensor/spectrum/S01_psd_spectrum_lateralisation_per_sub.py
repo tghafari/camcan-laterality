@@ -27,14 +27,14 @@ Questions:
 """
 # import libraries
 import os.path as op
-import os
+
 import pandas as pd
 import numpy as np
-import mne
-import sys 
 import matplotlib.pyplot as plt
 
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
+import mne
+
+platform = 'mac'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -62,8 +62,8 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
         from epochspectrum (output of previous function).
-        the shape of psd is (1, 1, 119) = #epochs, #sensors, #freqs
-        freqs = np.arange(1, 60.5, 0.5)"""
+        the shape of psd is (1, 1, 239) = #epochs, #sensors, #freqs
+        freqs = np.arange(1, 120, 0.5)"""
     
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()
@@ -109,6 +109,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
     bias_removed_log_lat -= average_power_high_freqs    
 
     return bias_removed_log_lat
+
 
 # Define where to read and write the data
 if platform == 'bluebear':
