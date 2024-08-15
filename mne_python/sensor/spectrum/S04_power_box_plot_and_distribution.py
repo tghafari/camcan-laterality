@@ -331,14 +331,14 @@ def plot_histogram_with_bins(plot_data, output_dir, title, bin_count):
 def plot_filtered_histogram_with_bins(plot_data, output_dir, title, bin_count, q1, q2):
     """Plot a histogram of power averages outside the IQR."""
     Q1, Q3 = plot_data['Power Avg'].quantile([q1, q2])
-    filtered_plot_data = plot_data[plot_data['Power Avg'] > Q3 | plot_data['Power Avg'] < Q1]
-    
+    filtered_plot_data = plot_data[(plot_data['Power Avg'] > Q3) | (plot_data['Power Avg'] < Q1)]
+
     min_power, max_power = filtered_plot_data['Power Avg'].min(), filtered_plot_data['Power Avg'].max()
     bins = np.linspace(min_power, max_power, bin_count + 1)
     
     plt.figure(figsize=(12, 8))
     sns.histplot(data=filtered_plot_data, x='Power Avg', hue='Sensor', bins=bins, multiple='dodge', shrink=0.8)
-    plt.title(f'Power Averages Between {q1}th and {q3}th Percentile for {title}')
+    plt.title(f'Power Averages Between {q1}th and {q2}th Percentile for {title}')
     plt.xlabel('Power Average')
     plt.ylabel('Number of Participants')
     plt.xticks(bins)
@@ -392,7 +392,7 @@ info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 output_dir = op.join(rds_dir, 'derivatives/meg/sensor/power_per_sensor')
-test_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
+test_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/healthy_distribution')
 
 # Load subject information and sensor layout
 good_subject_pd = pd.read_csv(good_sub_sheet).set_index('Unnamed: 0')
@@ -401,4 +401,4 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 # Calculate spectral power, store and then plot
 sensor_power_dataframes, freqs = calculate_and_store_spectral_power(good_subject_pd, sensors_layout_names_df, epoched_dir, output_dir)
 # plot_sensor_power(sensor_power_dataframes, sensors_layout_names_df, freqs, min_freq=60, max_freq=120, output_dir=None)
-plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120, test_plot_dir=test_plot_dir, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True)
+plot_power_average(sensor_power_dataframes, freqs, min_freq=0, max_freq=120, test_plot_dir=test_plot_dir, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True)
