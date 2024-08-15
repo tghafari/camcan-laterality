@@ -202,19 +202,26 @@ def plot_sensor_power(sensor_power_dataframes, sensors_layout_names_df,
         else:
             plt.show()
 
-def plot_power_average(sensor_power_dataframes, sensors_layout_names_df, freqs, min_freq=60, max_freq=120):
-    """This function calculates and plots the average power between 60-120 Hz 
-    for each participant and each sensor. Separate plots are created for sensors
-    whose names end in '1' and those whose names do not end in '1'."""
+
+def plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120, test_plot_dir=None, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True):
+    """Calculate and plot the average power between specified frequencies for each participant and each sensor.
+    
+    Args:
+        sensor_power_dataframes (dict): Dictionary containing DataFrames of power data for each sensor.
+        freqs (array): Array of frequency values.
+        min_freq (int): Minimum frequency for power calculation. Default is 60 Hz.
+        max_freq (int): Maximum frequency for power calculation. Default is 120 Hz.
+        test_plot_dir (str): Directory for saving plots. Default is 'None'.
+        plot_histogram (bool): Whether to plot the full histogram. Default is True.
+        plot_filtered_histogram (bool): Whether to plot the filtered histogram (outside IQR). Default is True.
+        plot_boxplot (bool): Whether to plot the boxplot. Default is True.
+        plot_pooled_histogram (bool): Whether to plot the pooled histogram. Default is True.
+    """
 
     freq_mask = np.where((freqs >= min_freq) & (freqs <= max_freq))[0]
     
-    # Dictionaries to hold power averages
-    power_avg_mag_dic = {}
-    power_avg_grad_dic = {}
-
-    # Empty numpy arrays to hold power averages for the sub and sensors pooled histogram 
-    num_grad_sensors = sum(1 for sensor_name in sensor_power_dataframes if not sensor_name.endswith('1'))  # Count the number of gradiometer and magnetometer sensors
+    # Initialize arrays for storing power averages for pooled hist
+    num_grad_sensors = sum(1 for sensor_name in sensor_power_dataframes if not sensor_name.endswith('1'))
     num_mag_sensors = sum(1 for sensor_name in sensor_power_dataframes if sensor_name.endswith('1'))
     num_subjects = sensor_power_dataframes['MEG0111'].shape[0]
 
@@ -223,6 +230,11 @@ def plot_power_average(sensor_power_dataframes, sensors_layout_names_df, freqs, 
 
     mag_sensor_idx = 0
     grad_sensor_idx = 0
+
+    # Initialise dictionaries for hist
+    power_avg_mag_dic = {}
+    power_avg_grad_dic = {}
+
 
     for sensor_name in sensor_power_dataframes:
         df = sensor_power_dataframes[sensor_name]
@@ -239,33 +251,36 @@ def plot_power_average(sensor_power_dataframes, sensors_layout_names_df, freqs, 
             power_avg_grad_array[:, grad_sensor_idx] = power_avg
             grad_sensor_idx += 1
 
-    num_grad_sensors = sum(1 for sensor_name in sensor_power_dataframes if not sensor_name.endswith('1'))  # Count the number of gradiometer and magnetometer sensors
-    num_mag_sensors = sum(1 for sensor_name in sensor_power_dataframes if sensor_name.endswith('1'))
-    num_subjects = sensor_power_dataframes['MEG0111'].shape[0]
-
     sub_sens_power_avg_mag_array = power_avg_mag_array.reshape(num_mag_sensors*num_subjects, -1)
     sub_sens_power_avg_grad_array = power_avg_grad_array.reshape(num_grad_sensors*num_subjects, -1)
 
-    # Plot sensors whose names end in '1'
-    output_dir = op.join(test_plot_dir,f'mag_{min_freq}-{max_freq}')
-    plot_avg_power_distribution(power_avg_mag_dic, sub_sens_power_avg_mag_array, output_dir=output_dir, title=f"Magnetometers_{min_freq}-{max_freq}")
+    # Plot Magnetometers
+    output_dir_mag = op.join(test_plot_dir, f'mag_{min_freq}-{max_freq}')
+    plot_avg_power_distribution(power_avg_mag_dic, sub_sens_power_avg_mag_array, output_dir=output_dir_mag, title=f"Magnetometers_{min_freq}-{max_freq}", plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
 
-    # Plot sensors whose names do not end in '1'
-    output_dir = op.join(test_plot_dir,f'grad_{min_freq}-{max_freq}')
-    plot_avg_power_distribution(power_avg_grad_dic, sub_sens_power_avg_grad_array, output_dir=output_dir, title=f"Gradiometers_{min_freq}-{max_freq}")
+    # Plot Gradiometers
+    output_dir_grad = op.join(test_plot_dir, f'grad_{min_freq}-{max_freq}')
+    plot_avg_power_distribution(power_avg_grad_dic, sub_sens_power_avg_grad_array, output_dir=output_dir_grad, title=f"Gradiometers_{min_freq}-{max_freq}", plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
 
 
-def plot_avg_power_distribution(power_avg_dict, power_avg_array, output_dir, title, bin_count=10):
-    """Plot the distribution of average power values binned into specific ranges.
-       Additionally, plot a box plot showing the average power distribution for each sensor.
+def plot_avg_power_distribution(power_avg_dict, power_avg_array, output_dir, title, bin_count=10, q1=0, q2=0.9, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True):
+    """Plot various distributions of average power values.
 
     Args:
-        power_avg_dict (dict): Dictionary where keys are sensor names and values are lists of power averages.
-        power_avg_array (array): Array of all sensors and all subjects power values pooled together.
+        power_avg_dict (dict): Dictionary with sensor names as keys and power averages as values.
+        power_avg_array (array): Array of all sensors and subjects power values pooled together.
+        output_dir (str): Directory for saving plots.
         title (str): Title of the plot.
-        bin_count (int): Number of bins to use for the histogram. Default is 10.
+        bin_count (int): Number of bins to use for histograms. Default is 10.
+        q1 (float between 0 and 1): first quantile for inter quantile range.
+        q2 (float between 0 and 1): last quantile for inter quantile range.
+        plot_histogram (bool): Whether to plot the full histogram. Default is True.
+        plot_filtered_histogram (bool): Whether to plot the filtered histogram (outside IQR). Default is True.
+        plot_boxplot (bool): Whether to plot the boxplot. Default is True.
+        plot_pooled_histogram (bool): Whether to plot the pooled histogram. Default is True.
     """
-    # Prepare the data for plotting
+
+    # Prepare data for plotting
     all_sensor_names = []
     all_avg_powers = []
     
@@ -273,68 +288,94 @@ def plot_avg_power_distribution(power_avg_dict, power_avg_array, output_dir, tit
         all_sensor_names.extend([sensor_name] * len(power_avgs))
         all_avg_powers.extend(power_avgs)
     
-    # Create a DataFrame for easier manipulation with seaborn
-    plot_data = pd.DataFrame({
-        'Sensor': all_sensor_names,
-        'Power Avg': all_avg_powers
-    })
-
-    # Drop any rows where 'Power Avg' is NaN
+    plot_data = pd.DataFrame({'Sensor': all_sensor_names, 'Power Avg': all_avg_powers})
     plot_data.dropna(subset=['Power Avg'], inplace=True)
 
-    # Check if the DataFrame is empty after dropping NaNs
     if plot_data.empty:
         print("No data available for plotting after removing NaN values.")
         return
 
-    # Determine the range and bin edges for the power averages
-    min_power = min(plot_data['Power Avg'])
-    max_power = max(plot_data['Power Avg'])
+    # Full Histogram Plot
+    if plot_histogram:
+        plot_histogram_with_bins(plot_data, output_dir, title, bin_count)
+
+    # Filtered Histogram (Outside IQR)
+    if plot_filtered_histogram:
+        plot_filtered_histogram_with_bins(plot_data, output_dir, title, bin_count, q1, q2)
+
+    # Boxplot of Sensor Power Averages
+    if plot_boxplot:
+        plot_boxplot_ranked_by_mean(plot_data, output_dir, title)
+
+    # Pooled Histogram of Sensors and Subjects
+    if plot_pooled_histogram:
+        plot_pooled_histogram_of_sensors(power_avg_array, output_dir, title, bin_count)
+    
+def plot_histogram_with_bins(plot_data, output_dir, title, bin_count):
+    """Plot a histogram of power averages."""
+    min_power, max_power = plot_data['Power Avg'].min(), plot_data['Power Avg'].max()
     bins = np.linspace(min_power, max_power, bin_count + 1)
     
-#    # Plot 1: Histogram with binned data
-#     plt.figure(figsize=(12, 8))
-#     sns.histplot(data=plot_data, x='Power Avg', hue='Sensor', bins=bins, multiple='dodge', shrink=0.8)
+    plt.figure(figsize=(12, 8))
+    sns.histplot(data=plot_data, x='Power Avg', hue='Sensor', bins=bins, multiple='dodge', shrink=0.8)
+    plt.title(f'Power Averages for {title}')
+    plt.xlabel('Power Average')
+    plt.ylabel('Number of Participants')
+    plt.xticks(bins)
+    plt.legend(title='Sensor', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}_{bin_count}bin.png', dpi=300)
+    plt.close()
 
-#     plt.title(f'Power Averageds for {title}')
-#     plt.xlabel('Power Average')
-#     plt.ylabel('Number of Participants')
-#     plt.xticks(bins)
-#     plt.legend(title='Sensor', bbox_to_anchor=(1.05, 1), loc='upper left')
-#     plt.tight_layout()
-#     plt.savefig(f'{output_dir}_{bin_count}bin.png', dpi=300)
-#     plt.close()
+
+def plot_filtered_histogram_with_bins(plot_data, output_dir, title, bin_count, q1, q2):
+    """Plot a histogram of power averages outside the IQR."""
+    Q1, Q3 = plot_data['Power Avg'].quantile([q1, q2])
+    filtered_plot_data = plot_data[plot_data['Power Avg'] > Q3 | plot_data['Power Avg'] < Q1]
     
-#     # Calculate the mean power for each sensor
-#     sensor_mean_powers = plot_data.groupby('Sensor')['Power Avg'].mean().sort_values()
+    min_power, max_power = filtered_plot_data['Power Avg'].min(), filtered_plot_data['Power Avg'].max()
+    bins = np.linspace(min_power, max_power, bin_count + 1)
+    
+    plt.figure(figsize=(12, 8))
+    sns.histplot(data=filtered_plot_data, x='Power Avg', hue='Sensor', bins=bins, multiple='dodge', shrink=0.8)
+    plt.title(f'Power Averages Between {q1}th and {q3}th Percentile for {title}')
+    plt.xlabel('Power Average')
+    plt.ylabel('Number of Participants')
+    plt.xticks(bins)
+    plt.legend(title='Sensor', bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}_{bin_count}bin_filtered90th.png', dpi=300)
+    plt.close()
 
-#     # Plot 2: Box plot of power averages ranked by sensor mean power
-#     plt.figure(figsize=(12, 8))
-#     sorted_sensors = sensor_mean_powers.index
-#     sns.boxplot(x='Sensor', y='Power Avg', data=plot_data, order=sorted_sensors, palette='coolwarm')
+def plot_boxplot_ranked_by_mean(plot_data, output_dir, title):
+    """Plot a boxplot of power averages, ranked by sensor mean power."""
+    sensor_mean_powers = plot_data.groupby('Sensor')['Power Avg'].mean().sort_values()
+    sorted_sensors = sensor_mean_powers.index
+    
+    plt.figure(figsize=(12, 8))
+    sns.boxplot(x='Sensor', y='Power Avg', data=plot_data, order=sorted_sensors, palette='coolwarm')
+    plt.title(f'{title} - Box Plot of Power Averages Ranked by Mean Power')
+    plt.xlabel('Sensors (Ranked)')
+    plt.ylabel('Power Average')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}_box.png', dpi=300)
+    plt.close()
 
-#     plt.title(f'{title}, Box Plot of Power Averages for Sensors, Ranked by Mean Power')
-#     plt.xlabel('Sensors (Ranked)')
-#     plt.ylabel('Power Average')
-#     plt.xticks(rotation=45)
-#     plt.tight_layout()
-#     plt.savefig(f'{output_dir}_box.png', dpi=300)
-#     plt.close()
-
-    # Plot 3: Histogram of subjects and sensors pooled together in a grad and mag array
-    """the aim of this plot is to find the healthy range of power across 
-    all sensors and all subjects."""
-
-    plt.figure(figsize=(12,8))
-    plt.hist(power_avg_array, bins=bins)
-    plt.title(f'Histogram of number of sensors + subjects vs power- {title}')
+def plot_pooled_histogram_of_sensors(power_avg_array, output_dir, title, bin_count):
+    """Plot a histogram of pooled sensors and subjects.
+        the aim of this plot is to find the healthy range of power across 
+        all sensors and all subjects."""
+    plt.figure(figsize=(12, 8))
+    plt.hist(power_avg_array, bins=bin_count)
+    plt.title(f'Histogram of Sensors and Subjects vs Power - {title}')
     plt.xlabel('Power')
     plt.ylabel('Number of Sensors + Subjects')
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig(f'{output_dir}_pooled.png', dpi=300)
     plt.close()
-    
+
 
 # Define paths (same as your original script)
 platform = 'mac'  # 'bluebear' or 'mac'?
@@ -360,4 +401,4 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 # Calculate spectral power, store and then plot
 sensor_power_dataframes, freqs = calculate_and_store_spectral_power(good_subject_pd, sensors_layout_names_df, epoched_dir, output_dir)
 # plot_sensor_power(sensor_power_dataframes, sensors_layout_names_df, freqs, min_freq=60, max_freq=120, output_dir=None)
-plot_power_average(sensor_power_dataframes, sensors_layout_names_df, freqs, min_freq=1, max_freq=120)
+plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120, test_plot_dir=test_plot_dir, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True)
