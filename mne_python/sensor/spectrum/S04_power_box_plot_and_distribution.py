@@ -230,7 +230,7 @@ def plot_power_average(sensor_power_dataframes, sensors_layout_names_df, freqs, 
     output_dir = op.join(test_plot_dir,f'grad_{min_freq}-{max_freq}')
     plot_avg_power_distribution(power_avg_grad, output_dir=output_dir, title=f"Gradiometers_{min_freq}-{max_freq}")
 
-def plot_avg_power_distribution(power_avg_dict, output_dir, title, bin_count=5):
+def plot_avg_power_distribution(power_avg_dict, output_dir, title, bin_count=10):
     """Plot the distribution of average power values binned into specific ranges.
        Additionally, plot a box plot showing the average power distribution for each sensor.
 
@@ -276,23 +276,24 @@ def plot_avg_power_distribution(power_avg_dict, output_dir, title, bin_count=5):
     plt.xticks(bins)
     plt.legend(title='Sensor', bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
-    plt.savefig(f'{output_dir}_bin.png', dpi=300)
+    plt.savefig(f'{output_dir}_{bin_count}bin.png', dpi=300)
     plt.close()
-    # Calculate the mean power for each sensor
-    sensor_mean_powers = plot_data.groupby('Sensor')['Power Avg'].mean().sort_values()
+    
+    # # Calculate the mean power for each sensor
+    # sensor_mean_powers = plot_data.groupby('Sensor')['Power Avg'].mean().sort_values()
 
-    # Plot 2: Box plot of power averages ranked by sensor mean power
-    plt.figure(figsize=(12, 8))
-    sorted_sensors = sensor_mean_powers.index
-    sns.boxplot(x='Sensor', y='Power Avg', data=plot_data, order=sorted_sensors, palette='coolwarm')
+    # # Plot 2: Box plot of power averages ranked by sensor mean power
+    # plt.figure(figsize=(12, 8))
+    # sorted_sensors = sensor_mean_powers.index
+    # sns.boxplot(x='Sensor', y='Power Avg', data=plot_data, order=sorted_sensors, palette='coolwarm')
 
-    plt.title(f'{title}, Box Plot of Power Averages for Sensors, Ranked by Mean Power')
-    plt.xlabel('Sensors (Ranked)')
-    plt.ylabel('Power Average')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(f'{output_dir}_box.png', dpi=300)
-    plt.close()
+    # plt.title(f'{title}, Box Plot of Power Averages for Sensors, Ranked by Mean Power')
+    # plt.xlabel('Sensors (Ranked)')
+    # plt.ylabel('Power Average')
+    # plt.xticks(rotation=45)
+    # plt.tight_layout()
+    # plt.savefig(f'{output_dir}_box.png', dpi=300)
+    # plt.close()
 
 # Define paths (same as your original script)
 platform = 'bluebear'  # 'bluebear' or 'mac'?
