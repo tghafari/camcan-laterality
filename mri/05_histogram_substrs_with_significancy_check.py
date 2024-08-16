@@ -244,5 +244,5 @@ def plot_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, structures,
 filter_and_plot_volumes(lat_sheet_fname, good_sub_sheet, structures, colormap)
 
 # Call the function to plot subcortical volumes
-# plot_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, structures, colormap)
+plot_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, structures, colormap)
 
