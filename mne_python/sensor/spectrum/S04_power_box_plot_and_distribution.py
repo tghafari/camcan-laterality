@@ -39,6 +39,7 @@ import matplotlib.pyplot as plt
 
 import seaborn as sns
 import mne
+import json
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
@@ -203,7 +204,10 @@ def plot_sensor_power(sensor_power_dataframes, sensors_layout_names_df,
             plt.show()
 
 
-def plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120, test_plot_dir=None, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True):
+def plot_power_average(sensor_power_dataframes, freqs, min_freq=0, max_freq=120, bin_count=30, q1=0, q2=0.9,
+                       test_plot_dir=None, plot_histogram=True, plot_filtered_histogram=True, 
+                       plot_boxplot=True, plot_pooled_histogram=True):
+    
     """Calculate and plot the average power between specified frequencies for each participant and each sensor.
     
     Args:
@@ -235,7 +239,6 @@ def plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120
     power_avg_mag_dic = {}
     power_avg_grad_dic = {}
 
-
     for sensor_name in sensor_power_dataframes:
         df = sensor_power_dataframes[sensor_name]
         power_avg = df.iloc[:, freq_mask].mean(axis=1)  # Average power for each participant
@@ -256,14 +259,22 @@ def plot_power_average(sensor_power_dataframes, freqs, min_freq=60, max_freq=120
 
     # Plot Magnetometers
     output_dir_mag = op.join(test_plot_dir, f'mag_{min_freq}-{max_freq}')
-    plot_avg_power_distribution(power_avg_mag_dic, sub_sens_power_avg_mag_array, output_dir=output_dir_mag, title=f"Magnetometers_{min_freq}-{max_freq}", plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
+    plot_avg_power_distribution(power_avg_mag_dic, sub_sens_power_avg_mag_array, output_dir=output_dir_mag, 
+                                title=f"Magnetometers_{min_freq}-{max_freq}", bin_count=bin_count, q1=q1, q2=q2, 
+                                plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, 
+                                plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
 
     # Plot Gradiometers
     output_dir_grad = op.join(test_plot_dir, f'grad_{min_freq}-{max_freq}')
-    plot_avg_power_distribution(power_avg_grad_dic, sub_sens_power_avg_grad_array, output_dir=output_dir_grad, title=f"Gradiometers_{min_freq}-{max_freq}", plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
+    plot_avg_power_distribution(power_avg_grad_dic, sub_sens_power_avg_grad_array, output_dir=output_dir_grad, 
+                                title=f"Gradiometers_{min_freq}-{max_freq}", bin_count=30, q1=0, q2=0.9, 
+                                plot_histogram=plot_histogram, plot_filtered_histogram=plot_filtered_histogram, 
+                                plot_boxplot=plot_boxplot, plot_pooled_histogram=plot_pooled_histogram)
 
 
-def plot_avg_power_distribution(power_avg_dict, power_avg_array, output_dir, title, bin_count=10, q1=0, q2=0.9, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True):
+def plot_avg_power_distribution(power_avg_dict, power_avg_array, output_dir, title, 
+                                bin_count=30, q1=0, q2=0.9, plot_histogram=True, 
+                                plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True):
     """Plot various distributions of average power values.
 
     Args:
@@ -327,18 +338,17 @@ def plot_histogram_with_bins(plot_data, output_dir, title, bin_count):
     plt.savefig(f'{output_dir}_{bin_count}bin.png', dpi=300)
     plt.close()
 
-
 def plot_filtered_histogram_with_bins(plot_data, output_dir, title, bin_count, q1, q2):
     """Plot a histogram of power averages outside the IQR."""
-    Q1, Q3 = plot_data['Power Avg'].quantile([q1, q2])
-    filtered_plot_data = plot_data[(plot_data['Power Avg'] > Q3) | (plot_data['Power Avg'] < Q1)]
+    Q1, Q2 = plot_data['Power Avg'].quantile([q1, q2])
+    filtered_plot_data = plot_data[(plot_data['Power Avg'] > Q2) | (plot_data['Power Avg'] < Q1)]
 
     min_power, max_power = filtered_plot_data['Power Avg'].min(), filtered_plot_data['Power Avg'].max()
     bins = np.linspace(min_power, max_power, bin_count + 1)
     
     plt.figure(figsize=(12, 8))
     sns.histplot(data=filtered_plot_data, x='Power Avg', hue='Sensor', bins=bins, multiple='dodge', shrink=0.8)
-    plt.title(f'Power Averages Between {q1}th and {q2}th Percentile for {title}')
+    plt.title(f'Power Averages Outside of {q1}th and {q2}th Percentile for {title}')
     plt.xlabel('Power Average')
     plt.ylabel('Number of Participants')
     plt.xticks(bins)
@@ -346,6 +356,11 @@ def plot_filtered_histogram_with_bins(plot_data, output_dir, title, bin_count, q
     plt.tight_layout()
     plt.savefig(f'{output_dir}_{bin_count}bin_filtered90th.png', dpi=300)
     plt.close()
+
+    # Convert and write JSON object to file
+    quantile_dict = {f'{q1}th quantile':Q1, f'{q2}th quantile':Q2}
+    with open(f'{output_dir}_{q1}_{q2}.json', "w") as outfile: 
+        json.dump(quantile_dict, outfile)
 
 def plot_boxplot_ranked_by_mean(plot_data, output_dir, title):
     """Plot a boxplot of power averages, ranked by sensor mean power."""
@@ -371,9 +386,9 @@ def plot_pooled_histogram_of_sensors(power_avg_array, output_dir, title, bin_cou
     plt.title(f'Histogram of Sensors and Subjects vs Power - {title}')
     plt.xlabel('Power')
     plt.ylabel('Number of Sensors + Subjects')
-    plt.xticks(rotation=45)
+    plt.xticks(rotation=45, minor=True)
     plt.tight_layout()
-    plt.savefig(f'{output_dir}_pooled.png', dpi=300)
+    plt.savefig(f'{output_dir}_{bin_count}bin_pooled.png', dpi=300)
     plt.close()
 
 
@@ -391,7 +406,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/power_per_sensor')
+deriv_dir = op.join(rds_dir, 'derivatives/meg/sensor/power_per_sensor')
 test_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/healthy_distribution')
 
 # Load subject information and sensor layout
@@ -399,6 +414,9 @@ good_subject_pd = pd.read_csv(good_sub_sheet).set_index('Unnamed: 0')
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
 # Calculate spectral power, store and then plot
-sensor_power_dataframes, freqs = calculate_and_store_spectral_power(good_subject_pd, sensors_layout_names_df, epoched_dir, output_dir)
+sensor_power_dataframes, freqs = calculate_and_store_spectral_power(good_subject_pd, sensors_layout_names_df, epoched_dir, deriv_dir)
 # plot_sensor_power(sensor_power_dataframes, sensors_layout_names_df, freqs, min_freq=60, max_freq=120, output_dir=None)
-plot_power_average(sensor_power_dataframes, freqs, min_freq=0, max_freq=120, test_plot_dir=test_plot_dir, plot_histogram=True, plot_filtered_histogram=True, plot_boxplot=True, plot_pooled_histogram=True)
+Q1, Q2 = plot_power_average(sensor_power_dataframes, freqs, min_freq=0, max_freq=120, 
+                            bin_count=30, q1=0, q2=0.9, test_plot_dir=test_plot_dir, 
+                            plot_histogram=False, plot_filtered_histogram=True, 
+                            plot_boxplot=False, plot_pooled_histogram=False)

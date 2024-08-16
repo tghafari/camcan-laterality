@@ -39,6 +39,7 @@ import matplotlib.pyplot as plt
 
 import mne
 from scipy import stats
+import json
 
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -79,6 +80,38 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
 
     return psd_right_sensor, psd_left_sensor, freqs
 
+def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
+                   subjectID, outlier_subjectID_df, quantiles_mag, quantiles_grad):
+    """
+    Identify outliers based on PSD values and predefined quantiles for magnetometers and gradiometers.
+    
+    Parameters:
+    - psd_right_sensor, psd_left_sensor: PSD values for right and left sensors.
+    - right and left sensor: Name of the sensor to identify its type.
+    - subjectID: Current subject ID being processed.
+    - outlier_subjectID_df: DataFrame to store outlier subject IDs.
+    - quantiles_mag, quantiles_grad: Dictionaries containing quantile thresholds for magnetometers and gradiometers.
+    
+    Returns:
+    - bool: True if the subject is an outlier, False otherwise.
+    """
+
+    # Determine sensor type
+    if right_sensor.endswith('1') or left_sensor.endswith('1'):
+        quantiles = quantiles_mag
+    else:
+        quantiles = quantiles_grad
+
+    # Check if PSD values are outliers
+    if np.any(psd_right_sensor > quantiles['q2']) or np.any(psd_right_sensor < quantiles['q1']): 
+        outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
+        return True, outlier_subjectID_df
+    
+    if np.any(psd_left_sensor > quantiles['q2']) or np.any(psd_left_sensor < quantiles['q1']):
+        outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
+        return True, outlier_subjectID_df
+
+    return False, outlier_subjectID_df
 
 def calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor):
     """ calculates lateralisation index for each pair of sensors."""
@@ -114,53 +147,10 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
     average_power_high_freqs = np.mean(lateralised_power[(freqs >= h_fmin) & (freqs <= h_fmax)])
 
     # Subtract the average power from all power values 
-    bias_removed_log_lat = lateralised_power.copy()  
-    bias_removed_log_lat -= average_power_high_freqs    
+    bias_removed_lat = lateralised_power.copy()  
+    bias_removed_lat -= average_power_high_freqs    
 
-    return bias_removed_log_lat
-
-def remove_outliers_and_save(sensor_dataframes, sub_IDs, freqs, output_dir, threshold=2.5, outlier_fraction=2/3):
-    """Removes rows with outliers from all sensor dataframes and saves the cleaned dataframes.
-    
-    Args:
-        sensor_dataframes (dict): Dictionary of dataframes to check for outliers.
-        sub_IDs (list): List of subject IDs.
-        freqs (array-like): Frequency values corresponding to the columns.
-        output_dir (str): Directory where cleaned dataframes should be saved.
-        threshold (float): Z-score threshold for identifying outliers.
-        outlier_fraction (float): Fraction of columns that need to be outliers to consider a row as an outlier.
-    """
-    outlier_subjects = set()
-
-    # First pass: Identify all outlier subject IDs across all dataframes
-    for df_name, df in sensor_dataframes.items():
-        # Calculate z-scores across the rows (i.e., across subjects for each frequency)
-        zscore = stats.zscore(df, axis=0)  # axis=0 ensures calculation is done across subjects
-
-        # Identify outliers (True where z-score exceeds threshold)
-        outliers = abs(zscore) > threshold
-
-        # Count the number of outliers in each row
-        outlier_count = outliers.sum(axis=1)
-
-        # Identify rows where outliers are >= 2/3 of total columns
-        outlier_rows = outlier_count >= (outlier_fraction * df.shape[1])
-
-        # Add the outlier subject IDs to the set
-        outlier_subjects.update(df.index[outlier_rows].tolist())
-
-    # Convert the set to a DataFrame (optional: save this information)
-    outlier_subjectID_df = pd.DataFrame(list(outlier_subjects), columns=['SubjectID'])
-    outlier_subjectID_df.to_csv(op.join(output_dir, "outlier_subjectIDs.csv"), index=False)
-
-    # Second pass: Remove outlier rows from all sensor dataframes
-    for df_name, df in sensor_dataframes.items():
-        sensor_dataframes[df_name] = df.drop(index=outlier_subjects)
-        # Save the cleaned dataframe as a CSV file
-        sensor_dataframes[df_name].to_csv(op.join(output_dir, f"no_outlier-{df_name}.csv"))
-
-    return outlier_subjectID_df
-
+    return bias_removed_lat
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -174,7 +164,8 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_sumsub_nonoise')
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers')
+threshold_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/healthy_distribution')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
@@ -182,6 +173,13 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
+
+# Read quantile (outlier threshold) dictionary
+with open(op.join(threshold_dir, 'mag_0-120_0_0.9.json')) as json_file:
+    quantlile_dict_mag = json.load(json_file)
+
+with open(op.join(threshold_dir, 'grad_0-120_0_0.9.json')) as json_file:
+    quantlile_dict_grad = json.load(json_file)
 
 # Preallocate lists
 sub_IDs = []
@@ -206,15 +204,22 @@ for i, subjectID in enumerate(good_subject_pd.index):
              psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                    row['right_sensors'][0:8], 
                                                                                    row['left_sensors'][0:8])
-             subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+            # Find outliers
+             outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
+                                                          row['right_sensors'][0:8], row['left_sensors'][0:8],
+                                                          subjectID, outlier_subjectID_df, 
+                                                          quantlile_dict_mag, quantlile_dict_grad)
+            
+             if not outlier:
+                subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
-             # Remove noise bias
-             bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
+                # Remove noise bias
+                bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
-             # Reshape the array to have shape (473 (#freqs), 1) for stacking
-             bias_removed_lat = bias_removed_lat.reshape(-1,1)
-             # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-             stacked_sensors.append(bias_removed_lat)
+                # Reshape the array to have shape (473 (#freqs), 1) for stacking
+                bias_removed_lat = bias_removed_lat.reshape(-1,1)
+                # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
+                stacked_sensors.append(bias_removed_lat)
 
         # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
         spec_lateralisation_all_sens = np.hstack(stacked_sensors)
@@ -236,11 +241,6 @@ for idx, array in enumerate(all_freq_all_subs_transposed):
     sensor_dataframes[df_name] = pd.DataFrame(array, index=sub_IDs, columns=freqs)
     # Save the dataframe as a CSV file
     sensor_dataframes[df_name].to_csv(op.join(output_dir, f"{df_name}.csv")) 
-
-if remove_outliers:
-    # Remove outliers and save cleaned dataframes
-    remove_outliers_and_save(sensor_dataframes, sub_IDs, freqs, output_dir)
-
 
 if test_plot:
 
