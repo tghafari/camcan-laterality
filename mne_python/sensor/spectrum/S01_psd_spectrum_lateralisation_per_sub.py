@@ -30,6 +30,7 @@ Issues/ contributions to community:
   
 Questions:
 """
+
 # import libraries
 import os.path as op
 
@@ -44,8 +45,6 @@ import json
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
-remove_outliers = False  # do you want to remove outliers based on lateralised power?
-
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     """
@@ -105,10 +104,14 @@ def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
     # Check if PSD values are outliers
     if np.any(psd_right_sensor > quantiles['q2']) or np.any(psd_right_sensor < quantiles['q1']): 
         outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
+        outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': right_sensor}, ignore_index=True)
+        outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': left_sensor}, ignore_index=True)
         return True, outlier_subjectID_df
     
     if np.any(psd_left_sensor > quantiles['q2']) or np.any(psd_left_sensor < quantiles['q1']):
         outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
+        outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': left_sensor}, ignore_index=True)
+        outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': right_sensor}, ignore_index=True)
         return True, outlier_subjectID_df
 
     return False, outlier_subjectID_df
@@ -173,6 +176,9 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
+
+# Initialize DataFrame for outliers
+outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'oulier_sensor', 'pair_sensor'])
 
 # Read quantile (outlier threshold) dictionary
 with open(op.join(threshold_dir, 'mag_0-120_0_0.9.json')) as json_file:
