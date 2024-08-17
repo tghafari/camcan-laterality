@@ -83,6 +83,9 @@ def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
                    subjectID, outlier_subjectID_df, quantiles_mag, quantiles_grad):
     """
     Identify outliers based on PSD values and predefined quantiles for magnetometers and gradiometers.
+    Please note that this function only works on the previously calculated quantiles 
+    (calculated and saved in S04_power_box_plot_and_disctribution.py). 
+    It does not input which quantile to compare the values with.
     
     Parameters:
     - psd_right_sensor, psd_left_sensor: PSD values for right and left sensors.
@@ -102,14 +105,17 @@ def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
         quantiles = quantiles_grad
 
     # Check if PSD values are outliers
-    if np.any(psd_right_sensor > quantiles['q2']) or np.any(psd_right_sensor < quantiles['q1']): 
+    if np.any(psd_right_sensor < list(quantiles.values())[1]) or np.any(psd_right_sensor > list(quantiles.values())[0]):
+        print(f'{right_sensor} in {subjectID} is an outlier') 
+        #create a dictionary here and concat it when the for loop is done.
         outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
         outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': right_sensor}, ignore_index=True)
         outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': left_sensor}, ignore_index=True)
         return True, outlier_subjectID_df
     
-    if np.any(psd_left_sensor > quantiles['q2']) or np.any(psd_left_sensor < quantiles['q1']):
-        outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
+    if np.any(psd_left_sensor > list(quantiles.values())[1]) or np.any(psd_left_sensor < list(quantiles.values())[0]):
+        print(f'{left_sensor} in {subjectID} is an outlier') 
+        outlier_subjectID_df = outlier_subjectID_df.concat({'SubjectID': subjectID}, ignore_index=True)
         outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': left_sensor}, ignore_index=True)
         outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': right_sensor}, ignore_index=True)
         return True, outlier_subjectID_df
@@ -182,16 +188,16 @@ outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'oulier_sensor', 'pair
 
 # Read quantile (outlier threshold) dictionary
 with open(op.join(threshold_dir, 'mag_0-120_0_0.9.json')) as json_file:
-    quantlile_dict_mag = json.load(json_file)
+    quantile_dict_mag = json.load(json_file)
 
 with open(op.join(threshold_dir, 'grad_0-120_0_0.9.json')) as json_file:
-    quantlile_dict_grad = json.load(json_file)
+    quantile_dict_grad = json.load(json_file)
 
 # Preallocate lists
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.index):
+for i, subjectID in enumerate(good_subject_pd.head(3).index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -214,24 +220,24 @@ for i, subjectID in enumerate(good_subject_pd.index):
              outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
                                                           row['right_sensors'][0:8], row['left_sensors'][0:8],
                                                           subjectID, outlier_subjectID_df, 
-                                                          quantlile_dict_mag, quantlile_dict_grad)
+                                                          quantile_dict_mag, quantile_dict_grad)
             
-             if not outlier:
-                subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+        #      if not outlier:
+        #         subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
-                # Remove noise bias
-                bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
+        #         # Remove noise bias
+        #         bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
-                # Reshape the array to have shape (473 (#freqs), 1) for stacking
-                bias_removed_lat = bias_removed_lat.reshape(-1,1)
-                # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-                stacked_sensors.append(bias_removed_lat)
+        #         # Reshape the array to have shape (473 (#freqs), 1) for stacking
+        #         bias_removed_lat = bias_removed_lat.reshape(-1,1)
+        #         # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
+        #         stacked_sensors.append(bias_removed_lat)
 
-        # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
-        spec_lateralisation_all_sens = np.hstack(stacked_sensors)
-        # Append all subjects together
-        spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
-        sub_IDs.append(subjectID)
+        # # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
+        # spec_lateralisation_all_sens = np.hstack(stacked_sensors)
+        # # Append all subjects together
+        # spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
+        # sub_IDs.append(subjectID)
 
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
