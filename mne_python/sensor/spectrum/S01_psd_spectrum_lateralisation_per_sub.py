@@ -43,7 +43,7 @@ from scipy import stats
 import json
 
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -105,7 +105,7 @@ def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
         quantiles = quantiles_grad
 
     # Check if the average over all frequency of PSD values are outliers
-    if np.any(np.mean(psd_right_sensor) < list(quantiles.values())[1]) or \
+    if np.any(np.mean(psd_right_sensor) > list(quantiles.values())[1]) or \
         np.any(np.mean(psd_right_sensor) < list(quantiles.values())[0]):
         print(f'{right_sensor} in {subjectID} is an outlier') 
         temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
@@ -204,7 +204,7 @@ with open(op.join(threshold_dir, 'grad_0-120_0_0.9.json')) as json_file:
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.head(3).index):
+for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)

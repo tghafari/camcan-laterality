@@ -23,7 +23,7 @@ from scipy import stats
 from scipy.stats import shapiro
 
 # Define paths
-platform = 'mac'  # 'bluebear' or 'mac'?
+platform = 'bluebear'  # 'bluebear' or 'mac'?
 
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
