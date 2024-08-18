@@ -180,7 +180,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers')
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_quantile')
 threshold_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/healthy_distribution')
 
 # Read only data from subjects with good preprocessed data
@@ -229,29 +229,32 @@ for i, subjectID in enumerate(good_subject_pd.head(3).index):
                                                           subjectID, outlier_subjectID_df, 
                                                           quantile_dict_mag, quantile_dict_grad)
             
-        #      if not outlier:
-        #         subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+             if not outlier:
+                subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
-        #         # Remove noise bias
-        #         bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
+                # Remove noise bias
+                bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
-        #         # Reshape the array to have shape (473 (#freqs), 1) for stacking
-        #         bias_removed_lat = bias_removed_lat.reshape(-1,1)
-        #         # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-        #         stacked_sensors.append(bias_removed_lat)
+                # Reshape the array to have shape (473 (#freqs), 1) for stacking
+                bias_removed_lat = bias_removed_lat.reshape(-1,1)
+                # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
+                stacked_sensors.append(bias_removed_lat)
 
-        # # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
-        # spec_lateralisation_all_sens = np.hstack(stacked_sensors)
-        # # Append all subjects together
-        # spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
-        # sub_IDs.append(subjectID)
+        # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
+        spec_lateralisation_all_sens = np.hstack(stacked_sensors)
+        # Append all subjects together
+        spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
+        sub_IDs.append(subjectID)
 
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass
 
+# Save outlier dataframe
+outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df.csv'))
+
 # Prepare for enumerate over sensor pairs - #sensor_pairs, #subs, #freqs
-all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1))  
+all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1)) 
 
 sensor_dataframes = {}
 for idx, array in enumerate(all_freq_all_subs_transposed):

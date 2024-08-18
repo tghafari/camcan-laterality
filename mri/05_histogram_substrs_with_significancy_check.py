@@ -35,6 +35,7 @@ elif platform == 'mac':
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
+outlier_subjectID_psd_df = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes.csv')
@@ -45,8 +46,146 @@ colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#
 structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 
+def find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2):
+    # Load data
+    quantiles_df = substr_vol_df.iloc[:, 1:].quantile([q1, q2])
+    quantiles_df.to_csv(op.join(info_dir, f"substr_volumes_{q1}-{q2}_quantiles.csv"))
+
+    # Remove CC prefix from subject IDs and convert to strings for comparison
+    substr_vol_df['subject_ID'] = substr_vol_df['subject_ID'].astype(str)
+
+    # Iterate through each subject
+    for index, row in substr_vol_df.iterrows():
+        subjectID = row['subject_ID']
+        
+        # Compare each subcortical structure's volume with the quantile values
+        for structure in substr_vol_df.columns[1:]:  # Skip the first column (subject_ID)
+            volume = row[structure]
+
+            # Ensure that q1 and q2 are used as float values for indexing
+            quant1 = quantiles_df.loc[q1, structure]
+            quant2 = quantiles_df.loc[q2, structure]
+ 
+            # Check if the volume is an outlier
+            if volume < quant1 or volume > quant2:
+                print(f'{structure} in {subjectID} is an outlier') 
+                temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
+                                                'outlier_structure': structure},
+                                                 index=([0]))
+                # Append the subject ID and structure name to the outlier DataFrame
+                outlier_subjectID_vol_df = pd.concat([outlier_subjectID_vol_df, temp_outlier_df], ignore_index=True)
+                del temp_outlier_df  # cleanup before moving on
+
+    return outlier_subjectID_vol_df
+
+
+# Function to plot subcortical volumes with left (L) and right (R) distinction
+def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
+                                    outlier_subjectID_psd_df, lat_sheet_fname, q1=0.1, q2=1):
+    """
+    Plots histograms of subcortical volumes, with darker shades of the colormap for left (L) structures
+    and lighter shades for right (R) structures.
+    
+    Parameters:
+    - substr_vol_sheet_fname: str, path to the subcortical volumes CSV file
+    - good_sub_sheet: str, path to the good subject CSV file
+    - structures: list, names of the subcortical structures
+    - colormap: list, color map for plotting histograms
+    - q1 and q2: quantiles to be calculated for identifying outliers. Default q1=0.1, q2=1 (only 
+    ignore smaller volumes)
+    
+    This function reads the subcortical volumes from the provided CSV file, removes subjects with missing
+    volume measurements, and ensures only subjects from the good subject list are included in the analysis.
+    Histograms are plotted for each subcortical structure with left (L) and right (R) sides distinguished
+    by shades of the colormap.
+    """
+    
+    # Load volume data
+    substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
+    good_subjects_df = pd.read_csv(good_sub_sheet)
+    outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_df)
+    outlier_subjectID_vol_df = pd.DataFrame(columns=['SubjectID', 'structure'])  # initialise a dataframe for volume outliers
+
+    outlier_subjectID_vol_df = find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2)
+
+    # Remove CC prefix from good subjects and convert to strings for comparison
+    good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
+    substr_vol_df['subject_ID'] = substr_vol_df['subject_ID'].astype(str)
+    
+    # Filter out subjects with missing volume measurements and find and save q1 and q2 
+    substr_vol_df = substr_vol_df.dropna()
+    
+    # Filter to include only good subjects, exclude psd and volume outliers
+    substr_vol_df = substr_vol_df[substr_vol_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
+    substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
+    substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
+
+    # Load lateralisation volume data and preprocess
+    substr_lat_df = pd.read_csv(lat_sheet_fname)
+    substr_lat_df['subject_ID'] = substr_lat_df['subject_ID'].astype(str)
+
+    # Filter out subjects with missing volume measurements and find and save q1 and q2 
+    substr_lat_df = substr_lat_df.dropna()
+    
+    # Filter to include only good subjects, exclude psd and volume outliers
+    substr_lat_df = substr_lat_df[substr_lat_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
+    substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
+    substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
+
+    return substr_vol_df, substr_lat_df, outlier_subjectID_vol_df
+
+def plot_volume_histograms(structures, substr_vol_df, colormap):
+    # Plotting histograms
+    fig, axs = plt.subplots(len(structures), 2, figsize=(12, 14))
+    
+    for idx, structure in enumerate(structures):
+        # Extract L and R volumes as numpy arrays
+        volume_L = substr_vol_df[f'L-{structure}'].values
+        volume_R = substr_vol_df[f'R-{structure}'].values
+        
+        # Plot L side histogram with darker color on the left subplot
+        ax_L = axs[idx, 0]
+        volume_L_hist = np.histogram(volume_L, bins=10, density=False)
+        x_L = volume_L_hist[1]
+        y_L = volume_L_hist[0]
+        ax_L.bar(x_L[:-1], y_L, width=np.diff(x_L), color=colormap[idx], alpha=0.7, label=f'L-{structure}')
+        ax_L.set_title(f'L-{structure}', fontsize=12, fontname='Calibri')
+        ax_L.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
+        ax_L.tick_params(axis='both', which='both', length=0)
+        ax_L.set_axisbelow(True)
+
+        # Fit and plot a normal density function
+        mu_L, std_L = stats.norm.fit(volume_L)
+        pdf_L = stats.norm.pdf(x_L, mu_L, std_L)
+        ax_L.plot(x_L, pdf_L * max(y_L) / max(pdf_L), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
+
+        if idx == 6:
+            ax_L.set_xlabel('Volume', fontsize=12, fontname='Calibri') 
+        
+        # Plot R side histogram with lighter color on the right subplot
+        ax_R = axs[idx, 1]
+        volume_R_hist = np.histogram(volume_R, bins=10, density=False)
+        x_R = volume_R_hist[1]
+        y_R = volume_R_hist[0]
+        ax_R.bar(x_R[:-1], y_R, width=np.diff(x_R), color=colormap[idx], alpha=0.3, label=f'R-{structure}')
+        ax_R.set_title(f'R-{structure}', fontsize=12, fontname='Calibri')
+        ax_R.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
+        ax_R.tick_params(axis='both', which='both', length=0)
+        ax_R.set_axisbelow(True)
+
+        # Fit a normal distribution and plot the PDF
+        mu_R, std_R = stats.norm.fit(volume_R)
+        pdf_R = stats.norm.pdf(x_R, mu_R, std_R)
+        ax_R.plot(x_R, pdf_R * max(y_R) / max(pdf_R), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
+
+        if idx == 6:
+            ax_R.set_xlabel('Volume', fontsize=12, fontname='Calibri')
+    
+    plt.tight_layout()
+    plt.show()
+
 # Function to filter subjects and plot lateralization histograms
-def filter_and_plot_volumes(lat_sheet_fname, good_sub_sheet, structures, colormap):
+def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
     """
     Filters subjects based on available lateralization volume measurements and good subject list,
     then plots histograms.
@@ -62,22 +201,8 @@ def filter_and_plot_volumes(lat_sheet_fname, good_sub_sheet, structures, colorma
     each subcortical structure.
     """
 
-    # Load data
-    df = pd.read_csv(lat_sheet_fname)
-    good_subjects_df = pd.read_csv(good_sub_sheet)
-
-    # Remove CC prefix from good subjects and convert to strings for comparison
-    good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
-    df['subject_ID'] = df['subject_ID'].astype(str)
-    
-    # Filter out subjects with missing volume measurements
-    df = df.dropna()
-    
-    # Filter to include only good subjects
-    df = df[df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-   
     # Extract lateralization volumes
-    lateralization_volume = df.iloc[:,1:8].to_numpy()
+    lateralization_volume = substr_lat_df.iloc[:,1:8].to_numpy()
 
     # Preallocation
     p_values = []
@@ -157,92 +282,14 @@ def filter_and_plot_volumes(lat_sheet_fname, good_sub_sheet, structures, colorma
     plt.tight_layout()
     plt.show()
 
+(substr_vol_df, substr_lat_df, 
+   outlier_subjectID_vol_df) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, 
+                                                              outlier_subjectID_psd_df,lat_sheet_fname, 
+                                                              q1=0.1, q2=1)
+# Save outlier dataframe
+outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
 
-# Function to plot subcortical volumes with left (L) and right (R) distinction
-def plot_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, structures, colormap):
-    """
-    Plots histograms of subcortical volumes, with darker shades of the colormap for left (L) structures
-    and lighter shades for right (R) structures.
-    
-    Parameters:
-    - substr_vol_sheet_fname: str, path to the subcortical volumes CSV file
-    - good_sub_sheet: str, path to the good subject CSV file
-    - structures: list, names of the subcortical structures
-    - colormap: list, color map for plotting histograms
-    
-    This function reads the subcortical volumes from the provided CSV file, removes subjects with missing
-    volume measurements, and ensures only subjects from the good subject list are included in the analysis.
-    Histograms are plotted for each subcortical structure with left (L) and right (R) sides distinguished
-    by shades of the colormap.
-    """
-    
-    # Load data
-    df = pd.read_csv(substr_vol_sheet_fname)
-    good_subjects_df = pd.read_csv(good_sub_sheet)
+plot_volume_histograms(structures, substr_vol_df, colormap)
+plot_lateralisation_volumes(substr_lat_df, structures, colormap)
 
-    # Remove CC prefix from good subjects and convert to strings for comparison
-    good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
-    df['subject_ID'] = df['subject_ID'].astype(str)
-    
-    # Filter out subjects with missing volume measurements
-    df = df.dropna()
-    
-    # Filter to include only good subjects
-    df = df[df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-    
-    # Plotting histograms
-    fig, axs = plt.subplots(len(structures), 2, figsize=(12, 14))
-    
-    for idx, structure in enumerate(structures):
-        # Extract L and R volumes as numpy arrays
-        volume_L = df[f'L-{structure}'].values
-        volume_R = df[f'R-{structure}'].values
-        
-        # Plot L side histogram with darker color on the left subplot
-        ax_L = axs[idx, 0]
-        volume_L_hist = np.histogram(volume_L, bins=10, density=False)
-        x_L = volume_L_hist[1]
-        y_L = volume_L_hist[0]
-        ax_L.bar(x_L[:-1], y_L, width=np.diff(x_L), color=colormap[idx], alpha=0.7, label=f'L-{structure}')
-        ax_L.set_title(f'L-{structure}', fontsize=12, fontname='Calibri')
-        ax_L.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
-        ax_L.tick_params(axis='both', which='both', length=0)
-        ax_L.set_axisbelow(True)
-
-        # Fit and plot a normal density function
-        mu_L, std_L = stats.norm.fit(volume_L)
-        pdf_L = stats.norm.pdf(x_L, mu_L, std_L)
-        ax_L.plot(x_L, pdf_L * max(y_L) / max(pdf_L), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
-
-        if idx == 6:
-            ax_L.set_xlabel('Volume', fontsize=12, fontname='Calibri') 
-        
-        # Plot R side histogram with lighter color on the right subplot
-        ax_R = axs[idx, 1]
-        volume_R_hist = np.histogram(volume_R, bins=10, density=False)
-        x_R = volume_R_hist[1]
-        y_R = volume_R_hist[0]
-        ax_R.bar(x_R[:-1], y_R, width=np.diff(x_R), color=colormap[idx], alpha=0.3, label=f'R-{structure}')
-        ax_R.set_title(f'R-{structure}', fontsize=12, fontname='Calibri')
-        ax_R.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
-        ax_R.tick_params(axis='both', which='both', length=0)
-        ax_R.set_axisbelow(True)
-
-        # Fit a normal distribution and plot the PDF
-        mu_R, std_R = stats.norm.fit(volume_R)
-        pdf_R = stats.norm.pdf(x_R, mu_R, std_R)
-        ax_R.plot(x_R, pdf_R * max(y_R) / max(pdf_R), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
-
-        if idx == 6:
-            ax_R.set_xlabel('Volume', fontsize=12, fontname='Calibri')
-    
-    plt.tight_layout()
-    plt.show()
-
-
-# Call the function to filter and plot lateralization volumes
-filter_and_plot_volumes(lat_sheet_fname, good_sub_sheet, structures, colormap)
-
-# Call the function to plot subcortical volumes
-plot_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, structures, colormap)
 

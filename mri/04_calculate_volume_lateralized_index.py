@@ -15,14 +15,22 @@ import numpy as np
 import pandas as pd
 import os.path as op
 
-volume_sheet_dir = r'X:\derivatives\mri\lateralized_index'
-volume_sheet_fname = op.join(volume_sheet_dir, 'all_subs_substr_volumes.csv')
-output_fname = op.join(volume_sheet_dir, 'lateralization_volumes.csv')
+# Define paths
+platform = 'mac'  # 'bluebear' or 'mac'?
 
-colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#ADD8E6']
+if platform == 'bluebear':
+    rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+elif platform == 'mac':
+    rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+
+volume_sheet_dir = 'derivatives/mri/lateralized_index'
+volume_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
+output_fname = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes.csv')
+
 labels = [10, 11, 12, 13, 16, 17, 18, 26, 49, 50, 51, 52, 53, 54, 58]
 structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-HemisComp = ['L', 'R', 'L', 'R', 'L', 'R', 'L']
 
 # Read the CSV file into a DataFrame
 volumes_df = pd.read_csv(volume_sheet_fname)
