@@ -104,20 +104,27 @@ def find_outliers(psd_right_sensor, psd_left_sensor, right_sensor, left_sensor,
     else:
         quantiles = quantiles_grad
 
-    # Check if PSD values are outliers
-    if np.any(psd_right_sensor < list(quantiles.values())[1]) or np.any(psd_right_sensor > list(quantiles.values())[0]):
+    # Check if the average over all frequency of PSD values are outliers
+    if np.any(np.mean(psd_right_sensor) < list(quantiles.values())[1]) or \
+        np.any(np.mean(psd_right_sensor) < list(quantiles.values())[0]):
         print(f'{right_sensor} in {subjectID} is an outlier') 
-        #create a dictionary here and concat it when the for loop is done.
-        outlier_subjectID_df = outlier_subjectID_df.append({'SubjectID': subjectID}, ignore_index=True)
-        outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': right_sensor}, ignore_index=True)
-        outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': left_sensor}, ignore_index=True)
+        temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
+                                        'outlier_sensor': right_sensor, 
+                                        'pair_sensor': left_sensor},
+                                         index=([0]))
+        outlier_subjectID_df = pd.concat([outlier_subjectID_df, temp_outlier_df], ignore_index=True)
+        del temp_outlier_df  # cleanup before moving on
         return True, outlier_subjectID_df
     
-    if np.any(psd_left_sensor > list(quantiles.values())[1]) or np.any(psd_left_sensor < list(quantiles.values())[0]):
+    if np.any(np.mean(psd_left_sensor) > list(quantiles.values())[1]) or \
+          np.any(np.mean(psd_left_sensor) < list(quantiles.values())[0]):
         print(f'{left_sensor} in {subjectID} is an outlier') 
-        outlier_subjectID_df = outlier_subjectID_df.concat({'SubjectID': subjectID}, ignore_index=True)
-        outlier_subjectID_df = outlier_subjectID_df.append({'outlier_sensor': left_sensor}, ignore_index=True)
-        outlier_subjectID_df = outlier_subjectID_df.append({'pair_sensor': right_sensor}, ignore_index=True)
+        temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
+                                        'outlier_sensor': left_sensor, 
+                                        'pair_sensor': right_sensor},
+                                         index=([0]))        
+        outlier_subjectID_df = pd.concat([outlier_subjectID_df, temp_outlier_df], ignore_index=True)
+        del temp_outlier_df
         return True, outlier_subjectID_df
 
     return False, outlier_subjectID_df
@@ -184,7 +191,7 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
 # Initialize DataFrame for outliers
-outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'oulier_sensor', 'pair_sensor'])
+outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'outlier_sensor', 'pair_sensor'])
 
 # Read quantile (outlier threshold) dictionary
 with open(op.join(threshold_dir, 'mag_0-120_0_0.9.json')) as json_file:
