@@ -97,9 +97,9 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 # Define frequency bands
 bands = {
     'Delta': (1, 4),
-    'Theta': (5, 8),
-    'Alpha': (9, 14),
-    'Beta': (15, 40)
+    'Theta': (4, 8),
+    'Alpha': (8, 14),
+    'Beta': (14, 40)
 }
 
 # List of subcortical structures

@@ -216,9 +216,10 @@ for substr in substrs:
                             mask=mask_grad_half, 
                             image_interp='nearest', 
                             axes=axes[0],
-                            show=False)  # use the axes for grad
+                            show=False,  # use the axes for grad
+                            mask_params=dict(marker='o', markersize=10))
 
-        axes[0].set_title(f'{substr} with grad: {band_name}')
+        axes[0].set_title(f'{substr} with grad: {band_name}', fontsize=14)
         axes[0].set_xlim(0, )  # remove the left half of topoplot
 
         # Plot mag sensors correlation on right
@@ -227,17 +228,18 @@ for substr in substrs:
                             mask=mask_mag, 
                             image_interp='nearest', 
                             axes=axes[1],
-                            show=False)  # use the axes for mag
+                            show=False,  # use the axes for mag
+                            mask_params=dict(marker='o', markersize=10))
 
-        axes[1].set_title(f'{substr} with mag: {band_name}')
+        axes[1].set_title(f'{substr} with mag: {band_name}', fontsize=14)
         axes[1].set_xlim(0, )  # remove the left half of topoplot
         cbar = fig.colorbar(im, ax=axes.ravel().tolist(), orientation='horizontal', location='bottom')
-        cbar.ax.tick_params(labelsize=5)
-        cbar.set_label('Correlation Values')
+        cbar.ax.tick_params(labelsize=10)
+        cbar.set_label('Correlation Values', fontsize=14)
 
         fig.set_size_inches(12, 12)
 
         if not op.exists(op.join(fig_output_dir)):
             os.mkdir(op.join(fig_output_dir))
-        plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations.jpg'), format='jpg', dpi=300)
+        plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations_new.jpg'), format='jpg', dpi=500)
         plt.close()
