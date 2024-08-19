@@ -46,6 +46,39 @@ import json
 platform = 'bluebear'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
+
+# Define where to read and write the data
+if platform == 'bluebear':
+    rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+elif platform == 'mac':
+    rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+
+epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
+info_dir = op.join(rds_dir, 'dataman/data_information')
+good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
+sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+
+# Read only data from subjects with good preprocessed data
+good_subject_pd = pd.read_csv(good_sub_sheet)
+good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+
+# Read sensor layout sheet
+sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
+
+# Initialize DataFrame for outliers
+outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'outlier_sensor', 'pair_sensor'])
+
+# Read quantile (outlier threshold) dictionary
+with open(op.join(info_dir, 'thresh-mag_0-120_0_0.9.json')) as json_file:
+    quantile_dict_mag = json.load(json_file)
+
+with open(op.join(info_dir, 'thresh-grad_0-120_0_0.9.json')) as json_file:
+    quantile_dict_grad = json.load(json_file)
+
+
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     """
     The data are divided into sections being 2 s long. 
@@ -168,38 +201,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
 
     return bias_removed_lat
 
-# Define where to read and write the data
-if platform == 'bluebear':
-    rds_dir = '/rds/projects/q/quinna-camcan'
-    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
-elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan'
-    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
-
-epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-info_dir = op.join(rds_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_quantile')
-threshold_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots/healthy_distribution')
-
-# Read only data from subjects with good preprocessed data
-good_subject_pd = pd.read_csv(good_sub_sheet)
-good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
-
-# Read sensor layout sheet
-sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
-
-# Initialize DataFrame for outliers
-outlier_subjectID_df = pd.DataFrame(columns=['SubjectID', 'outlier_sensor', 'pair_sensor'])
-
-# Read quantile (outlier threshold) dictionary
-with open(op.join(threshold_dir, 'mag_0-120_0_0.9.json')) as json_file:
-    quantile_dict_mag = json.load(json_file)
-
-with open(op.join(threshold_dir, 'grad_0-120_0_0.9.json')) as json_file:
-    quantile_dict_grad = json.load(json_file)
-
+# Loop over participants and sensors
 # Preallocate lists
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []

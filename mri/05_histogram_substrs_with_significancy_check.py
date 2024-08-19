@@ -38,7 +38,9 @@ outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes.csv')
+lat_sheet_fname_nooutlier = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes_nooutliers.csv')
 substr_vol_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
+output_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/volume-plots')
 
 # Define colormap and structures
 colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#ADD8E6']
@@ -80,7 +82,7 @@ def find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2):
 
 # Function to plot subcortical volumes with left (L) and right (R) distinction
 def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
-                                    outlier_subjectID_psd_df, lat_sheet_fname, q1=0.1, q2=1):
+                                    outlier_subjectID_psd_csv, lat_sheet_fname, q1=0.01, q2=1):
     """
     Plots histograms of subcortical volumes, with darker shades of the colormap for left (L) structures
     and lighter shades for right (R) structures.
@@ -90,7 +92,7 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
     - good_sub_sheet: str, path to the good subject CSV file
     - structures: list, names of the subcortical structures
     - colormap: list, color map for plotting histograms
-    - q1 and q2: quantiles to be calculated for identifying outliers. Default q1=0.1, q2=1 (only 
+    - q1 and q2: quantiles to be calculated for identifying outliers. Default q1=0.01, q2=1 (only 
     ignore smaller volumes)
     
     This function reads the subcortical volumes from the provided CSV file, removes subjects with missing
@@ -130,6 +132,9 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
     substr_lat_df = substr_lat_df[substr_lat_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
     substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
     substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
+
+    # Save lateralisation index df without outliers
+    substr_lat_df.to_csv(lat_sheet_fname_nooutlier)
 
     return substr_vol_df, substr_lat_df, outlier_subjectID_vol_df
 
@@ -181,7 +186,7 @@ def plot_volume_histograms(structures, substr_vol_df, colormap):
             ax_R.set_xlabel('Volume', fontsize=12, fontname='Calibri')
     
     plt.tight_layout()
-    plt.show()
+    plt.savefig(op.join(output_plot_dir, 'substr-histograms-nooutliers.png'), dpi=300)
 
 # Function to filter subjects and plot lateralization histograms
 def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
@@ -279,12 +284,12 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
         ax.set_axisbelow(True)
         
     plt.tight_layout()
-    plt.show()
+    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-nooutliers.png'), dpi=300)
 
 (substr_vol_df, substr_lat_df, 
    outlier_subjectID_vol_df) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, 
-                                                              outlier_subjectID_psd_df,lat_sheet_fname, 
-                                                              q1=0.1, q2=1)
+                                                              outlier_subjectID_psd_csv,lat_sheet_fname, 
+                                                              q1=0.01, q2=1)
 # Save outlier dataframe
 outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
 

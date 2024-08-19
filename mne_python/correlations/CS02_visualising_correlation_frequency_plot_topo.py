@@ -1,6 +1,6 @@
 """
 ====================================
-CS02_correlation_frequency_topo_plot:
+CS02_correlation_frequency_plot_topo:
     this script:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
@@ -40,8 +40,8 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_std-subtraction')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_std-subtraction')
+corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-psd')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction_nooutlier-psd')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -125,7 +125,7 @@ for substr in substrs:
     evoked = mne.EvokedArray(correlation_df.values.T, rightraw.info, tmin=0, comment=f'spearmanr')
 
     # Plot the correlation values with similar format as plot_topo
-    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/std-subtraction', f'{substr}.png'))
+    evoked_fig_output_fname = op.join(op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/correlation_plot_topos/subtraction-nonoise-nooutlier-psd', f'{substr}.png'))
     evoked_fig = evoked.plot_topo(title=f"correlation between frequency and {substr} laterality")
     evoked_fig.savefig(evoked_fig_output_fname)
 

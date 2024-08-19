@@ -81,12 +81,15 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/test_all_sensors_all_subs_all_freqs_subtraction_nonoise')
 test_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/test_plots')
+outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+# Filter to include only good subjects, exclude psd and volume outliers
+outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
+good_subject_pd = good_subject_pd[~good_subject_pd.index.isin(outlier_subjectID_psd_df['SubjectID'])]
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
@@ -121,9 +124,10 @@ psd_all_sens_all_subs_arr = np.array(psd_all_sens_all_subs)  # shape: #subjects,
 # Calculate grand average PSD for each channel
 grand_average_psd = np.mean(psd_all_sens_all_subs_arr, axis=0)  # shape: #channels, #freqs
 
-# Filter out frequencies below 60 Hz - to show low amplitudes in high freqs better
-max_freq = 60
-freq_mask = np.where(freqs < max_freq)[0]
+# Filter out frequencies below 60 Hz - to show low amplitudes in high freqs better  # freq_mask = np.where(freqs > min_freq)[0] # for only one condition
+min_freq = 0
+max_freq = 120
+freq_mask = (freqs > min_freq) & (freqs < max_freq)
 filtered_freqs = freqs[freq_mask]
 
 # Create Evoked objects for right and left
@@ -154,11 +158,11 @@ handles = [plt.Line2D([0], [0], color='orange', lw=2),
            plt.Line2D([0], [0], color='blue', lw=2)]
 labels = ['Right Sensors', 'Left Sensors']
 plt.legend(handles, labels, loc='upper right')
-plt.title('Grand Average (0-60Hz) PSD Right and Left Sensors- no outliers')
+plt.title(f'Grand Average {min_freq}-{max_freq}Hz PSD Right and Left Sensors- no outliers')
 ax.grid(True)
 #plt.show()
 
-grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'nooutlier_grand_average_psd_plot_topo_0-60.tiff'))
+grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, f'nooutlier_grand_average_psd_plot_topo_{min_freq}-{max_freq}.tiff'))
 grand_avg_fig.savefig(grand_avg_fig_output_fname, dpi=1500)
 
 # Plotting stds of sensor pairs on right side
@@ -181,11 +185,11 @@ labels = ['Right Sensors', 'Left Sensors']
 plt.legend(handles, labels, loc='upper right')
 
 # Adding title and adjusting plot properties
-plt.title('Grand Average (0-60Hz) PSD Right vs Left Sensors- no outliers')
+plt.title(f'Grand Average {min_freq}-{max_freq}Hz PSD Right vs Left Sensors- no outliers')
 ax.grid(True)
 #plt.show()
 
 # Save
-grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, 'nooutlier_grand_average_right_plot_topo_0-60.tiff')
+grand_avg_fig_output_fname = op.join(op.join(test_plot_dir, f'nooutlier_grand_average_right_plot_topo_{min_freq}-{max_freq}.tiff')
                                     )
 grand_avg_fig.savefig(grand_avg_fig_output_fname, dpi=1500)

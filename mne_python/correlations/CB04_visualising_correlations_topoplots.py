@@ -15,7 +15,7 @@ CS04_visualising_correlations_topoplots:
     structure folders
     5. then opens the correlation table
     6. finds the correlation value for
-    the frequency of interest
+    the frequency band of interest
     7. put it in a list of all correlation
     values for that substr and all sensor pairs
     8. does the same for p-value
@@ -35,27 +35,21 @@ import matplotlib.pyplot as plt
 import mne
 
 
-def freq_substr_corr_p_values(corr_dir, substr, freq):    
+def band_substr_corr_p_values(corr_dir, substr, band):
     """
-    This definition inputs corr_dir that contains all sensor pair folders and
-    all substr folders for which we calculated correlation and pvalues.
-    then creates a list of those values for each substr, each frequency,
-    and all sensor pairs
-    
+    This function inputs corr_dir that contains all sensor pair folders and
+    all substr folders for which we calculated correlation and p-values.
+    Then creates a list of those values for each substr, each frequency band,
+    and all sensor pairs.
+
     Parameters:
-        corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise') 
-        substr(str) = 'Caud'
-        freq(int) = Frequency for which to retrieve correlation and p-values
+        corr_dir (str): Directory containing all sensor pair folders.
+        substr (str): Subcortical structure, e.g., 'Caud'.
+        band (tuple): Frequency band range as a tuple, e.g., (8, 12) for alpha band.
+
     Returns:
-        tuple: Tuple containing correlation and p-values for gradiometers and magnetometers, channel indices, and channel drops.
-            - correlation_values_grad (list): Correlation values for gradiometers.
-            - correlation_values_mag (list): Correlation values for magnetometers.
-            - p_values_grad (list): P-values for gradiometers.
-            - p_values_mag (list): P-values for magnetometers.
-            - channel_index_grad (list): Channel indices for gradiometers.
-            - channel_index_mag (list): Channel indices for magnetometers.
-            - channel_drop_grad (list): Channel drops for gradiometers.
-            - channel_drop_mag (list): Channel drops for magnetometers.
+        tuple: Tuple containing correlation and p-values for gradiometers and magnetometers, 
+               channel indices, and channel drops.
     """
     correlation_values_grad = []
     correlation_values_mag = []
@@ -99,9 +93,15 @@ def freq_substr_corr_p_values(corr_dir, substr, freq):
             correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
             pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'spearman_pvals')))
             
-            # Get the correlation value for the desired frequency
-            correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
-            p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
+            # Filter the correlation and p-value tables for the desired frequency band
+            band_corr_values = correlation_table.loc[(correlation_table['Unnamed: 0'] >= band[0]) & 
+                                                     (correlation_table['Unnamed: 0'] <= band[1]), '0']
+            band_pvals = pvals_table.loc[(pvals_table['Unnamed: 0'] >= band[0]) & 
+                                         (pvals_table['Unnamed: 0'] <= band[1]), '0']
+            
+            # Calculate the mean correlation value and p-value for the band
+            correlation_value = band_corr_values.mean()
+            p_value = band_pvals.mean()
 
             # Update the corresponding lists
             if is_magnetometer:
@@ -130,29 +130,34 @@ elif platform == 'mac':
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
 corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-psd')  # containing all sensor pair folders
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/freqs/subtraction_nonoise_nooutliers-psd')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd')
 
 # List of the things for which you want topoplots
 substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu']
-# ['Caud', 'Hipp']
-freqs = np.arange(1,40,1)
-#[10,10.5,11,11.5,12,12.5]
-#freqs=[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,60,60.5,61,61.5,62,62.5,63,63.5,64,64.5,110,110.5,111,111.5,112]
 
-# Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
+# Define frequency bands (for example: delta, theta, alpha, beta, gamma)
+bands = {
+    'Delta': (1, 4),
+    'Theta': (4, 8),
+    'Alpha': (8, 12),
+    'Beta': (12, 30),
+    'Gamma': (30, 40)
+}
+
+# Initialize a dictionary to store correlation values for each sensor pair and dfs for all bands
 correlations_dfs_grad = {}
 correlations_dfs_mag = {}
 pvals_dfs_grad = {}
 pvals_dfs_mag = {}
 
-# Create lists of correlation values and pvalues for meg and grad for each freq and substr
-for freq in freqs:
+# Create lists of correlation values and p-values for each band and substr
+for band_name, band_range in bands.items():
     for substr in substrs:
         # Loop through each sensor pair folder
         (correlation_values_grad, correlation_values_mag, 
             p_values_grad, p_values_mag, 
             channel_index_grad, channel_index_mag, 
-            channel_drop_grad, channel_drop_mag) = freq_substr_corr_p_values(corr_dir, substr, freq)
+            channel_drop_grad, channel_drop_mag) = band_substr_corr_p_values(corr_dir, substr, band_range)
         
         # Convert the dictionary to a DataFrame
         correlations_df_grad = pd.DataFrame(correlation_values_grad, 
@@ -167,17 +172,17 @@ for freq in freqs:
         pvals_df_mag = pd.DataFrame(p_values_mag, 
                                     index=channel_index_mag, 
                                     columns=['Correlation'])
-        # Name the DataFrame with the frequency value
-        correlations_dfs_grad[f'{freq}Hz_{substr}'] = correlations_df_grad
-        correlations_dfs_mag[f'{freq}Hz_{substr}'] = correlations_df_mag
-        pvals_dfs_grad[f'{freq}Hz_{substr}'] = pvals_df_grad
-        pvals_dfs_mag[f'{freq}Hz_{substr}'] = pvals_df_mag
+        # Name the DataFrame with the band name
+        correlations_dfs_grad[f'{band_name}_{substr}'] = correlations_df_grad
+        correlations_dfs_mag[f'{band_name}_{substr}'] = correlations_df_mag
+        pvals_dfs_grad[f'{band_name}_{substr}'] = pvals_df_grad
+        pvals_dfs_mag[f'{band_name}_{substr}'] = pvals_df_mag
 
     del (correlations_df_grad, correlations_df_mag, 
-         pvals_df_grad, pvals_df_mag)  # refresh for next freq
+         pvals_df_grad, pvals_df_mag)  # refresh for next band
 
 
-# Load one sample meg file for channel names
+# Load one sample MEG file for channel names
 meg_fname =  op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif')
 raw = mne.io.read_raw_fif(meg_fname)
 halfgradraw = raw.copy().pick(channel_index_grad)
@@ -186,23 +191,23 @@ magraw = raw.copy().pick_types(meg='mag')  # this is to be able to show negative
 halfmagraw = raw.copy().pick(channel_index_mag)  # channels for plotting grads
 
 for substr in substrs:
-    for f, freq in enumerate(freqs):
+    for band_name in bands.keys():
         fig, axes = plt.subplots(1, 2)
-        print(f'plotting correlations values for {substr} in {freq}Hz')
+        print(f'Plotting correlation values for {substr} in {band_name} band')
 
         # Get correlation and p-value DataFrames for grad sensors
-        corr_df_grad = correlations_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
+        corr_df_grad = correlations_dfs_grad[f'{band_name}_{substr}'].reindex(halfgradraw.ch_names)
         corr_grad_np = corr_df_grad['Correlation'].to_numpy()
         corr_grad_half = (corr_grad_np[::2] + corr_grad_np[1::2]) / 2  # to be able to use maginfo for displaying negative values on topoplot
-        pval_df_grad = pvals_dfs_grad[f'{freq}Hz_{substr}'].reindex(halfgradraw.ch_names)
+        pval_df_grad = pvals_dfs_grad[f'{band_name}_{substr}'].reindex(halfgradraw.ch_names)
         pval_grad_ls = [float(val) for val in pval_df_grad['Correlation']]
         mask_grad = np.array([val < 0.05 for val in pval_grad_ls], dtype=bool)
         mask_grad_half = mask_grad[::2]  # same reason as line [195]
         
         # Get correlation and p-value DataFrames for mag sensors
-        corr_df_mag = correlations_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
+        corr_df_mag = correlations_dfs_mag[f'{band_name}_{substr}'].reindex(halfmagraw.ch_names)
         corr_mag_ls = corr_df_mag['Correlation'].to_list()
-        pval_df_mag = pvals_dfs_mag[f'{freq}Hz_{substr}'].reindex(halfmagraw.ch_names)
+        pval_df_mag = pvals_dfs_mag[f'{band_name}_{substr}'].reindex(halfmagraw.ch_names)
         pval_mag_ls = [float(val) for val in pval_df_mag['Correlation']]
         mask_mag = np.array([val < 0.05 for val in pval_mag_ls], dtype=bool)
 
@@ -214,7 +219,7 @@ for substr in substrs:
                             axes=axes[0],
                             show=False)  # use the axes for grad
 
-        axes[0].set_title(f'{substr} with grad: {freq}Hz')
+        axes[0].set_title(f'{substr} with grad: {band_name}')
         axes[0].set_xlim(0, )  # remove the left half of topoplot
 
         # Plot mag sensors correlation on right
@@ -225,7 +230,7 @@ for substr in substrs:
                             axes=axes[1],
                             show=False)  # use the axes for mag
 
-        axes[1].set_title(f'{substr} with mag: {freq}Hz')
+        axes[1].set_title(f'{substr} with mag: {band_name}')
         axes[1].set_xlim(0, )  # remove the left half of topoplot
         cbar = fig.colorbar(im, ax=axes.ravel().tolist(), orientation='horizontal', location='bottom')
         cbar.ax.tick_params(labelsize=5)
@@ -235,7 +240,5 @@ for substr in substrs:
 
         if not op.exists(op.join(fig_output_dir, substr)):
             os.mkdir(op.join(fig_output_dir, substr))
-        #plt.savefig(op.join(correlation_path, f'{band}_correlations.svg'), format='svg', dpi=300)
-        #plt.savefig(op.join(correlation_path, f'{band}_correlations.tiff'), format='tiff', dpi=300)
-        plt.savefig(op.join(fig_output_dir, substr, f'{freq}_correlations.jpg'), format='jpg', dpi=300)
+        plt.savefig(op.join(fig_output_dir, substr, f'{band_name}_correlations.jpg'), format='jpg', dpi=300)
         plt.close()

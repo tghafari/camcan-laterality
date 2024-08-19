@@ -75,22 +75,21 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction')
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/cloud-substr-freq-subtraction-regression')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/cloud-substr-freq-subtraction-nooutlier-psd')
 
 # Load substr file
 substr_lat_df = pd.read_csv(substr_sheet_fname)
 
 sensor_pairs_to_plot = [   # first is left sensor, second is right sensor in each pair
     ['MEG0233','MEG1343'], 
-    ['MEG0422','MEG1112']
-]#,
-#  ['MEG1933','MEG2333'],
-# ['MEG1941','MEG2321']
-#] 
+    ['MEG0422','MEG1112'],
+    ['MEG1933','MEG2333'],
+    ['MEG1941','MEG2321']
+] 
 random_subject_num = 20  # if random_selection == True, how many participants you want in the subgroup?
 
 
