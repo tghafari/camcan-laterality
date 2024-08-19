@@ -12,7 +12,6 @@ written by Tara Ghafari
 ==============================================
 """
 
-
 import os.path as op
 
 import numpy as np
@@ -35,7 +34,7 @@ elif platform == 'mac':
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-outlier_subjectID_psd_df = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
+outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes.csv')
@@ -57,15 +56,15 @@ def find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2):
     # Iterate through each subject
     for index, row in substr_vol_df.iterrows():
         subjectID = row['subject_ID']
-        
+        print(subjectID)
         # Compare each subcortical structure's volume with the quantile values
         for structure in substr_vol_df.columns[1:]:  # Skip the first column (subject_ID)
             volume = row[structure]
-
+            print(volume)
             # Ensure that q1 and q2 are used as float values for indexing
             quant1 = quantiles_df.loc[q1, structure]
             quant2 = quantiles_df.loc[q2, structure]
- 
+            print([quant1, quant2])
             # Check if the volume is an outlier
             if volume < quant1 or volume > quant2:
                 print(f'{structure} in {subjectID} is an outlier') 
@@ -103,7 +102,7 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
     # Load volume data
     substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
     good_subjects_df = pd.read_csv(good_sub_sheet)
-    outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_df)
+    outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
     outlier_subjectID_vol_df = pd.DataFrame(columns=['SubjectID', 'structure'])  # initialise a dataframe for volume outliers
 
     outlier_subjectID_vol_df = find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2)

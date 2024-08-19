@@ -240,11 +240,13 @@ for i, subjectID in enumerate(good_subject_pd.index):
                 # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
                 stacked_sensors.append(bias_removed_lat)
 
-        # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
-        spec_lateralisation_all_sens = np.hstack(stacked_sensors)
-        # Append all subjects together
-        spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
-        sub_IDs.append(subjectID)
+        if sum(outlier_subjectID_df['SubjectID'].isin([subjectID])) == 0:  # remove subjects that have any outlying sensors
+            print(f'{subjectID} is not outlier')
+            # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
+            spec_lateralisation_all_sens = np.hstack(stacked_sensors)
+            # Append all subjects together
+            spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
+            sub_IDs.append(subjectID)
 
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
