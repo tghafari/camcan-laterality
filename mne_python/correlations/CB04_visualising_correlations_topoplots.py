@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+
 """
 ====================================
 CS04_visualising_correlations_topoplots:
     this script:
-    the goal is to creat topo plots using 
+    the goal is to create topo plots using 
     correlation values instead of power
 
     1. navigates to the correlation directory
@@ -14,7 +15,7 @@ CS04_visualising_correlations_topoplots:
     4. then inside each of the subcortical
     structure folders
     5. then opens the correlation table
-    6. finds the correlation value for
+    6. finds the pre-calculated correlation value for
     the frequency band of interest
     7. put it in a list of all correlation
     values for that substr and all sensor pairs
@@ -35,17 +36,14 @@ import matplotlib.pyplot as plt
 import mne
 
 
-def band_substr_corr_p_values(corr_dir, substr, band):
+def band_substr_corr_p_values(output_corr_dir, substr, band_name):
     """
-    This function inputs corr_dir that contains all sensor pair folders and
-    all substr folders for which we calculated correlation and p-values.
-    Then creates a list of those values for each substr, each frequency band,
-    and all sensor pairs.
+    This function loads the pre-calculated correlation and p-value values for the given frequency band and substr.
 
     Parameters:
-        corr_dir (str): Directory containing all sensor pair folders.
+        output_corr_dir (str): Directory containing the pre-calculated band correlation files.
         substr (str): Subcortical structure, e.g., 'Caud'.
-        band (tuple): Frequency band range as a tuple, e.g., (8, 12) for alpha band.
+        band_name (str): Name of the frequency band, e.g., 'Alpha'.
 
     Returns:
         tuple: Tuple containing correlation and p-values for gradiometers and magnetometers, 
@@ -60,11 +58,11 @@ def band_substr_corr_p_values(corr_dir, substr, band):
     channel_drop_grad = []
     channel_drop_mag = []
     
-    for sensor_pair_fname in os.listdir(corr_dir):
+    for sensor_pair_fname in os.listdir(output_corr_dir):
         if not sensor_pair_fname.startswith('MEG'):
             continue
         
-        sensor_pair_path = os.path.join(corr_dir, sensor_pair_fname)
+        sensor_pair_path = os.path.join(output_corr_dir, sensor_pair_fname)
         substr_folder_path = os.path.join(sensor_pair_path, substr)
 
         if not os.path.isdir(substr_folder_path):
@@ -84,37 +82,38 @@ def band_substr_corr_p_values(corr_dir, substr, band):
             channel_index_grad.append(sensor_pair_fname[-7:])  
             channel_drop_grad.append(sensor_pair_fname[0:7])
         
-        # Loop through each correlation table in the substr folder
-        for filename in os.listdir(substr_folder_path):
-            if not filename.endswith("spearmanr.csv") or filename.startswith('._'):
-                continue
+        # Load the pre-calculated correlation and p-value tables for the frequency band
+        corr_file_path = os.path.join(substr_folder_path, f'{substr}_lat_spectra_substr_spearmanr.csv')
+        pval_file_path = os.path.join(substr_folder_path, f'{substr}_lat_spectra_substr_spearman_pvals.csv')
+        
+        if not os.path.exists(corr_file_path) or not os.path.exists(pval_file_path):
+            print(f'{corr_file_path} or {pval_file_path} does not exist')
+            continue
+        
+        correlation_table = pd.read_csv(corr_file_path, index_col=0)
+        pvals_table = pd.read_csv(pval_file_path, index_col=0)
+        
+        # Extract the correlation value and p-value for the specific band
+        if band_name in correlation_table.index:
+            correlation_value = correlation_table.loc[band_name, '0']
+            p_value = pvals_table.loc[band_name, '0']
+        else:
+            print(f'{band_name} not found in {corr_file_path}')
+            continue
 
-            # Read correlation and p-value tables
-            correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
-            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'spearman_pvals')))
-            
-            # Filter the correlation and p-value tables for the desired frequency band
-            band_corr_values = correlation_table.loc[(correlation_table['Unnamed: 0'] >= band[0]) & 
-                                                     (correlation_table['Unnamed: 0'] <= band[1]), '0']
-            band_pvals = pvals_table.loc[(pvals_table['Unnamed: 0'] >= band[0]) & 
-                                         (pvals_table['Unnamed: 0'] <= band[1]), '0']
-            
-            # Calculate the mean correlation value and p-value for the band
-            correlation_value = band_corr_values.mean()
-            p_value = band_pvals.mean()
-
-            # Update the corresponding lists
-            if is_magnetometer:
-                correlation_values_mag.append(correlation_value)
-                p_values_mag.append(p_value)
-            else:
-                correlation_values_grad.append(correlation_value)
-                p_values_grad.append(p_value)
+        # Update the corresponding lists
+        if is_magnetometer:
+            correlation_values_mag.append(correlation_value)
+            p_values_mag.append(p_value)
+        else:
+            correlation_values_grad.append(correlation_value)
+            p_values_grad.append(p_value)
 
     return (correlation_values_grad, correlation_values_mag, 
             p_values_grad, p_values_mag, 
             channel_index_grad, channel_index_mag, 
             channel_drop_grad, channel_drop_mag)
+
 
 platform = 'bluebear'
 
@@ -129,19 +128,18 @@ elif platform == 'mac':
 # Define directories 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-psd')  # containing all sensor pair folders
+output_corr_dir = op.join(deriv_dir, 'correlations/bands/bands_sensor_pairs_subtraction_nooutlier-psd')  # containing all sensor pair folders
 fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd')
 
 # List of the things for which you want topoplots
-substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 # Define frequency bands (for example: delta, theta, alpha, beta, gamma)
 bands = {
     'Delta': (1, 4),
     'Theta': (4, 8),
     'Alpha': (8, 12),
-    'Beta': (12, 30),
-    'Gamma': (30, 40)
+    'Beta': (12, 30)
 }
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all bands
@@ -151,15 +149,15 @@ pvals_dfs_grad = {}
 pvals_dfs_mag = {}
 
 # Create lists of correlation values and p-values for each band and substr
-for band_name, band_range in bands.items():
+for band_name in bands.keys():
     for substr in substrs:
         # Loop through each sensor pair folder
         (correlation_values_grad, correlation_values_mag, 
             p_values_grad, p_values_mag, 
             channel_index_grad, channel_index_mag, 
-            channel_drop_grad, channel_drop_mag) = band_substr_corr_p_values(corr_dir, substr, band_range)
+            channel_drop_grad, channel_drop_mag) = band_substr_corr_p_values(output_corr_dir, substr, band_name)
         
-        # Convert the dictionary to a DataFrame
+        # Convert the lists to DataFrames
         correlations_df_grad = pd.DataFrame(correlation_values_grad, 
                                             index=channel_index_grad, 
                                             columns=['Correlation'])
@@ -172,6 +170,7 @@ for band_name, band_range in bands.items():
         pvals_df_mag = pd.DataFrame(p_values_mag, 
                                     index=channel_index_mag, 
                                     columns=['Correlation'])
+        
         # Name the DataFrame with the band name
         correlations_dfs_grad[f'{band_name}_{substr}'] = correlations_df_grad
         correlations_dfs_mag[f'{band_name}_{substr}'] = correlations_df_mag
@@ -238,7 +237,7 @@ for substr in substrs:
 
         fig.set_size_inches(12, 12)
 
-        if not op.exists(op.join(fig_output_dir, substr)):
-            os.mkdir(op.join(fig_output_dir, substr))
-        plt.savefig(op.join(fig_output_dir, substr, f'{band_name}_correlations.jpg'), format='jpg', dpi=300)
+        if not op.exists(op.join(fig_output_dir)):
+            os.mkdir(op.join(fig_output_dir))
+        plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations.jpg'), format='jpg', dpi=300)
         plt.close()
