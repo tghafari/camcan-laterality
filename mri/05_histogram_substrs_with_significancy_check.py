@@ -22,7 +22,7 @@ from scipy import stats
 from scipy.stats import shapiro
 
 # Define paths
-platform = 'bluebear'  # 'bluebear' or 'mac'?
+platform = 'mac'  # 'bluebear' or 'mac'?
 
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -230,7 +230,7 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
     for idx, structure in enumerate(structures):
         ax = axs[idx // 4, idx % 4]
         ax.set_title(structure, fontsize=12, fontname='Calibri')
-        ax.set_xlabel('Lateralization Volume', fontsize=12, fontname='Calibri')
+        ax.set_xlabel('Lateralisation Volume', fontsize=12, fontname='Calibri')
         ax.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
         ax.axvline(x=0, color='k', linewidth=0.25, linestyle=':')
         
@@ -284,7 +284,7 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
         ax.set_axisbelow(True)
         
     plt.tight_layout()
-    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-nooutliers.png'), dpi=300)
+    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-nooutliers-nonormalcurve.png'), dpi=300)
 
 (substr_vol_df, substr_lat_df, 
    outlier_subjectID_vol_df) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, 
@@ -293,7 +293,7 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
 # Save outlier dataframe
 outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
 
-plot_volume_histograms(structures, substr_vol_df, colormap)
+# plot_volume_histograms(structures, substr_vol_df, colormap)
 plot_lateralisation_volumes(substr_lat_df, structures, colormap)
 
 
