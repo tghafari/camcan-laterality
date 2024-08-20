@@ -242,4 +242,6 @@ for substr in substrs:
         if not op.exists(op.join(fig_output_dir)):
             os.mkdir(op.join(fig_output_dir))
         plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations_new.jpg'), format='jpg', dpi=500)
+        plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations_new.tiff'), format='tiff', dpi=500)
+        plt.savefig(op.join(fig_output_dir, f'{substr}_{band_name}_correlations_new.svg'), format='svg', dpi=500)
         plt.close()
