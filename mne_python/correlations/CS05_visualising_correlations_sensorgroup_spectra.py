@@ -28,7 +28,7 @@ import os
 import matplotlib.pyplot as plt
 import mne
 
-platform = 'bluebear'
+platform = 'mac'
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -42,7 +42,7 @@ elif platform == 'mac':
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
 corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-psd')
-fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction_nooutlier-psd')
+fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/sensor-pair-freq-substr-correlations_subtraction_nooutlier-psd/average-sensors')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load one sample meg file for channel names
@@ -55,14 +55,19 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 # Subcortical structure and their associated sensor clusters
 substr_sensclusters = {
     'Thal': [['0431','1141'], ['1821','2211'], ['1841', '2231']], 
-    'Puta': [['0531', '0941'], ['0541', '0931'], ['0511', '0921'], ['0321', '1231'], ['0341', '1221']], 
-    'Hipp': [['0532','0942'], ['0611','1021'], ['0541','0931'], ['0331','1241'], ['0321','1231'], ['','1221'], ['','1411']]
+    'Puta': [['0531', '0941'], ['0541', '0931'], ['0511', '0921'],
+             ['0321', '1231'], ['0341', '1221']], 
+    'Hipp': [['0532','0942'], ['0611','1021'], ['0541','0931'],
+             ['0331','1241'], ['0321','1231'], ['0341','1221'], 
+             ['0121','1411']]
 }
+# colormap = ['#FFD700', '#191970', '#6B8E23']  # structure color map from fslanat
+colormap = ['darkred', 'darkred', 'darkblue']
 
 # Frequencies of interest
-freqs = np.arange(1, 40.5, 0.5)
+freqs = np.arange(1, 41, 1)
 
-for substr in substr_sensclusters.keys():
+for idx, substr in enumerate(substr_sensclusters.keys()):
     print(f'Working on {substr}')
     
     # Placeholder for averaged correlation values and p-values
@@ -74,8 +79,8 @@ for substr in substr_sensclusters.keys():
         print(f'Processing sensor {sensor_id}')
         
         # Build file paths
-        pearsonr_fname = op.join(corr_dir, f'MEG{sensor_id}_MEG{sensor_id}', f'{substr}', f'{substr}_lat_spectra_substr_spearmanr.csv')
-        pval_fname = op.join(corr_dir, f'MEG{sensor_id}_MEG{sensor_id}', f'{substr}', f'{substr}_lat_spectra_substr_spearman_pvals.csv')
+        pearsonr_fname = op.join(corr_dir, f'MEG{sensor_id[0]}_MEG{sensor_id[1]}', f'{substr}', f'{substr}_lat_spectra_substr_spearmanr.csv')
+        pval_fname = op.join(corr_dir, f'MEG{sensor_id[0]}_MEG{sensor_id[1]}', f'{substr}', f'{substr}_lat_spectra_substr_spearman_pvals.csv')
         
         if not op.exists(pearsonr_fname) or not op.exists(pval_fname):
             print(f'Files for sensor {sensor_id} not found. Skipping.')
@@ -83,32 +88,32 @@ for substr in substr_sensclusters.keys():
         
         # Load correlation and p-value data
         corr_df = pd.read_csv(pearsonr_fname, index_col=0)
-        pval_df = pd.read_csv(pval_fname, index_col=0)
+        #pval_df = pd.read_csv(pval_fname, index_col=0)
 
         # Ensure data is aligned with the frequencies
-        corr_vals = corr_df.loc[freqs.astype(str), '0'].values
-        pvals = pval_df.loc[freqs.astype(str), '0'].values
+        corr_vals = corr_df.loc[freqs, '0'].values
+        #pvals = pval_df.loc[freqs, '0'].values
 
         # Accumulate correlation values and p-values
         avg_corr_vals += corr_vals
-        avg_pvals += pvals
+        #avg_pvals += pvals
 
     # Average the correlation values and p-values across sensors
     avg_corr_vals /= num_sensors
-    avg_pvals /= num_sensors
+    #avg_pvals /= num_sensors
 
     # Plot averaged correlation values
     plt.figure(figsize=(10, 6))
-    plt.plot(freqs, avg_corr_vals, marker='o', color='blue', label=f'Averaged Correlation Values for {substr}', zorder=1)
+    plt.plot(freqs, avg_corr_vals, marker='o', color=colormap[idx], zorder=1)
     
-    # Highlight frequencies where p-values < 0.05
-    significant_freqs = freqs[avg_pvals < 0.05]
-    for freq in significant_freqs:
-        plt.axvline(x=freq, color='red', alpha=0.5, linestyle='--', linewidth=1, label='p < 0.05')
+    # Highlight frequencies where p-values < 0.05  -- find a reasonable way to find significant p-values. average doesn't make sense
+    # significant_freqs = freqs[avg_pvals < 0.05]
+    # for freq in significant_freqs:
+    #     plt.axvline(x=freq, color='red', alpha=0.5, linestyle='--', linewidth=1, label='p < 0.05')
 
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Averaged Correlation Values')
-    plt.title(f'Averaged Correlation Values for {substr} Across Frequencies (1-40 Hz)')
+    plt.title(f'Averaged Correlation Values for {substr} Across Sensors')
     plt.legend()
     plt.grid(True)
 
@@ -118,7 +123,7 @@ for substr in substr_sensclusters.keys():
         os.makedirs(fig_output_path)
     
     fig_output_fname = op.join(fig_output_path, f'{substr}_avg_corr_values.png')
-    plt.savefig(fig_output_fname, dpi=300)
+    plt.savefig(fig_output_fname, dpi=500)
     plt.close()
 
 print('Processing complete.')
