@@ -49,7 +49,7 @@ bem_suffix = 'bem-sol'
 fs_sub = f'sub-{subject}'  # FreeSurfer subject name
 
 # Specify specific file names
-bids_root = r'Z:\Projects\mTBI_predict\Collected_Data\MNE-bids-data' #'-anonymized'  # RDS folder for bids formatted data
+bids_root = r'Z:\Projects\mTBI_predict\Collected_Data\MNE-bids-data'   # RDS folder for bids formatted data
 bids_path = BIDSPath(subject=subject, session=session,
                      task=task, run=run, root=bids_root, 
                      suffix=meg_suffix, extension=meg_extension)
