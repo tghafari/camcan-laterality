@@ -35,6 +35,30 @@ import mne
 from mne_bids import BIDSPath, read_raw_bids
 
 
+
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
+test_plot = False  # do you want sanity check plots?
+
+
+# Define where to read and write the data
+if platform == 'bluebear':
+    rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+elif platform == 'mac':
+    rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+
+output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+
+# Read only data from subjects with good preprocessed data
+good_subject_pd = pd.read_csv(good_sub_sheet)
+good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+
+# Read sensor layout sheet
+sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
+
+
+
 # subject info 
 site = 'Birmingham'
 subject = '04'  # subject code in mTBI project
