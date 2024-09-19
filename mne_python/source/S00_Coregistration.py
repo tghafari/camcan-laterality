@@ -31,15 +31,15 @@ Notes:
 
 import numpy as np
 import os.path as op
+import os
+import pandas as pd
 
 import mne
 from mne_bids import BIDSPath, read_raw_bids
 
 
 
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
-test_plot = False  # do you want sanity check plots?
-
+platform = 'mac'  # are you running on bluebear or windows or mac?
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -49,63 +49,44 @@ elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
 
-output_dir = op.join(rds_dir, 'derivatives/mri/source/')
+epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
+info_dir = op.join(rds_dir, 'dataman/data_information')
+good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
-# Read sensor layout sheet
-sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
-
-
-
 # subject info 
-site = 'Birmingham'
-subject = '04'  # subject code in mTBI project
-session = '01'  # data collection session within each run
-run = '01'  # data collection run for each participant
-pilot = 'P' # is the data collected 'P'ilot or 'T'ask?
-task = 'SpAtt'
 meg_extension = '.fif'
 meg_suffix = 'meg'
-deriv_suffix = 'coreg-trans'
+trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
-fs_sub = f'sub-{subject}'  # FreeSurfer subject name
+subjectID = '110087'  # FreeSurfer subject name
+fs_sub = f'sub-CC{subjectID}'  # name of fs folder for each subject
 
 # Specify specific file names
-bids_root = r'Z:\Projects\mTBI_predict\Collected_Data\MNE-bids-data'   # RDS folder for bids formatted data
-bids_path = BIDSPath(subject=subject, session=session,
-                     task=task, run=run, root=bids_root, 
-                     suffix=meg_suffix, extension=meg_extension)
-deriv_folder = op.join(bids_root, 'derivatives', 'flux-pipeline',
-                       'sub-' + subject, 'task-' + task)  # RDS folder for results
-deriv_fname = bids_path.basename.replace(meg_suffix, deriv_suffix)
-bem_fname = deriv_fname.replace(deriv_suffix, bem_suffix)  # save in the bids folder
+fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat/{fs_sub}_T1w')  # FreeSurfer directory (after running recon all)
+deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub)
 
-fs_sub_dir = r'Z:\Projects\mTBI_predict\Collected_Data\MRI_data\sub-04'  # FreeSurfer directory (after running recon all)
-mr_figname = op.join(fs_sub_dir, 'fs_parsed.png')  # save figures in the MRI folder
-bem_figname = mr_figname.replace('fs_parsed', 'bem_sol')
-coreg_figname = mr_figname.replace('fs_parsed', 'final_coreg')
+if not os.path.exists(deriv_folder):
+    os.makedirs(deriv_folder)
+trans_fname = op.join(deriv_folder, fs_sub, f'{fs_sub}_trans_suffix')
+bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
+bem_figname = bem_fname
+coreg_figname = bem_fname.replace(bem_suffix, 'final_coreg')
 
-# """ Steps 1, 2, and 3 - no need to run them here if you ran recon_all"""
-# # Step 1: reconstruct the MRI file using freesurfer 
-# Brain = mne.viz.get_brain_class()
-# brain = Brain(fs_sub, hemi='lh', surf='pial',
-#               subjects_dir=fs_sub_dir, size=(800,600))
-# brain.save_image(mr_figname)
+# for i, subjectID in enumerate(good_subject_pd.index):
+    # Read subjects one by one 
+epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+epoched_fif = op.join(epoched_dir, epoched_fname)
 
-# # Step 2: reconstruct the scalp surface
-# mne.bem.make_scalp_surface(subject=fs_sub, subjects_dir=fs_sub_dir,
-#                            force=True, overwrite=True, verbose=True,
-#                            mri='T1.mgz')  # mri should exist in subject_dir/subject/mri
+    # try:
+    #     print(f'Reading subject # {i}')
+                    
+info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info  # one 7min50sec epochs
 
-# # Step 3: reconstruct Boundary Element Model (BEM)
-# mne.bem.make_watershed_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
-#                            overwrite=True, verbose=True)
-
-""" Steps 4 and 5 should be run here"""
-# Step 4: Get Boundary Element model (BEM) solution
+# Get Boundary Element model (BEM) solution
 """ run this section after the watershed_bem surfaces are read in freesurfer,
 (using my_recon.sh batch script)"""
 
@@ -128,7 +109,7 @@ fig = mne.viz.plot_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
                        orientation='coronal', brain_surfaces='white')
 fig.savefig(bem_figname)
 
-# Step 5: Coregistration
+# Coregistration
 """ trans file is created here for later use in bids and then
 the source-base analysis.
 1) save the trans file in the MRI folder
@@ -137,7 +118,6 @@ the source-base analysis.
 """
 
 ## AUTOMATED COREGISTRATION ## 
-info = read_raw_bids(bids_path=bids_path, verbose=False).info
 plot_kwargs = dict(subject=fs_sub, subjects_dir=fs_sub_dir,
                    surfaces="head-dense", dig=True,
                    eeg=[], meg='sensors', show_axes=True,
@@ -150,7 +130,7 @@ fiducials = "estimated"  # gets fiducials from fsaverage
 coreg = mne.coreg.Coregistration(info, subject=fs_sub, 
                                  subjects_dir=fs_sub_dir,
                                  fiducials=fiducials)
-mne.write_trans(deriv_fname, coreg.trans)
+mne.write_trans(trans_fname, coreg.trans)
 fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Initial fit with fiducials
