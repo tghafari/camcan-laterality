@@ -28,6 +28,7 @@ Notes:
     Run recon_all on freesurfer before this script.
     Steps 1, 2, and 3 are also included in the my_recon.sh bash script
 """
+
 import numpy as np
 import os.path as op
 
@@ -48,7 +49,7 @@ elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
 
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+output_dir = op.join(rds_dir, 'derivatives/mri/source/')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
@@ -87,21 +88,21 @@ mr_figname = op.join(fs_sub_dir, 'fs_parsed.png')  # save figures in the MRI fol
 bem_figname = mr_figname.replace('fs_parsed', 'bem_sol')
 coreg_figname = mr_figname.replace('fs_parsed', 'final_coreg')
 
-""" Steps 1, 2, and 3 - no need to run them here if you use bluebear"""
-# Step 1: reconstruct the MRI file using freesurfer 
-Brain = mne.viz.get_brain_class()
-brain = Brain(fs_sub, hemi='lh', surf='pial',
-              subjects_dir=fs_sub_dir, size=(800,600))
-brain.save_image(mr_figname)
+# """ Steps 1, 2, and 3 - no need to run them here if you ran recon_all"""
+# # Step 1: reconstruct the MRI file using freesurfer 
+# Brain = mne.viz.get_brain_class()
+# brain = Brain(fs_sub, hemi='lh', surf='pial',
+#               subjects_dir=fs_sub_dir, size=(800,600))
+# brain.save_image(mr_figname)
 
-# Step 2: reconstruct the scalp surface
-mne.bem.make_scalp_surface(subject=fs_sub, subjects_dir=fs_sub_dir,
-                           force=True, overwrite=True, verbose=True,
-                           mri='T1.mgz')  # mri should exist in subject_dir/subject/mri
+# # Step 2: reconstruct the scalp surface
+# mne.bem.make_scalp_surface(subject=fs_sub, subjects_dir=fs_sub_dir,
+#                            force=True, overwrite=True, verbose=True,
+#                            mri='T1.mgz')  # mri should exist in subject_dir/subject/mri
 
-# Step 3: reconstruct Boundary Element Model (BEM)
-mne.bem.make_watershed_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
-                           overwrite=True, verbose=True)
+# # Step 3: reconstruct Boundary Element Model (BEM)
+# mne.bem.make_watershed_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
+#                            overwrite=True, verbose=True)
 
 """ Steps 4 and 5 should be run here"""
 # Step 4: Get Boundary Element model (BEM) solution
@@ -110,13 +111,18 @@ mne.bem.make_watershed_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
 
 # Creat BEM model
 conductivity = (.3,)  # for single layer
-# conductivity = (.3, .006, .3)  # for three layers
-model = mne.make_bem_model(subject=fs_sub, subjects_dir=fs_sub_dir,
-                           ico=4, conductivity=conductivity)
+model = mne.make_bem_model(subject=fs_sub, 
+                           subjects_dir=fs_sub_dir,
+                           ico=4, 
+                           conductivity=conductivity)
 
 # BEM solution is derived from the BEM model
 bem = mne.make_bem_solution(model)
-mne.write_bem_solution(bem_fname, bem, overwrite=True, verbose=True)
+mne.write_bem_solution(bem_fname, 
+                       bem, 
+                       overwrite=True, 
+                       verbose=True)
+
 # Visualize the BEM
 fig = mne.viz.plot_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
                        orientation='coronal', brain_surfaces='white')
