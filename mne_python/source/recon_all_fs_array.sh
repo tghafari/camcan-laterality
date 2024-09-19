@@ -1,12 +1,16 @@
 #!/bin/bash
-#SBATCH --ntasks 1
-#SBATCH --time 12:00:00
+#SBATCH --account quinna-camcan
 #SBATCH --qos bbdefault
+#SBATCH --time 12:00:00
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
 #SBATCH --mem 32G
+#SBATCH --array=10-20  # Adjust this based on the number of subjects
 
 set -e
 
-module purge; module load bluebear
+module purge
+module load bluebear
 module load bear-apps/2022a
 module load MNE-Python/1.3.1-foss-2022a
 module load FreeSurfer/7.4.1-centos8_x86_64
@@ -15,11 +19,19 @@ module load FreeSurfer/7.4.1-centos8_x86_64
 export SUBJECTS_DIR=/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat  # FreeSurfer subject output path
 export FS_LICENSE=${HOME}/freesurfer_license.txt  # FreeSurfer license path
 
+# Define the location of the file
+export base_dir="/rds/projects/q/quinna-camcan"
+info_dir="${base_dir}/dataman/data_information"
+good_sub_sheet="${info_dir}/demographics_goodPreproc_subjects.csv"
+
+# Read good subject IDs from the CSV, selecting the one based on the array job index
+subjectID=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$good_sub_sheet" | cut -d',' -f1)  # more efficient than the on in fsl_anat
+
 # Define the subject directory where the input MRI file is located
-subject_dir="/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110045/anat"
+subject_dir="${SUBJECTS_DIR}/sub-CC${subjectID}/anat"
 
 # Define the subject ID and the file name (assumed to be in subject_dir)
-subject_id="sub-CC110045_T1w"
+subject_id="sub-CC${subjectID}_T1w"
 input_file="${subject_dir}/${subject_id}.nii.gz"
 
 # Check if the file exists

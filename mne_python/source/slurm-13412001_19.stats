@@ -1,0 +1,11 @@
++--------------------------------------------------------------------------+
+| Job on the BlueBEAR cluster:
+| Starting at Thu Sep 19 16:34:06 2024 for ghafarit(667799)
+| Identity jobid 13412011 jobname recon_all_fs_array.sh
+| Array Identity 13412001_19
+| Running against project quinna-camcan and in partition sapphire-shared
+| Requested cpu=1,mem=32G,node=1,billing=1 - 12:00:00 walltime
+| Assigned to nodes bear-pg0202u12a
+| Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source/recon_all_fs_array.sh
+| WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source
++--------------------------------------------------------------------------+

@@ -1,0 +1,10 @@
++--------------------------------------------------------------------------+
+| Job on the BlueBEAR cluster:
+| Starting at Thu Sep 19 16:26:19 2024 for ghafarit(667799)
+| Identity jobid 13411952 jobname recon_all_fs.sh
+| Running against project jenseno-avtemporal-attention and in partition sapphire-shared
+| Requested cpu=1,mem=32G,node=1,billing=1 - 12:00:00 walltime
+| Assigned to nodes bear-pg0202u08b
+| Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source/recon_all_fs.sh
+| WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source
++--------------------------------------------------------------------------+

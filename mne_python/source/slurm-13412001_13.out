@@ -1,0 +1,240 @@
+GCCcore/11.3.0
+zlib/1.2.12-GCCcore-11.3.0
+binutils/2.38-GCCcore-11.3.0
+GCC/11.3.0
+numactl/2.0.14-GCCcore-11.3.0
+XZ/5.2.5-GCCcore-11.3.0
+libxml2/2.9.13-GCCcore-11.3.0
+libpciaccess/0.16-GCCcore-11.3.0
+hwloc/2.7.1-GCCcore-11.3.0
+OpenSSL/1.1
+libevent/2.1.12-GCCcore-11.3.0
+UCX/1.12.1-GCCcore-11.3.0
+libfabric/1.15.1-GCCcore-11.3.0
+PMIx/4.1.2-GCCcore-11.3.0
+UCC/1.0.0-GCCcore-11.3.0
+OpenMPI/4.1.4-GCC-11.3.0
+OpenBLAS/0.3.20-GCC-11.3.0
+FlexiBLAS/3.2.0-GCC-11.3.0
+FFTW/3.3.10-GCC-11.3.0
+gompi/2022a
+FFTW.MPI/3.3.10-gompi-2022a
+ScaLAPACK/2.2.0-gompi-2022a-fb
+foss/2022a
+bzip2/1.0.8-GCCcore-11.3.0
+ncurses/6.3-GCCcore-11.3.0
+libreadline/8.1.2-GCCcore-11.3.0
+ncurses/6.3-GCCcore-11.3.0
+Tcl/8.6.12-GCCcore-11.3.0
+SQLite/3.38.3-GCCcore-11.3.0
+GMP/6.2.1-GCCcore-11.3.0
+libffi/3.4.2-GCCcore-11.3.0
+Python/3.10.4-GCCcore-11.3.0
+pybind11/2.9.2-GCCcore-11.3.0
+SciPy-bundle/2022.05-foss-2022a
+libxml2/2.9.13-GCCcore-11.3.0
+libxslt/1.1.34-GCCcore-11.3.0
+libpng/1.6.37-GCCcore-11.3.0
+Brotli/1.0.9-GCCcore-11.3.0
+freetype/2.12.1-GCCcore-11.3.0
+expat/2.4.8-GCCcore-11.3.0
+util-linux/2.38-GCCcore-11.3.0
+fontconfig/2.14.0-GCCcore-11.3.0
+xorg-macros/1.19.3-GCCcore-11.3.0
+X11/20220504-GCCcore-11.3.0
+Tk/8.6.12-GCCcore-11.3.0
+Tkinter/3.10.4-GCCcore-11.3.0
+NASM/2.15.05-GCCcore-11.3.0
+libjpeg-turbo/2.1.3-GCCcore-11.3.0
+jbigkit/2.1-GCCcore-11.3.0
+gzip/1.12-GCCcore-11.3.0
+lz4/1.9.3-GCCcore-11.3.0
+zstd/1.5.2-GCCcore-11.3.0
+libdeflate/1.10-GCCcore-11.3.0
+LibTIFF/4.3.0-GCCcore-11.3.0
+Pillow/9.1.1-GCCcore-11.3.0
+Qhull/2020.2-GCCcore-11.3.0
+matplotlib/3.5.2-foss-2022a
+tqdm/4.64.0-GCCcore-11.3.0
+scikit-learn/1.1.2-foss-2022a
+LLVM/12.0.1-GCCcore-11.3.0
+numba/0.56.4-foss-2022a
+pydicom/2.3.0-GCCcore-11.3.0
+NiBabel/4.0.2-foss-2022a
+Szip/2.1.1-GCCcore-11.3.0
+HDF5/1.12.2-gompi-2022a
+h5py/3.7.0-foss-2022a
+imageio/2.22.2-foss-2022a
+libdrm/2.4.110-GCCcore-11.3.0
+libglvnd/1.4.0-GCCcore-11.3.0
+libunwind/1.6.2-GCCcore-11.3.0
+Mesa/22.0.3-GCCcore-11.3.0
+libGLU/9.0.2-GCCcore-11.3.0
+VTK/9.2.2-foss-2022a
+MNE-Python/1.3.1-foss-2022a
+MCR/R2019b.8
+FreeSurfer/7.4.1-centos8_x86_64
+fs-check-version --s sub-CC110187_T1w --o /tmp/tmp.IoQKDn
+Thu Sep 19 16:35:15 BST 2024
+
+setenv SUBJECTS_DIR /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat
+cd /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source
+/rds/bear-apps/2022a/EL8-ice/software/FreeSurfer/7.4.1-centos8_x86_64/bin/fs-check-version --s sub-CC110187_T1w --o /tmp/tmp.IoQKDn
+-rwxrwxr-x 1 branfosj-admin build 18565 Jun 14  2023 /rds/bear-apps/2022a/EL8-ice/software/FreeSurfer/7.4.1-centos8_x86_64/bin/fs-check-version
+
+freesurfer-linux-centos8_x86_64-7.4.1-20230613-7eb8460
+$Id$
+Linux bear-pg0202u08a.bear.cluster 4.18.0-372.32.1.el8_6.x86_64 #1 SMP Fri Oct 7 12:35:10 EDT 2022 x86_64 x86_64 x86_64 GNU/Linux
+pid 53411
+Current FS Version freesurfer-linux-centos8_x86_64-7.4.1-20230613-7eb8460
+Subject does not have a bstampfile, copying /rds/bear-apps/2022a/EL8-ice/software/FreeSurfer/7.4.1-centos8_x86_64/build-stamp.txt
+Subject FS Version: freesurfer-linux-centos8_x86_64-7.4.1-20230613-7eb8460
+No constraints on version because REQ=UnSet and FsVerFile=NotThere
+#@#% fs-check-version match = 1
+fs-check-version Done
+INFO: SUBJECTS_DIR is /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat
+Actual FREESURFER_HOME /rds/bear-apps/2022a/EL8-ice/software/FreeSurfer/7.4.1-centos8_x86_64
+Linux bear-pg0202u08a.bear.cluster 4.18.0-372.32.1.el8_6.x86_64 #1 SMP Fri Oct 7 12:35:10 EDT 2022 x86_64 x86_64 x86_64 GNU/Linux
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w
+
+ mri_convert /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187/anat/sub-CC110187_T1w.nii.gz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig/001.mgz 
+
+mri_convert /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187/anat/sub-CC110187_T1w.nii.gz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig/001.mgz 
+reading from /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187/anat/sub-CC110187_T1w.nii.gz...
+TR=0.00, TE=0.00, TI=0.00, flip angle=0.00
+i_ras = (-0.003515, -0.999994, 0)
+j_ras = (0.00172698, -5.96046e-06, 0.999999)
+k_ras = (0.999992, -0.00351501, -0.00172722)
+writing to /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig/001.mgz...
+@#@FSTIME  2024:09:19:16:35:18 mri_convert N 2 e 4.98 S 0.04 U 4.83 P 97% M 54680 F 1 R 1356 W 0 c 17 w 28 I 48 O 0 L 76.36 77.13 74.44
+@#@FSLOADPOST 2024:09:19:16:35:23 mri_convert N 2 76.41 77.12 74.46
+#--------------------------------------------
+#@# MotionCor Thu Sep 19 16:35:24 BST 2024
+Found 1 runs
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig/001.mgz
+Checking for (invalid) multi-frame inputs...
+Only one run found so motion
+correction will not be performed. I'll
+copy the run to rawavg and continue.
+
+ cp /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig/001.mgz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz 
+
+
+ mri_info /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz 
+
+rawavg.mgz ========================================
+Volume information for /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz
+          type: MGH
+    dimensions: 256 x 256 x 192
+   voxel sizes: 1.000000, 1.000000, 1.000000
+          type: FLOAT (3)
+           fov: 256.000
+           dof: 1
+        xstart: -128.0, xend: 128.0
+        ystart: -128.0, yend: 128.0
+        zstart: -96.0, zend: 96.0
+            TR: 0.00 msec, TE: 0.00 msec, TI: 0.00 msec, flip angle: 0.00 degrees
+       nframes: 1
+       PhEncDir: UNKNOWN
+       FieldStrength: 0.000000
+ras xform present
+    xform info: x_r =  -0.0035, y_r =   0.0017, z_r =   1.0000, c_r =     1.7855
+              : x_a =  -1.0000, y_a =  -0.0000, z_a =  -0.0035, c_a =    10.0706
+              : x_s =   0.0000, y_s =   1.0000, z_s =  -0.0017, c_s =   -21.3682
+
+talairach xfm : 
+Orientation   : PSR
+Primary Slice Direction: sagittal
+
+voxel to ras transform:
+               -0.0035   0.0017   1.0000   -93.9849
+               -1.0000  -0.0000  -0.0035   138.4081
+                0.0000   1.0000  -0.0017  -149.2023
+                0.0000   0.0000   0.0000     1.0000
+
+voxel-to-ras determinant -1
+
+ras to voxel transform:
+               -0.0035  -1.0000   0.0000   138.0768
+                0.0017  -0.0000   1.0000   149.3652
+                1.0000  -0.0035  -0.0017    94.2130
+               -0.0000  -0.0000  -0.0000     1.0000
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w
+
+ mri_convert /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz --conform 
+
+mri_convert /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz --conform 
+reading from /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/rawavg.mgz...
+TR=0.00, TE=0.00, TI=0.00, flip angle=0.00
+i_ras = (-0.003515, -0.999994, 0)
+j_ras = (0.00172698, -5.96046e-06, 0.999999)
+k_ras = (0.999992, -0.00351501, -0.00172722)
+changing data type from float to uchar (noscale = 0)...
+MRIchangeType: Building histogram 0 797 1000, flo=0, fhi=0.999, dest_type=0
+Reslicing using trilinear interpolation 
+writing to /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz...
+@#@FSTIME  2024:09:19:16:35:28 mri_convert N 3 e 3.91 S 0.04 U 3.84 P 99% M 66812 F 0 R 6620 W 0 c 16 w 15 I 0 O 0 L 76.38 77.10 74.46
+@#@FSLOADPOST 2024:09:19:16:35:32 mri_convert N 3 76.51 77.12 74.48
+
+ mri_add_xform_to_header -c /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/transforms/talairach.xfm /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz 
+
+INFO: extension is mgz
+@#@FSTIME  2024:09:19:16:35:32 mri_add_xform_to_header N 4 e 1.45 S 0.02 U 1.42 P 99% M 21596 F 0 R 1305 W 0 c 6 w 19 I 0 O 0 L 76.51 77.12 74.48
+@#@FSLOADPOST 2024:09:19:16:35:33 mri_add_xform_to_header N 4 76.51 77.12 74.48
+
+ mri_info /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz 
+
+orig.mgz ========================================
+Volume information for /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/orig.mgz
+          type: MGH
+    dimensions: 256 x 256 x 256
+   voxel sizes: 1.000000, 1.000000, 1.000000
+          type: UCHAR (0)
+           fov: 256.000
+           dof: 1
+        xstart: -128.0, xend: 128.0
+        ystart: -128.0, yend: 128.0
+        zstart: -128.0, zend: 128.0
+            TR: 0.00 msec, TE: 0.00 msec, TI: 0.00 msec, flip angle: 0.00 degrees
+       nframes: 1
+       PhEncDir: UNKNOWN
+       FieldStrength: 0.000000
+ras xform present
+    xform info: x_r =  -1.0000, y_r =   0.0000, z_r =   0.0000, c_r =     1.7855
+              : x_a =   0.0000, y_a =  -0.0000, z_a =   1.0000, c_a =    10.0706
+              : x_s =   0.0000, y_s =  -1.0000, z_s =   0.0000, c_s =   -21.3682
+
+talairach xfm : /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri/transforms/talairach.xfm
+Orientation   : LIA
+Primary Slice Direction: coronal
+
+voxel to ras transform:
+               -1.0000   0.0000   0.0000   129.7855
+                0.0000  -0.0000   1.0000  -117.9294
+                0.0000  -1.0000   0.0000   106.6318
+                0.0000   0.0000   0.0000     1.0000
+
+voxel-to-ras determinant -1
+
+ras to voxel transform:
+               -1.0000  -0.0000  -0.0000   129.7855
+               -0.0000   0.0000  -1.0000   106.6318
+               -0.0000   1.0000  -0.0000   117.9294
+               -0.0000  -0.0000  -0.0000     1.0000
+#--------------------------------------------
+#@# Talairach Thu Sep 19 16:35:34 BST 2024
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri
+
+ mri_nu_correct.mni --no-rescale --i orig.mgz --o orig_nu.mgz --ants-n4 --n 1 --proto-iters 1000 --distance 50 
+
+/usr/bin/bc
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri
+/rds/bear-apps/2022a/EL8-ice/software/FreeSurfer/7.4.1-centos8_x86_64/bin/mri_nu_correct.mni
+--no-rescale --i orig.mgz --o orig_nu.mgz --ants-n4 --n 1 --proto-iters 1000 --distance 50
+nIters 1
+mri_nu_correct.mni 7.4.1
+Linux bear-pg0202u08a.bear.cluster 4.18.0-372.32.1.el8_6.x86_64 #1 SMP Fri Oct 7 12:35:10 EDT 2022 x86_64 x86_64 x86_64 GNU/Linux
+Thu Sep 19 16:35:34 BST 2024
+tmpdir is ./tmp.mri_nu_correct.mni.53980
+cd /rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110187_T1w/mri
+AntsN4BiasFieldCorrectionFs -i orig.mgz -o ./tmp.mri_nu_correct.mni.53980/nu0.mgz --dtype uchar
