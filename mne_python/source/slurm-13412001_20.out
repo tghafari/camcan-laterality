@@ -1788,3 +1788,8 @@ GCAMRegisterLevel(): init RMS 0.551254
 l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=2.00 
 tol=5.00e-02, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=0, sigma=0.5,type=2, relabel=0, neg=no
 
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.527129
+
+
+

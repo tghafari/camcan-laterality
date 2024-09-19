@@ -2110,3 +2110,14 @@ tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_d
 blurring input image with Gaussian with sigma=2.000...
 GCAMRegisterLevel(): init RMS 0.420291
 
+
+
+#GCAMreg# pass 0 level1 3 level2 1 tsec 36.005 sigma 0.5
+l_jacobian=1.00 l_log_likelihood=0.20 l_smoothness=0.12 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=16, sigma=0.5,type=2, relabel=0, neg=yes
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.420207
+
+
+

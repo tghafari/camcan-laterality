@@ -3244,3 +3244,114 @@ projecting onto sphere...
 surface projected - minimizing metric distortion...
 vertex spacing 1.00 +- 0.56 (0.00-->7.04) (max @ vno 100040 --> 100066)
 face area 0.03 +- 0.04 (-0.24-->0.86)
+Entering MRISinflateToSphere()
+inflating to sphere (rms error < 2.00)
+000: dt: 0.0000, rms radial error=175.549, avgs=0
+005/300: dt: 0.9000, rms radial error=175.291, avgs=0
+010/300: dt: 0.9000, rms radial error=174.736, avgs=0
+015/300: dt: 0.9000, rms radial error=174.008, avgs=0
+020/300: dt: 0.9000, rms radial error=173.179, avgs=0
+025/300: dt: 0.9000, rms radial error=172.294, avgs=0
+030/300: dt: 0.9000, rms radial error=171.379, avgs=0
+035/300: dt: 0.9000, rms radial error=170.446, avgs=0
+040/300: dt: 0.9000, rms radial error=169.506, avgs=0
+045/300: dt: 0.9000, rms radial error=168.563, avgs=0
+050/300: dt: 0.9000, rms radial error=167.622, avgs=0
+055/300: dt: 0.9000, rms radial error=166.683, avgs=0
+060/300: dt: 0.9000, rms radial error=165.747, avgs=0
+065/300: dt: 0.9000, rms radial error=164.816, avgs=0
+070/300: dt: 0.9000, rms radial error=163.889, avgs=0
+075/300: dt: 0.9000, rms radial error=162.967, avgs=0
+080/300: dt: 0.9000, rms radial error=162.050, avgs=0
+085/300: dt: 0.9000, rms radial error=161.138, avgs=0
+090/300: dt: 0.9000, rms radial error=160.231, avgs=0
+095/300: dt: 0.9000, rms radial error=159.329, avgs=0
+100/300: dt: 0.9000, rms radial error=158.431, avgs=0
+105/300: dt: 0.9000, rms radial error=157.539, avgs=0
+110/300: dt: 0.9000, rms radial error=156.652, avgs=0
+115/300: dt: 0.9000, rms radial error=155.770, avgs=0
+120/300: dt: 0.9000, rms radial error=154.893, avgs=0
+125/300: dt: 0.9000, rms radial error=154.020, avgs=0
+130/300: dt: 0.9000, rms radial error=153.153, avgs=0
+135/300: dt: 0.9000, rms radial error=152.290, avgs=0
+140/300: dt: 0.9000, rms radial error=151.433, avgs=0
+145/300: dt: 0.9000, rms radial error=150.580, avgs=0
+150/300: dt: 0.9000, rms radial error=149.732, avgs=0
+155/300: dt: 0.9000, rms radial error=148.889, avgs=0
+160/300: dt: 0.9000, rms radial error=148.050, avgs=0
+165/300: dt: 0.9000, rms radial error=147.216, avgs=0
+170/300: dt: 0.9000, rms radial error=146.387, avgs=0
+175/300: dt: 0.9000, rms radial error=145.562, avgs=0
+180/300: dt: 0.9000, rms radial error=144.742, avgs=0
+185/300: dt: 0.9000, rms radial error=143.927, avgs=0
+190/300: dt: 0.9000, rms radial error=143.116, avgs=0
+195/300: dt: 0.9000, rms radial error=142.310, avgs=0
+200/300: dt: 0.9000, rms radial error=141.508, avgs=0
+205/300: dt: 0.9000, rms radial error=140.711, avgs=0
+210/300: dt: 0.9000, rms radial error=139.918, avgs=0
+215/300: dt: 0.9000, rms radial error=139.131, avgs=0
+220/300: dt: 0.9000, rms radial error=138.348, avgs=0
+225/300: dt: 0.9000, rms radial error=137.570, avgs=0
+230/300: dt: 0.9000, rms radial error=136.796, avgs=0
+235/300: dt: 0.9000, rms radial error=136.027, avgs=0
+240/300: dt: 0.9000, rms radial error=135.262, avgs=0
+245/300: dt: 0.9000, rms radial error=134.501, avgs=0
+250/300: dt: 0.9000, rms radial error=133.745, avgs=0
+255/300: dt: 0.9000, rms radial error=132.992, avgs=0
+260/300: dt: 0.9000, rms radial error=132.245, avgs=0
+265/300: dt: 0.9000, rms radial error=131.501, avgs=0
+270/300: dt: 0.9000, rms radial error=130.761, avgs=0
+275/300: dt: 0.9000, rms radial error=130.026, avgs=0
+280/300: dt: 0.9000, rms radial error=129.294, avgs=0
+285/300: dt: 0.9000, rms radial error=128.567, avgs=0
+290/300: dt: 0.9000, rms radial error=127.844, avgs=0
+295/300: dt: 0.9000, rms radial error=127.125, avgs=0
+300/300: dt: 0.9000, rms radial error=126.409, avgs=0
+
+spherical inflation complete.
+epoch 1 (K=10.0), pass 1, starting sse = 15281.93
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+pass 1 complete, delta sse/iter = 0.00/13 = 0.00037
+epoch 2 (K=40.0), pass 1, starting sse = 2378.77
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+pass 1 complete, delta sse/iter = 0.00/13 = 0.00038
+epoch 3 (K=160.0), pass 1, starting sse = 186.24
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+pass 1 complete, delta sse/iter = 0.11/14 = 0.00786
+epoch 4 (K=640.0), pass 1, starting sse = 7.31
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+taking momentum steps...
+pass 1 complete, delta sse/iter = 0.14/20 = 0.00693
+final distance error %100000.00
+writing spherical brain to ../surf/lh.qsphere.nofix
+spherical transformation took 0.0208 hours
+FSRUNTIME@ mris_sphere  0.0208 hours 1 threads
+#VMPC# mris_sphere VmPeak  496720
+mris_sphere done
+@#@FSTIME  2024:09:19:18:22:33 mris_sphere N 9 e 74.75 S 3.90 U 70.58 P 99% M 217256 F 0 R 2283494 W 0 c 267 w 21 I 0 O 0 L 61.94 56.89 56.90
+@#@FSLOADPOST 2024:09:19:18:23:48 mris_sphere N 9 59.61 57.13 56.97
+#--------------------------------------------
+#@# QSphere rh Thu Sep 19 18:23:48 BST 2024
+/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/sub-CC110037_T1w/scripts
+
+ mris_sphere -q -p 6 -a 128 -seed 1234 ../surf/rh.inflated.nofix ../surf/rh.qsphere.nofix 
+
+doing quick spherical unfolding.
+limitting unfolding to 6 passes
+using n_averages = 128
+setting seed for random number genererator to 1234
+version: 7.4.1
+available threads: 1
+scaling brain by 0.329...
+inflating...
