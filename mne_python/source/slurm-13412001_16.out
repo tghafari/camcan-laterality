@@ -2114,3 +2114,4 @@ tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_d
 blurring input image with Gaussian with sigma=0.500...
 GCAMRegisterLevel(): init RMS 0.419104
 
+

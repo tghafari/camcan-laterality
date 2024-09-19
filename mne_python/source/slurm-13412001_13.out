@@ -2121,3 +2121,7 @@ GCAMRegisterLevel(): init RMS 0.420207
 
 
 
+
+iter 0, gcam->neg = 2
+after 1 iterations, nbhd size=0, neg = 0
+
