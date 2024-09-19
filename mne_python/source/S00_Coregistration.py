@@ -63,15 +63,15 @@ meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
 subjectID = '110087'  # FreeSurfer subject name
-fs_sub = f'sub-CC{subjectID}'  # name of fs folder for each subject
+fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
-fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat/{fs_sub}_T1w')  # FreeSurfer directory (after running recon all)
-deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub)
+fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
+deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
 
 if not os.path.exists(deriv_folder):
     os.makedirs(deriv_folder)
-trans_fname = op.join(deriv_folder, fs_sub, f'{fs_sub}_trans_suffix')
+trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix)
 bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
 bem_figname = bem_fname
 coreg_figname = bem_fname.replace(bem_suffix, 'final_coreg')
@@ -105,8 +105,10 @@ mne.write_bem_solution(bem_fname,
                        verbose=True)
 
 # Visualize the BEM
-fig = mne.viz.plot_bem(subject=fs_sub, subjects_dir=fs_sub_dir,
-                       orientation='coronal', brain_surfaces='white')
+fig = mne.viz.plot_bem(subject=fs_sub, 
+                       subjects_dir=fs_sub_dir,
+                       orientation='coronal', 
+                       brain_surfaces='white')
 fig.savefig(bem_figname)
 
 # Coregistration
@@ -118,26 +120,39 @@ the source-base analysis.
 """
 
 ## AUTOMATED COREGISTRATION ## 
-plot_kwargs = dict(subject=fs_sub, subjects_dir=fs_sub_dir,
-                   surfaces="head-dense", dig=True,
-                   eeg=[], meg='sensors', show_axes=True,
+plot_kwargs = dict(subject=fs_sub, 
+                   subjects_dir=fs_sub_dir,
+                   surfaces="head-dense", 
+                   dig=True,
+                   eeg=[], 
+                   meg='sensors', 
+                   show_axes=True,
                    coord_frame='meg')
-view_kwargs = dict(azimuth=45, elevation=90, distance=.6,
+view_kwargs = dict(azimuth=45, 
+                   elevation=90, 
+                   distance=.6,
                    focalpoint=(0.,0.,0.,))
 
 # Set up the coregistration model
 fiducials = "estimated"  # gets fiducials from fsaverage
-coreg = mne.coreg.Coregistration(info, subject=fs_sub, 
+coreg = mne.coreg.Coregistration(info, 
+                                 subject=fs_sub, 
                                  subjects_dir=fs_sub_dir,
                                  fiducials=fiducials)
-mne.write_trans(trans_fname, coreg.trans)
-fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
+mne.write_trans(trans_fname, 
+                coreg.trans,
+                overwrite=True)
+fig = mne.viz.plot_alignment(info, 
+                             trans=coreg.trans, 
+                             **plot_kwargs)
 
 # Initial fit with fiducials
 """ firstly fit with 3 fiducial points. This allows to find a good
 initial solution before optimization using head shape points"""
 coreg.fit_fiducials(verbose=True)
-fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
+fig = mne.viz.plot_alignment(info, 
+                             trans=coreg.trans, 
+                             **plot_kwargs)
 
 # Refining with ICP
 """ secondly we refine the transformation using a few iterations of the
@@ -147,12 +162,18 @@ fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
-coreg.omit_head_shape_points(distance=5. /1000)  # distance is in meters
+coreg.omit_head_shape_points(distance=5./1000)  # distance is in meters
 
 # Final coregistration fit
-coreg.fit_icp(n_iterations=20, nasion_weight=10., verbose=True)
-coreg_fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
-mne.viz.set_3d_view(fig, **view_kwargs)
+coreg.fit_icp(n_iterations=20, 
+              nasion_weight=10., 
+              verbose=True)
+# error about camera position and coreg_fig not having savefig attribute
+coreg_fig = mne.viz.plot_alignment(info, 
+                                   trans=coreg.trans, 
+                                   **plot_kwargs)
+mne.viz.set_3d_view(coreg_fig, 
+                    **view_kwargs)
 coreg_fig.savefig(coreg_figname)
 
 dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
