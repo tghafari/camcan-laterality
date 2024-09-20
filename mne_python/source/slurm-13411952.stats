@@ -8,3 +8,9 @@
 | Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source/recon_all_fs.sh
 | WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source
 +--------------------------------------------------------------------------+
++--------------------------------------------------------------------------+
+| Finished at Thu Sep 19 19:29:09 2024 for ghafarit(667799) on the BlueBEAR Cluster
+| Required (03:00:42 cputime, 2006063K memory used) - 03:02:50 walltime
+| JobState COMPLETING - Reason NonZeroExitCode
+| Exitcode 1:0
++--------------------------------------------------------------------------+
