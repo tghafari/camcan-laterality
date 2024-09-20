@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --account quinna-camcan
 #SBATCH --qos bbdefault
-#SBATCH --time 12:00:00
+#SBATCH --time 05:00:00
 #SBATCH --nodes 1
 #SBATCH --ntasks 4
 #SBATCH --mem 32G
-#SBATCH --array=10-20  # Adjust this based on the number of subjects
+#SBATCH --array=25-27 # Adjust this based on the number of subjects
 
 set -e
 
