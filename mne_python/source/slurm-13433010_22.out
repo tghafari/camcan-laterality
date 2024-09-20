@@ -1141,3 +1141,512 @@ GCAMRegisterLevel(): init RMS 0.843465
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+#GCAMreg# pass 0 level1 5 level2 1 tsec 220.635 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.16 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=256, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.693327
+
+
+
+
+
+
+
+
+
+setting smoothness cost coefficient to 0.615
+
+#GCAMreg# pass 0 level1 4 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.62 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=64, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.693677
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#GCAMreg# pass 0 level1 4 level2 1 tsec 108.209 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.62 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=64, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.667596
+
+
+setting smoothness cost coefficient to 2.353
+
+#GCAMreg# pass 0 level1 3 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=2.35 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=16, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.704211
+
+
+
+
+#GCAMreg# pass 0 level1 3 level2 1 tsec 34.518 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=2.35 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=16, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.702165
+
+
+
+setting smoothness cost coefficient to 8.000
+
+#GCAMreg# pass 0 level1 2 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=8.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=4, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.777829
+
+
+
+
+
+
+
+#GCAMreg# pass 0 level1 2 level2 1 tsec 62.111 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=8.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=4, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.748557
+
+setting smoothness cost coefficient to 20.000
+
+#GCAMreg# pass 0 level1 1 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=20.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=1, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.788037
+
+
+
+
+#GCAMreg# pass 0 level1 1 level2 1 tsec 33.521 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=20.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=1, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.788035
+
+
+
+resetting metric properties...
+setting smoothness cost coefficient to 40.000
+
+#GCAMreg# pass 0 level1 0 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=40.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=0, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.723378
+
+
+
+#GCAMreg# pass 0 level1 0 level2 1 tsec 28.863 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=40.00 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=0, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.720357
+
+
+
+GCAMregister done in 12.4137 min
+Starting GCAmapRenormalizeWithAlignment() without scales
+renormalizing by structure alignment....
+renormalizing input #0
+gca peak = 0.10253 (16)
+mri peak = 0.12771 (29)
+Left_Lateral_Ventricle (4): linear fit = 1.53 x + 0.0 (1097 voxels, overlap=0.282)
+Left_Lateral_Ventricle (4): linear fit = 1.50 x + 0.0 (1097 voxels, peak = 25), gca=24.0
+gca peak = 0.17690 (16)
+mri peak = 0.13013 (30)
+Right_Lateral_Ventricle (43): linear fit = 1.84 x + 0.0 (1239 voxels, overlap=0.130)
+Right_Lateral_Ventricle (43): linear fit = 1.50 x + 0.0 (1239 voxels, peak = 29), gca=24.0
+gca peak = 0.28275 (96)
+mri peak = 0.10306 (97)
+Right_Pallidum (52): linear fit = 1.01 x + 0.0 (1086 voxels, overlap=0.997)
+Right_Pallidum (52): linear fit = 1.01 x + 0.0 (1086 voxels, peak = 97), gca=97.4
+gca peak = 0.18948 (93)
+mri peak = 0.08646 (101)
+Left_Pallidum (13): linear fit = 1.07 x + 0.0 (966 voxels, overlap=1.007)
+Left_Pallidum (13): linear fit = 1.07 x + 0.0 (966 voxels, peak = 99), gca=99.0
+gca peak = 0.20755 (55)
+mri peak = 0.05665 (76)
+Right_Hippocampus (53): linear fit = 1.35 x + 0.0 (1094 voxels, overlap=0.031)
+Right_Hippocampus (53): linear fit = 1.35 x + 0.0 (1094 voxels, peak = 74), gca=74.0
+gca peak = 0.31831 (58)
+mri peak = 0.06131 (86)
+Left_Hippocampus (17): linear fit = 1.28 x + 0.0 (1007 voxels, overlap=0.021)
+Left_Hippocampus (17): linear fit = 1.28 x + 0.0 (1007 voxels, peak = 75), gca=74.5
+gca peak = 0.11957 (102)
+mri peak = 0.08859 (105)
+Right_Cerebral_White_Matter (41): linear fit = 1.03 x + 0.0 (72128 voxels, overlap=0.773)
+Right_Cerebral_White_Matter (41): linear fit = 1.03 x + 0.0 (72128 voxels, peak = 106), gca=105.6
+gca peak = 0.11429 (102)
+mri peak = 0.10323 (105)
+Left_Cerebral_White_Matter (2): linear fit = 1.03 x + 0.0 (76118 voxels, overlap=0.597)
+Left_Cerebral_White_Matter (2): linear fit = 1.03 x + 0.0 (76118 voxels, peak = 106), gca=105.6
+gca peak = 0.14521 (59)
+mri peak = 0.03912 (77)
+Left_Cerebral_Cortex (3): linear fit = 1.33 x + 0.0 (29915 voxels, overlap=0.003)
+Left_Cerebral_Cortex (3): linear fit = 1.33 x + 0.0 (29915 voxels, peak = 78), gca=78.2
+gca peak = 0.14336 (58)
+mri peak = 0.03986 (76)
+Right_Cerebral_Cortex (42): linear fit = 1.29 x + 0.0 (31903 voxels, overlap=0.001)
+Right_Cerebral_Cortex (42): linear fit = 1.29 x + 0.0 (31903 voxels, peak = 75), gca=75.1
+gca peak = 0.13305 (70)
+mri peak = 0.13372 (82)
+Right_Caudate (50): linear fit = 1.23 x + 0.0 (892 voxels, overlap=0.013)
+Right_Caudate (50): linear fit = 1.23 x + 0.0 (892 voxels, peak = 86), gca=85.8
+gca peak = 0.15761 (71)
+mri peak = 0.11496 (86)
+Left_Caudate (11): linear fit = 1.17 x + 0.0 (1132 voxels, overlap=0.007)
+Left_Caudate (11): linear fit = 1.17 x + 0.0 (1132 voxels, peak = 83), gca=83.4
+gca peak = 0.13537 (57)
+mri peak = 0.03998 (79)
+Left_Cerebellum_Cortex (8): linear fit = 1.38 x + 0.0 (20236 voxels, overlap=0.001)
+Left_Cerebellum_Cortex (8): linear fit = 1.38 x + 0.0 (20236 voxels, peak = 79), gca=78.9
+gca peak = 0.13487 (56)
+mri peak = 0.04975 (75)
+Right_Cerebellum_Cortex (47): linear fit = 1.29 x + 0.0 (26368 voxels, overlap=0.001)
+Right_Cerebellum_Cortex (47): linear fit = 1.29 x + 0.0 (26368 voxels, peak = 73), gca=72.5
+gca peak = 0.19040 (84)
+mri peak = 0.04078 (97)
+Left_Cerebellum_White_Matter (7): linear fit = 1.15 x + 0.0 (10076 voxels, overlap=0.867)
+Left_Cerebellum_White_Matter (7): linear fit = 1.15 x + 0.0 (10076 voxels, peak = 97), gca=97.0
+gca peak = 0.18871 (83)
+mri peak = 0.04548 (87)
+Right_Cerebellum_White_Matter (46): linear fit = 1.04 x + 0.0 (8923 voxels, overlap=0.794)
+Right_Cerebellum_White_Matter (46): linear fit = 1.04 x + 0.0 (8923 voxels, peak = 87), gca=86.7
+gca peak = 0.24248 (57)
+mri peak = 0.08609 (80)
+Left_Amygdala (18): linear fit = 1.33 x + 0.0 (481 voxels, overlap=0.073)
+Left_Amygdala (18): linear fit = 1.33 x + 0.0 (481 voxels, peak = 76), gca=75.5
+gca peak = 0.35833 (56)
+mri peak = 0.07375 (74)
+Right_Amygdala (54): linear fit = 1.29 x + 0.0 (575 voxels, overlap=0.047)
+Right_Amygdala (54): linear fit = 1.29 x + 0.0 (575 voxels, peak = 73), gca=72.5
+gca peak = 0.12897 (85)
+mri peak = 0.08066 (94)
+Left_Thalamus (10): linear fit = 1.09 x + 0.0 (5837 voxels, overlap=0.489)
+Left_Thalamus (10): linear fit = 1.09 x + 0.0 (5837 voxels, peak = 92), gca=92.2
+gca peak = 0.13127 (83)
+mri peak = 0.08562 (91)
+Right_Thalamus (49): linear fit = 1.08 x + 0.0 (4948 voxels, overlap=0.695)
+Right_Thalamus (49): linear fit = 1.08 x + 0.0 (4948 voxels, peak = 89), gca=89.2
+gca peak = 0.12974 (78)
+mri peak = 0.10894 (92)
+Left_Putamen (12): linear fit = 1.16 x + 0.0 (2489 voxels, overlap=0.005)
+Left_Putamen (12): linear fit = 1.16 x + 0.0 (2489 voxels, peak = 91), gca=90.9
+gca peak = 0.17796 (79)
+mri peak = 0.10279 (90)
+Right_Putamen (51): linear fit = 1.14 x + 0.0 (2610 voxels, overlap=0.055)
+Right_Putamen (51): linear fit = 1.14 x + 0.0 (2610 voxels, peak = 90), gca=90.5
+gca peak = 0.10999 (80)
+mri peak = 0.08065 (89)
+Brain_Stem (16): linear fit = 1.12 x + 0.0 (10380 voxels, overlap=0.319)
+Brain_Stem (16): linear fit = 1.12 x + 0.0 (10380 voxels, peak = 90), gca=90.0
+gca peak = 0.13215 (88)
+mri peak = 0.08426 (95)
+Right_VentralDC (60): linear fit = 1.09 x + 0.0 (1278 voxels, overlap=0.511)
+Right_VentralDC (60): linear fit = 1.09 x + 0.0 (1278 voxels, peak = 95), gca=95.5
+gca peak = 0.11941 (89)
+mri peak = 0.07500 (96)
+Left_VentralDC (28): linear fit = 1.11 x + 0.0 (1462 voxels, overlap=0.392)
+Left_VentralDC (28): linear fit = 1.11 x + 0.0 (1462 voxels, peak = 98), gca=98.3
+gca peak = 0.20775 (25)
+mri peak = 1.00000 (30)
+Third_Ventricle (14): linear fit = 1.15 x + 0.0 (90 voxels, overlap=2.038)
+Third_Ventricle (14): linear fit = 1.15 x + 0.0 (90 voxels, peak = 29), gca=28.9
+gca peak = 0.13297 (21)
+mri peak = 0.17478 (29)
+Fourth_Ventricle (15): linear fit = 1.74 x + 0.0 (509 voxels, overlap=0.074)
+Fourth_Ventricle (15): linear fit = 1.74 x + 0.0 (509 voxels, peak = 36), gca=36.4
+gca peak Unknown = 0.94777 ( 0)
+gca peak Left_Inf_Lat_Vent = 0.19087 (28)
+gca peak Fourth_Ventricle = 0.13297 (21)
+gca peak CSF = 0.16821 (33)
+gca peak Left_Accumbens_area = 0.32850 (63)
+gca peak Left_undetermined = 0.98480 (28)
+gca peak Left_vessel = 0.40887 (53)
+gca peak Left_choroid_plexus = 0.10898 (46)
+gca peak Right_Inf_Lat_Vent = 0.17798 (26)
+gca peak Right_Accumbens_area = 0.30137 (64)
+gca peak Right_vessel = 0.47828 (52)
+gca peak Right_choroid_plexus = 0.11612 (45)
+gca peak Fifth_Ventricle = 0.59466 (35)
+gca peak WM_hypointensities = 0.10053 (78)
+gca peak non_WM_hypointensities = 0.07253 (60)
+gca peak Optic_Chiasm = 0.25330 (73)
+not using caudate to estimate GM means
+estimating mean gm scale to be 1.31 x + 0.0
+estimating mean wm scale to be 1.03 x + 0.0
+estimating mean csf scale to be 1.38 x + 0.0
+saving intensity scales to talairach.label_intensities.txt
+GCAmapRenormalizeWithAlignment() took 2.00937 min
+noneg pre
+Starting GCAMregister()
+label assignment complete, 0 changed (0.00%)
+npasses = 1, nlevels = 6
+#pass# 1 of 1 ************************
+enabling zero nodes
+setting smoothness cost coefficient to 0.008
+
+#GCAMreg# pass 0 level1 5 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.01 
+tol=5.00e-02, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=256, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.732852
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#GCAMreg# pass 0 level1 5 level2 1 tsec 906.029 sigma 0.5
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.01 
+tol=5.00e-02, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=256, sigma=0.5,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.601822
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+setting smoothness cost coefficient to 0.031
+
+#GCAMreg# pass 0 level1 4 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_label=1.00 l_log_likelihood=0.20 l_smoothness=0.03 
+tol=5.00e-02, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=64, sigma=2.0,type=2, relabel=0, neg=no
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.59984
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

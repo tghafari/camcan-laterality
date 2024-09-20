@@ -69,7 +69,7 @@ deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4]
 
 if not os.path.exists(deriv_folder):
     os.makedirs(deriv_folder)
-trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix)
+trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix + meg_extension)
 bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
 bem_figname = bem_fname
 coreg_figname = bem_fname.replace(bem_suffix, 'final_coreg')
