@@ -32,5 +32,9 @@ fi
 recon-all -i "$input_file" -s "$subject_id" -all -notal-check
 
 # Run MNE-Python scalp surface and watershed BEM steps
-mne make_scalp_surfaces --overwrite --subject "$subject_id" --force
-mne watershed_bem --overwrite --subject "$subject_id"
+python -c "
+import mne
+subject = '${subject_id}'
+mne.bem.make_scalp_surfaces(subject=subject, force=True, overwrite=True)
+mne.bem.make_watershed_bem(subject=subject, overwrite=True)
+"

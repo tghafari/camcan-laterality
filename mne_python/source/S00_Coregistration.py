@@ -35,9 +35,7 @@ import os
 import pandas as pd
 
 import mne
-from mne_bids import BIDSPath, read_raw_bids
-
-
+import matplotlib.pyplot as plt
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
 
@@ -168,14 +166,24 @@ coreg.omit_head_shape_points(distance=5./1000)  # distance is in meters
 coreg.fit_icp(n_iterations=20, 
               nasion_weight=10., 
               verbose=True)
-# error about camera position and coreg_fig not having savefig attribute
+
 coreg_fig = mne.viz.plot_alignment(info, 
                                    trans=coreg.trans, 
                                    **plot_kwargs)
-mne.viz.set_3d_view(coreg_fig, 
-                    **view_kwargs)
-coreg_fig.savefig(coreg_figname)
+mne.viz.set_3d_view(coreg_fig, **view_kwargs)
 
+# To save the fig above, take a screenshot of the 3D scene
+screenshot = coreg_fig.plotter.screenshot()
+
+# The screenshot is just a NumPy array, so we can display it via imshow()
+# and then save it to a file.
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.imshow(screenshot, origin='upper')
+ax.set_axis_off()  # Disable axis labels and ticks
+fig.tight_layout()
+fig.savefig(coreg_figname, dpi=150)
+
+# Compute distance between MRI and HSP
 dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
 print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
       f"/ {np.min(dists):.2f} mm / {np.max(dists):.2f} mm")
