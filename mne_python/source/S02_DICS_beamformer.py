@@ -34,37 +34,54 @@ from mne.time_frequency import csd_multitaper
 
 
 # subject info 
-site = 'Birmingham'
-subject = '04'  # subject code in mTBI project
-session = '01'  # data collection session within each run
-run = '01'  # data collection run for each participant
-pilot = 'P' # is the data collected 'P'ilot or 'T'ask?
-task = 'SpAtt'
+subjectID = '110087'  # FreeSurfer subject name
+fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
+
+platform = 'mac'  # are you running on bluebear or windows or mac?
+# Define where to read and write the data
+if platform == 'bluebear':
+    rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+elif platform == 'mac':
+    rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+
+epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
+info_dir = op.join(rds_dir, 'dataman/data_information')
+good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
+
+# Read only data from subjects with good preprocessed data
+good_subject_pd = pd.read_csv(good_sub_sheet)
+good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+
+
+# Specific file names
 meg_extension = '.fif'
 meg_suffix = 'meg'
-epo_suffix = 'epo'
+trans_suffix = 'coreg-trans'
+bem_suffix = 'bem-sol'
+surf_suffix = 'surf-src'
+vol_suffix = 'vol-src'
 fwd_suffix = 'fwd'
-fs_sub = f'sub-{subject}'  # FreeSurfer subject name
+
+fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
+deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
+fwd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_suffix + meg_extension)
+
 
 inv_method = 'dics'  # which inverse method are you using? dspm/dics/lcmv
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 
-# Specify specific file names
-bids_root = r'Z:\Projects\mTBI_predict\Collected_Data\MNE-bids-data' #'-anonymized'  # RDS folder for bids formatted data
-bids_path = BIDSPath(subject=subject, session=session,
-                     task=task, run=run, root=bids_root, 
-                     suffix=meg_suffix, extension=meg_extension)
-deriv_folder = op.join(bids_root, 'derivatives', 'flux-pipeline',
-                       'sub-' + subject, 'task-' + task)  # RDS folder for results
-input_fname = bids_path.basename.replace(meg_suffix, epo_suffix)
-epo_fname = op.join(deriv_folder, input_fname)  # only used for suffices that are not recognizable to bids 
-fwd_fname = epo_fname.replace(epo_suffix, fwd_suffix)
-
-fs_sub_dir = r'Z:\Projects\mTBI_predict\Collected_Data\MRI_data\sub-04'  # FreeSurfer directory (after running recon all)
-
-
 # Read epoched data + baseline correction + define frequency bands
-epochs = mne.read_epochs(epo_fname, verbose=True, preload=False)
+# for i, subjectID in enumerate(good_subject_pd.index):
+    # Read subjects one by one 
+epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+epoched_fif = op.join(epoched_dir, epoched_fname)
+
+    # try:
+    #     print(f'Reading subject # {i}')
+                    
+epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
 
 baseline_win = (-1.5, 0.)
 active_win = (0., 1)

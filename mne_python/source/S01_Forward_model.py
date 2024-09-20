@@ -58,7 +58,7 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 
 space = 'volume'  # what to use for source modeling? surface or volume
 
-# Specify specific file names
+# Specific file names
 meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
