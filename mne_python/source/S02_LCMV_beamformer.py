@@ -55,7 +55,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '110087'  # FreeSurfer subject name
+subjectID = '120182'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -110,7 +110,7 @@ forward = mne.read_forward_solution(fwd_fname)
 
 epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
 epoched_fif = op.join(epoched_dir, epoched_fname)
-noise_fname = op.join('sub-CC' + str(subjectID), 'sub-CC' + str(subjectID) + '_ses-noise_task-noise.fif')
+noise_fname = op.join('sub-CC' + str(subjectID), 'sub-CC' + str('110087') + '_ses-noise_task-noise.fif')
 noise_fif = op.join(noise_dir, noise_fname)
     # try:
     #     print(f'Reading subject # {i}')

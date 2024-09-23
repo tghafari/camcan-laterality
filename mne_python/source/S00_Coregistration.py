@@ -60,7 +60,7 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
-subjectID = '110087'  # FreeSurfer subject name
+subjectID = '120182'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -71,8 +71,8 @@ if not os.path.exists(deriv_folder):
     os.makedirs(deriv_folder)
 trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix + meg_extension)
 bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
-bem_figname = bem_fname
-coreg_figname = bem_fname.replace(bem_suffix, 'final_coreg')
+bem_figname = bem_fname.replace(meg_extension, '.png')
+coreg_figname = bem_figname.replace(bem_suffix, 'final_coreg')
 
 # for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one 
@@ -160,7 +160,7 @@ fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
-coreg.omit_head_shape_points(distance=5./1000)  # distance is in meters
+coreg.omit_head_shape_points(distance=5./1000)  # distance is in meters- try smaller distances
 
 # Final coregistration fit
 coreg.fit_icp(n_iterations=20, 
@@ -194,6 +194,8 @@ for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ"""
 
 mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
+#compare automatic and manual in a few images.
+#workout the triggers for EEG and LFP
 
 
 
