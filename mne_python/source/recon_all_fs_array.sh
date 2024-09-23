@@ -5,7 +5,7 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks 4
 #SBATCH --mem 32G
-#SBATCH --array=25-27 # Adjust this based on the number of subjects
+#SBATCH --array=30-33 # Adjust this based on the number of subjects
 
 set -e
 
@@ -44,5 +44,6 @@ fi
 recon-all -i "$input_file" -s "$subject_id" -all -notal-check
 
 # Run MNE-Python scalp surface and watershed BEM steps
-#mne make_scalp_surfaces --overwrite --subject "$subject_id" --force
 mne watershed_bem --overwrite --subject "$subject_id"
+mne make_scalp_surfaces --overwrite --subject "$subject_id" --force
+

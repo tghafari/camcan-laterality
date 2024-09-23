@@ -84,6 +84,17 @@ epoched_fif = op.join(epoched_dir, epoched_fname)
                     
 info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info  # one 7min50sec epochs
 
+# First inspect the surface reconstruction
+Brain = mne.viz.get_brain_class()
+
+brain = Brain(subject=fs_sub, 
+              hemi='lh', 
+              surf='pial',
+              subjects_dir=fs_sub_dir, 
+              size=(800, 600))
+
+brain.add_annotation('aparc.a2009s', borders=False)
+
 # Get Boundary Element model (BEM) solution
 """ run this section after the watershed_bem surfaces are read in freesurfer,
 (using my_recon.sh batch script)"""
@@ -191,6 +202,7 @@ print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
 ### MANUAL COREGISTRATION ##
 """ manually pick the fiducials and coregister MEG with MRI.
 for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
+
 
 mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
