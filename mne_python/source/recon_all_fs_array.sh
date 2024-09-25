@@ -5,13 +5,15 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks 4
 #SBATCH --mem 32G
-#SBATCH --array=30-33 # Adjust this based on the number of subjects
+#SBATCH --array=33-36 # Adjust this based on the number of subjects
 
 set -e
 
-module purge
+module purge; 
 module load bluebear
 module load bear-apps/2022a
+module load GCC/11.3.0
+module load VTK/9.2.2-foss-2022a
 module load MNE-Python/1.3.1-foss-2022a
 module load FreeSurfer/7.4.1-centos8_x86_64
 

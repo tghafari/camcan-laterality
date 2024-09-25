@@ -6,11 +6,14 @@
 
 set -e
 
-module purge; module load bluebear
+module purge; 
+module load bluebear
 module load bear-apps/2022a
+module load GCC/11.3.0
+module load VTK/9.2.2-foss-2022a
 module load MNE-Python/1.3.1-foss-2022a
 module load FreeSurfer/7.4.1-centos8_x86_64
-module load VTK/9.2.2-foss-2022a
+
 
 # Define the SUBJECTS_DIR where recon-all will save output
 export SUBJECTS_DIR=/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat  # FreeSurfer subject output path

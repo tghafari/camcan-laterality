@@ -60,7 +60,7 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
-subjectID = '120182'  # FreeSurfer subject name
+subjectID = '120309'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -202,9 +202,19 @@ print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
 ### MANUAL COREGISTRATION ##
 """ manually pick the fiducials and coregister MEG with MRI.
 for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
-
-
 mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
+
+# Save them manually in the gui
+fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
+coreg = mne.coreg.Coregistration(info, 
+                                 subject=fs_sub, 
+                                 subjects_dir=fs_sub_dir,
+                                 fiducials='auto')
+fig = mne.viz.plot_alignment(info=info, trans=coreg.trans, subject=fs_sub, 
+                             dig=True, meg=['helmet', 'sensors'], 
+                             subjects_dir=fs_sub_dir, surfaces='brain', 
+                             mri_fiducials=fiducials_fname, bem=bem, 
+                             verbose=True)
 
 #compare automatic and manual in a few images.
 #workout the triggers for EEG and LFP
