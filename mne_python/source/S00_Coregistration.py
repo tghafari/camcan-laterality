@@ -148,9 +148,6 @@ coreg = mne.coreg.Coregistration(info,
                                  subject=fs_sub, 
                                  subjects_dir=fs_sub_dir,
                                  fiducials=fiducials)
-mne.write_trans(trans_fname, 
-                coreg.trans,
-                overwrite=True)
 fig = mne.viz.plot_alignment(info, 
                              trans=coreg.trans, 
                              **plot_kwargs)
@@ -171,7 +168,7 @@ fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
-coreg.omit_head_shape_points(distance=5./1000)  # distance is in meters- try smaller distances
+coreg.omit_head_shape_points(distance=5.0/1000)  # distance is in meters- try smaller distances
 
 # Final coregistration fit
 coreg.fit_icp(n_iterations=20, 
@@ -193,6 +190,11 @@ ax.imshow(screenshot, origin='upper')
 ax.set_axis_off()  # Disable axis labels and ticks
 fig.tight_layout()
 fig.savefig(coreg_figname, dpi=150)
+
+# Write trans if you're happy with the coregistration
+mne.write_trans(trans_fname, 
+                coreg.trans,
+                overwrite=True)
 
 # Compute distance between MRI and HSP
 dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
