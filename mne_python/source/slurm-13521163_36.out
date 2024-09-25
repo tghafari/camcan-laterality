@@ -2075,3 +2075,68 @@ blurring input image with Gaussian with sigma=0.500...
 GCAMRegisterLevel(): init RMS 0.420672
 
 
+
+
+
+
+
+
+
+setting smoothness cost coefficient to 0.118
+
+#GCAMreg# pass 0 level1 3 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_log_likelihood=0.20 l_smoothness=0.12 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=16, sigma=2.0,type=2, relabel=0, neg=yes
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.419957
+
+
+
+#GCAMreg# pass 0 level1 3 level2 1 tsec 28.067 sigma 0.5
+l_jacobian=1.00 l_log_likelihood=0.20 l_smoothness=0.12 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=16, sigma=0.5,type=2, relabel=0, neg=yes
+
+blurring input image with Gaussian with sigma=0.500...
+GCAMRegisterLevel(): init RMS 0.419812
+
+
+
+iter 0, gcam->neg = 1
+after 0 iterations, nbhd size=0, neg = 0
+
+iter 0, gcam->neg = 9
+after 0 iterations, nbhd size=0, neg = 0
+
+iter 0, gcam->neg = 7
+after 3 iterations, nbhd size=0, neg = 0
+
+iter 0, gcam->neg = 10
+after 10 iterations, nbhd size=1, neg = 0
+
+iter 0, gcam->neg = 8
+after 9 iterations, nbhd size=1, neg = 0
+
+iter 0, gcam->neg = 8
+after 1 iterations, nbhd size=0, neg = 0
+
+iter 0, gcam->neg = 7
+after 3 iterations, nbhd size=0, neg = 0
+
+iter 0, gcam->neg = 5
+after 8 iterations, nbhd size=1, neg = 0
+
+
+
+
+iter 0, gcam->neg = 1
+after 2 iterations, nbhd size=0, neg = 0
+setting smoothness cost coefficient to 0.400
+
+#GCAMreg# pass 0 level1 2 level2 0 tsec 0 sigma 2
+l_jacobian=1.00 l_log_likelihood=0.20 l_smoothness=0.40 
+tol=2.50e-01, dt=5.00e-02, exp_k=20.0, momentum=0.90, levels=6, niter=500, lbl_dist=10.00, avgs=4, sigma=2.0,type=2, relabel=0, neg=yes
+
+blurring input image with Gaussian with sigma=2.000...
+GCAMRegisterLevel(): init RMS 0.413742
+

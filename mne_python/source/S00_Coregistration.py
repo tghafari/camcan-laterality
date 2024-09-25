@@ -58,8 +58,8 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 # subject info 
 meg_extension = '.fif'
 meg_suffix = 'meg'
-trans_suffix = 'coreg-trans'
-bem_suffix = 'bem-sol'
+trans_suffix = 'coreg-trans_auto'
+bem_suffix = 'bem-sol_auto'
 subjectID = '120309'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
@@ -205,16 +205,7 @@ for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ"""
 mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
 # Save them manually in the gui
-fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
-coreg = mne.coreg.Coregistration(info, 
-                                 subject=fs_sub, 
-                                 subjects_dir=fs_sub_dir,
-                                 fiducials='auto')
-fig = mne.viz.plot_alignment(info=info, trans=coreg.trans, subject=fs_sub, 
-                             dig=True, meg=['helmet', 'sensors'], 
-                             subjects_dir=fs_sub_dir, surfaces='brain', 
-                             mri_fiducials=fiducials_fname, bem=bem, 
-                             verbose=True)
+# fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
 
 #compare automatic and manual in a few images.
 #workout the triggers for EEG and LFP
