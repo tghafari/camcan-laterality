@@ -59,8 +59,8 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans_auto'
-bem_suffix = 'bem-sol_auto'
-subjectID = '120309'  # FreeSurfer subject name
+bem_suffix = 'bem-sol'
+subjectID = '120470'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -163,12 +163,12 @@ fig = mne.viz.plot_alignment(info,
 # Refining with ICP
 """ secondly we refine the transformation using a few iterations of the
 Iterative Closest Point (ICP) algorithm."""
-coreg.fit_icp(n_iterations=6, nasion_weight=2., verbose=True)
+coreg.fit_icp(n_iterations=20, nasion_weight=1., verbose=True)
 fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
-coreg.omit_head_shape_points(distance=5.0/1000)  # distance is in meters- try smaller distances
+coreg.omit_head_shape_points(distance=5/1000)  # distance is in meters- try smaller distances
 
 # Final coregistration fit
 coreg.fit_icp(n_iterations=20, 
@@ -204,8 +204,11 @@ print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
 ### MANUAL COREGISTRATION ##
 """ manually pick the fiducials and coregister MEG with MRI.
 for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
-mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
+mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir, trans=trans_fname)#, info=info_fname)
 
+# Use this for info path in the gui
+info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC120470_ses-rest_task-rest_megtransdef_epo.fif'
+trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC120470/sub-CC120470_coreg-trans_auto.fif'
 # Save them manually in the gui
 # fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
 
@@ -226,4 +229,22 @@ mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
 
 
+
+# <Transform | head->MRI (surface RAS)>
+# [[ 0.99945389 -0.02169776 -0.02492242  0.00045882]
+#  [ 0.01701271  0.98445294 -0.17482272 -0.02623326]
+#  [ 0.02832821  0.17430325  0.98428446 -0.0584221 ]
+#  [ 0.          0.          0.          1.        ]]
+
+# <Transform | head->MRI (surface RAS)>
+# [[ 0.99855504 -0.05026108 -0.01901751 -0.00146179]
+#  [ 0.04720134  0.98948798 -0.13669518 -0.01605041]
+#  [ 0.02568804  0.13560001  0.99043059 -0.04714126]
+#  [ 0.          0.          0.          1.        ]]
+
+# <Transform | head->MRI (surface RAS)>
+# [[ 0.99678183 -0.07992457  0.00616407 -0.00053715]
+#  [ 0.07853536  0.95825326 -0.27492344 -0.02253706]
+#  [ 0.01606639  0.27452278  0.96144634 -0.05963702]
+#  [ 0.          0.          0.          1.        ]]
 
