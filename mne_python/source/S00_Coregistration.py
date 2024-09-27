@@ -60,7 +60,7 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans_auto'
 bem_suffix = 'bem-sol'
-subjectID = '120470'  # FreeSurfer subject name
+subjectID = '120550'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -73,6 +73,8 @@ trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix + meg_exten
 bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
 bem_figname = bem_fname.replace(meg_extension, '.png')
 coreg_figname = bem_figname.replace(bem_suffix, 'final_coreg')
+
+check_dig_points_csv_fname = op.join(deriv_folder, 'head_points_fit.csv')
 
 # for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one 
@@ -148,6 +150,8 @@ coreg = mne.coreg.Coregistration(info,
                                  subject=fs_sub, 
                                  subjects_dir=fs_sub_dir,
                                  fiducials=fiducials)
+before = coreg._info["dig"]  # save the list of digitalised points in coreg
+
 fig = mne.viz.plot_alignment(info, 
                              trans=coreg.trans, 
                              **plot_kwargs)
@@ -156,6 +160,8 @@ fig = mne.viz.plot_alignment(info,
 """ firstly fit with 3 fiducial points. This allows to find a good
 initial solution before optimization using head shape points"""
 coreg.fit_fiducials(verbose=True)
+after_fit_fiducials = coreg._info["dig"]  # save the list of digitalised points in coreg
+
 fig = mne.viz.plot_alignment(info, 
                              trans=coreg.trans, 
                              **plot_kwargs)
@@ -163,17 +169,23 @@ fig = mne.viz.plot_alignment(info,
 # Refining with ICP
 """ secondly we refine the transformation using a few iterations of the
 Iterative Closest Point (ICP) algorithm."""
-coreg.fit_icp(n_iterations=20, nasion_weight=1., verbose=True)
+coreg.fit_icp(n_iterations=20, 
+              nasion_weight=1., 
+              verbose=True)
+after_fit_icp = coreg._info["dig"]  # save the list of digitalised points in coreg
+
 fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
 coreg.omit_head_shape_points(distance=5/1000)  # distance is in meters- try smaller distances
+after_omit_head_point = coreg._info["dig"]  # save the list of digitalised points in coreg
 
 # Final coregistration fit
 coreg.fit_icp(n_iterations=20, 
               nasion_weight=10., 
               verbose=True)
+after_final_fit_icp = coreg._info["dig"]  # save the list of digitalised points in coreg
 
 coreg_fig = mne.viz.plot_alignment(info, 
                                    trans=coreg.trans, 
@@ -212,39 +224,86 @@ trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC12
 # Save them manually in the gui
 # fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
 
-#compare automatic and manual in a few images.
-#workout the triggers for EEG and LFP
+
+
+
+
+"""
+double_check_headmodel
+
+the code below reads the head point from coreg in every 
+step up until final fit and saves a csv file to 
+compare them together.
+
+process_digpoint_list: A helper function that takes in a 
+        ist of DigPoint objects, processes each element, and extracts 
+        the label and coordinates.
+Regex: The code uses regular expressions to extract the 
+        label (before the :) and the coordinates (between parentheses).
+Convert to DataFrame: Each processed list is converted 
+        into a Pandas DataFrame with two columns (label and coordinates).
+Concatenate DataFrames: The DataFrames are concatenated side by side, 
+        resulting in a final DataFrame with 130 rows and 8 columns.
+Save as CSV: The resulting DataFrame is saved as a CSV file called 
+        digpoint_data.csv.
+This script creates the required table and saves it as a CSV file.
+"""
+
+import pandas as pd
+import re
+
+# Assuming the lists are called: before, after_fit_fiducials, after_fit_icp, after_omit_head_point, after_final_icp
+# These lists have the DigPoint format.
+
+# Helper function to process the DigPoint strings
+def process_digpoint_list(dig_list):
+    processed_data = []
+    
+    for digpoint in dig_list:
+        # Convert DigPoint object to string
+        dig_str = str(digpoint)
+        
+        # Extract the label (everything before the ":")
+        label_match = re.search(r'<DigPoint \|(.+?):', dig_str)
+        label = label_match.group(1).strip() if label_match else None
+        
+        # Extract the coordinates (everything between parentheses and "mm")
+        coord_match = re.search(r'\((.+?)\) mm', dig_str)
+        coords = coord_match.group(1).strip() if coord_match else None
+        
+        # Add the processed data
+        processed_data.append([label, coords])
+    
+    return processed_data
+
+# Process each list
+before_processed = process_digpoint_list(before)
+after_fit_fiducials_processed = process_digpoint_list(after_fit_fiducials)
+after_fit_icp_processed = process_digpoint_list(after_fit_icp)
+after_omit_head_point_processed = process_digpoint_list(after_omit_head_point)
+after_final_icp_processed = process_digpoint_list(after_final_fit_icp)
+
+# Convert the lists into DataFrames
+before_df = pd.DataFrame(before_processed, columns=["Label_Before", "Coords_Before"])
+after_fit_fiducials_df = pd.DataFrame(after_fit_fiducials_processed, columns=["Label_After_Fit_Fiducials", "Coords_After_Fit_Fiducials"])
+after_fit_icp_df = pd.DataFrame(after_fit_icp_processed, columns=["Label_After_Fit_ICP", "Coords_After_Fit_ICP"])
+after_omit_head_point_df = pd.DataFrame(after_omit_head_point_processed, columns=["Label_After_Omit_Head_Point", "Coords_After_Omit_Head_Point"])
+after_final_icp_df = pd.DataFrame(after_final_icp_processed, columns=["Label_After_Final_ICP", "Coords_After_Final_ICP"])
+
+# Concatenate the DataFrames horizontally (side by side)
+final_df = pd.concat([before_df, 
+                      after_fit_fiducials_df, 
+                      after_fit_icp_df, 
+                      after_omit_head_point_df, 
+                      after_final_icp_df], axis=1)
+
+# Save to CSV
+final_df.to_csv(check_dig_points_csv_fname, index=False)
+
+print("Data saved to 'digpoint_data.csv'")
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-# <Transform | head->MRI (surface RAS)>
-# [[ 0.99945389 -0.02169776 -0.02492242  0.00045882]
-#  [ 0.01701271  0.98445294 -0.17482272 -0.02623326]
-#  [ 0.02832821  0.17430325  0.98428446 -0.0584221 ]
-#  [ 0.          0.          0.          1.        ]]
-
-# <Transform | head->MRI (surface RAS)>
-# [[ 0.99855504 -0.05026108 -0.01901751 -0.00146179]
-#  [ 0.04720134  0.98948798 -0.13669518 -0.01605041]
-#  [ 0.02568804  0.13560001  0.99043059 -0.04714126]
-#  [ 0.          0.          0.          1.        ]]
-
-# <Transform | head->MRI (surface RAS)>
-# [[ 0.99678183 -0.07992457  0.00616407 -0.00053715]
-#  [ 0.07853536  0.95825326 -0.27492344 -0.02253706]
-#  [ 0.01606639  0.27452278  0.96144634 -0.05963702]
-#  [ 0.          0.          0.          1.        ]]
 
