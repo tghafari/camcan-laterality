@@ -55,7 +55,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '120182'  # FreeSurfer subject name
+subjectID = '120469'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -63,19 +63,20 @@ platform = 'mac'  # are you running on bluebear or windows or mac?
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx'
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/Volumes/jenseno-sub2ctx'
 
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-noise_dir = op.join(rds_dir, 'cc700/meg/pipeline/release005/BIDSsep/empty_room')
+noise_dir = op.join(sub2ctx_dir, 'camcan/MEG1/meg_emptyroom') 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 
 # Read only data from subjects with good preprocessed data
 good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
-
 
 # Specific file names
 meg_extension = '.fif'
@@ -110,7 +111,7 @@ forward = mne.read_forward_solution(fwd_fname)
 
 epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
 epoched_fif = op.join(epoched_dir, epoched_fname)
-noise_fname = op.join('sub-CC' + str(subjectID), 'sub-CC' + str('110087') + '_ses-noise_task-noise.fif')
+noise_fname = op.join('sub-CC' + str(subjectID), 'emptyroom', 'emptyroom_CC'+ str(subjectID) + meg_extension) 
 noise_fif = op.join(noise_dir, noise_fname)
     # try:
     #     print(f'Reading subject # {i}')
@@ -120,9 +121,9 @@ epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   
 epochspectrum.plot()
 epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
 
-
 print('calculating the covariance matrix')
-# Compute rank
+
+# Compute rank - should be similar to OSL, but double check with Mats
 rank = mne.compute_rank(epochs, tol=1e-6, tol_kind='relative')
 common_cov = compute_covariance(epochs, 
                                 method='empirical',
@@ -157,14 +158,14 @@ print('Derive and apply spatial filters')
 filters = make_lcmv(epochs.info, 
                     forward, 
                     common_cov, 
-                    reg=0.05,
-                    noise_cov=noise_cov, 
-                    rank=rank,
-                    pick_ori='max-power',
+                    reg=0.05,  # OSL:reg=0, Ole: 0.05
+                    noise_cov=noise_cov,  # OSL: None
+                    rank=rank,  
+                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
                     reduce_rank=True,
                     depth=0,
                     inversion='matrix',
-                    weight_norm='unit-noise-gain'
+                    weight_norm="unit-noise-gain" # OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
                     ) 
 stc = apply_lcmv_cov(common_cov, filters)
 
@@ -177,5 +178,19 @@ kwargs = dict(
     initial_time=0.087,
     verbose=True,
     )
+dict(kind="value", pos_lims=lims)
+stc.plot(mode="stat_map", clim='auto', **kwargs)
 
-stc.plot(mode="stat_map", clim=dict(kind="value", pos_lims=lims), **kwargs)
+brain = stc.plot(
+    subject=fs_sub,
+    subjects_dir=fs_sub_dir,
+    src=forward["src"],
+    initial_time=0.087,
+    mode="stat_map",
+    )
+
+
+    # initial_time=initial_time,
+    # clim=dict(kind="value", lims=[3, 6, 9]),
+    # smoothing_steps=7,
+)

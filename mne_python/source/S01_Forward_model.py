@@ -35,7 +35,7 @@ import mne
 
 
 # subject info 
-subjectID = '120182'  # FreeSurfer subject name
+subjectID = '120469'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -55,8 +55,10 @@ good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
-
-space = 'volume'  # what to use for source modeling? surface or volume
+# OSL settings
+space = 'volume'  # what to use for source modeling? surface or volume- from OSL
+gridstep=8  # from OSL
+mindist=4.0
 
 # Specific file names
 meg_extension = '.fif'
@@ -72,8 +74,6 @@ deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4]
 
 trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + trans_suffix + meg_extension)
 bem_fname = trans_fname.replace(trans_suffix, bem_suffix)  
-bem_figname = bem_fname
-coreg_figname = bem_fname.replace(bem_suffix, 'final_coreg')
 
 surf_fname = trans_fname.replace(trans_suffix, surf_suffix)  # only used for suffices that are not recognizable to bids 
 vol_fname = surf_fname.replace(surf_suffix, vol_suffix)  # save in the bids folder
@@ -101,7 +101,9 @@ elif space == 'volume':
                                         subjects_dir=fs_sub_dir,
                                         surface=surface,
                                         mri='T1.mgz',
-                                        verbose=True)
+                                        verbose=True,
+                                        gridstep=gridstep, 
+                                        mindist=mindist)
     mne.write_source_spaces(vol_fname, src, overwrite=True)
     
 # Visualize source space and BEM
@@ -147,8 +149,9 @@ fwd = mne.make_forward_solution(info,
                                 bem=bem_fname,
                                 meg=True, 
                                 eeg=False, 
-                                verbose=True, 
-                                mindist=5.) # could be 2.5
+                                verbose=True,) 
+                                # mindist=5.) # could be 2.5
+
 mne.write_forward_solution(fwd_fname, fwd)
 
 # Print some details

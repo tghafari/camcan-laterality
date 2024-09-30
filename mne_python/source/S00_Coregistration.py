@@ -58,9 +58,9 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 # subject info 
 meg_extension = '.fif'
 meg_suffix = 'meg'
-trans_suffix = 'coreg-trans_auto'
-bem_suffix = 'bem-sol'
-subjectID = '120550'  # FreeSurfer subject name
+trans_suffix = 'coreg-trans'
+bem_suffix = 'bem-sol' 
+subjectID = '120469'  # FreeSurfer subject name - 120469  120462  120309
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -74,9 +74,9 @@ bem_fname = trans_fname.replace(trans_suffix, bem_suffix)
 bem_figname = bem_fname.replace(meg_extension, '.png')
 coreg_figname = bem_figname.replace(bem_suffix, 'final_coreg')
 
-check_dig_points_csv_fname = op.join(deriv_folder, 'info_dig_head_points_fit.csv')
-check_dig_dict_points_csv_fname = op.join(deriv_folder, 'dig_dict_head_points_fit.csv')
-check_trans_points_csv_fname = op.join(deriv_folder, 'trans_head_points_fit.csv')
+check_dig_points_csv_fname = op.join(deriv_folder, 'info_dig_head_points_fit2.csv')
+check_dig_dict_points_csv_fname = op.join(deriv_folder, 'dig_dict_head_points_fit2.csv')
+check_trans_points_csv_fname = op.join(deriv_folder, 'trans_head_points_fit2.csv')
 
 # for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one 
@@ -104,18 +104,18 @@ info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info  # one 7min
 # (using my_recon.sh batch script)"""
 
 # # Creat BEM model
-# conductivity = (.3,)  # for single layer
-# model = mne.make_bem_model(subject=fs_sub, 
-#                            subjects_dir=fs_sub_dir,
-#                            ico=4, 
-#                            conductivity=conductivity)
+conductivity = (.3,)  # for single layer
+model = mne.make_bem_model(subject=fs_sub, 
+                           subjects_dir=fs_sub_dir,
+                           ico=4, 
+                           conductivity=conductivity)
 
-# # BEM solution is derived from the BEM model
-# bem = mne.make_bem_solution(model)
-# mne.write_bem_solution(bem_fname, 
-#                        bem, 
-#                        overwrite=True, 
-#                        verbose=True)
+# BEM solution is derived from the BEM model
+bem = mne.make_bem_solution(model)
+mne.write_bem_solution(bem_fname, 
+                       bem, 
+                       overwrite=True, 
+                       verbose=True)
 
 # # Visualize the BEM
 # fig = mne.viz.plot_bem(subject=fs_sub, 
@@ -133,18 +133,18 @@ the source-base analysis.
 """
 
 # ## AUTOMATED COREGISTRATION ## 
-# plot_kwargs = dict(subject=fs_sub, 
-#                    subjects_dir=fs_sub_dir,
-#                    surfaces="head-dense", 
-#                    dig=True,
-#                    eeg=[], 
-#                    meg='sensors', 
-#                    show_axes=True,
-#                    coord_frame='meg')
-# view_kwargs = dict(azimuth=45, 
-#                    elevation=90, 
-#                    distance=.6,
-#                    focalpoint=(0.,0.,0.,))
+plot_kwargs = dict(subject=fs_sub, 
+                   subjects_dir=fs_sub_dir,
+                   surfaces="head-dense", 
+                   dig=True,
+                   eeg=[], 
+                   meg='sensors', 
+                   show_axes=True,
+                   coord_frame='meg')
+view_kwargs = dict(azimuth=45, 
+                   elevation=90, 
+                   distance=.6,
+                   focalpoint=(0.,0.,0.,))
 
 # Set up the coregistration model
 fiducials = "estimated"  # gets fiducials from fsaverage
@@ -156,9 +156,9 @@ dig_info_before = coreg._info["dig"]
 dig_dict_before = coreg._dig_dict  # save the list of digitalised points in coreg
 trans_before = coreg.trans
 
-# fig = mne.viz.plot_alignment(info, 
-#                              trans=coreg.trans, 
-#                              **plot_kwargs)
+fig = mne.viz.plot_alignment(info, 
+                             trans=coreg.trans, 
+                             **plot_kwargs)
 
 # Initial fit with fiducials
 """ firstly fit with 3 fiducial points. This allows to find a good
@@ -168,9 +168,9 @@ dig_info_after_fit_fiducials = coreg._info["dig"]
 dig_dict_after_fit_fiducials = coreg._dig_dict   # save the list of digitalised points in coreg
 trans_after_fit_fiducials = coreg.trans
 
-# fig = mne.viz.plot_alignment(info, 
-#                              trans=coreg.trans, 
-#                              **plot_kwargs)
+fig = mne.viz.plot_alignment(info, 
+                             trans=coreg.trans, 
+                             **plot_kwargs)
 
 # Refining with ICP
 """ secondly we refine the transformation using a few iterations of the
@@ -182,7 +182,7 @@ dig_info_after_fit_icp = coreg._info["dig"]
 dig_dict_after_fit_icp = coreg._dig_dict  # save the list of digitalised points in coreg
 trans_after_fit_icp = coreg.trans
 
-# fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
+fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
 # Omitting bad points
 """ we now remove the points that are not on the scalp"""
@@ -190,6 +190,9 @@ coreg.omit_head_shape_points(distance=5/1000)  # distance is in meters- try smal
 dig_info_after_omit_head_points = coreg._info["dig"]
 dig_dict_after_omit_head_points = coreg._dig_dict   # save the list of digitalised points in coreg
 trans_after_omit_head_points = coreg.trans
+fig = mne.viz.plot_alignment(info, 
+                            trans=coreg.trans, 
+                            **plot_kwargs)
 
 # Final coregistration fit
 coreg.fit_icp(n_iterations=20, 
@@ -199,9 +202,9 @@ dig_info_after_final_fit_icp = coreg._info["dig"]
 dig_dict_after_final_fit_icp = coreg._dig_dict  # save the list of digitalised points in coreg
 trans_after_final_fit_icp = coreg.trans
 
-# coreg_fig = mne.viz.plot_alignment(info, 
-#                                    trans=coreg.trans, 
-#                                    **plot_kwargs)
+coreg_fig = mne.viz.plot_alignment(info, 
+                                   trans=coreg.trans, 
+                                   **plot_kwargs)
 # mne.viz.set_3d_view(coreg_fig, **view_kwargs)
 
 # To save the fig above, take a screenshot of the 3D scene
@@ -225,19 +228,17 @@ trans_after_final_fit_icp = coreg.trans
 # print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
 #       f"/ {np.min(dists):.2f} mm / {np.max(dists):.2f} mm")
 
-# ### MANUAL COREGISTRATION ##
-# """ manually pick the fiducials and coregister MEG with MRI.
-# for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
-# mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir, trans=trans_fname)#, info=info_fname)
+### MANUAL COREGISTRATION ##
+""" manually pick the fiducials and coregister MEG with MRI.
+for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
+mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
-# # Use this for info path in the gui
-# info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC120470_ses-rest_task-rest_megtransdef_epo.fif'
-# trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC120470/sub-CC120470_coreg-trans_auto.fif'
+# Use this for info path in the gui
+info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC120469_ses-rest_task-rest_megtransdef_epo.fif'
+trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC120469/sub-CC120469_coreg-trans.fif'
 
 # Save them manually in the gui
-# fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
-
-
+fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
 
 
 
@@ -265,8 +266,6 @@ This script creates the required table and saves it as a CSV file.
 import pandas as pd
 import re
 
-# Assuming the lists are called: before, after_fit_fiducials, after_fit_icp, after_omit_head_point, after_final_icp
-# These lists have the DigPoint format.
 
 # Helper function to process the DigPoint strings
 def process_digpoint_list(dig_list):

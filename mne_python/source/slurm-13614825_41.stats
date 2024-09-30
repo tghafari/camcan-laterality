@@ -1,0 +1,17 @@
++--------------------------------------------------------------------------+
+| Job on the BlueBEAR cluster:
+| Starting at Mon Sep 30 14:36:40 2024 for ghafarit(667799)
+| Identity jobid 13614830 jobname recon_all_fs_array.sh
+| Array Identity 13614825_41
+| Running against project quinna-camcan and in partition sapphire-shared
+| Requested cpu=4,mem=32G,node=1,billing=4 - 05:00:00 walltime
+| Assigned to nodes bear-pg0210u32b
+| Command /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source/recon_all_fs_array.sh
+| WorkDir /rds/projects/q/quinna-camcan/ghafarit-scripts/github/camcan-laterality/mne_python/source
++--------------------------------------------------------------------------+
++--------------------------------------------------------------------------+
+| Finished at Mon Sep 30 18:01:19 2024 for ghafarit(667799) on the BlueBEAR Cluster
+| Required (03:23:36 cputime, 1994971K memory used) - 03:24:40 walltime
+| JobState COMPLETING - Reason NonZeroExitCode
+| Exitcode 1:0
++--------------------------------------------------------------------------+
