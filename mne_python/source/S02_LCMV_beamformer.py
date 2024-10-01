@@ -193,4 +193,3 @@ brain = stc.plot(
     # initial_time=initial_time,
     # clim=dict(kind="value", lims=[3, 6, 9]),
     # smoothing_steps=7,
-)
