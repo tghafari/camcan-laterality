@@ -60,7 +60,7 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol' 
-subjectID = '120469'  # FreeSurfer subject name - 120469  120462  120309
+subjectID = '121795'  # FreeSurfer subject name - 120469  120462  120309
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -234,8 +234,8 @@ for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ"""
 mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
 # Use this for info path in the gui
-info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC120469_ses-rest_task-rest_megtransdef_epo.fif'
-trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC120469/sub-CC120469_coreg-trans.fif'
+info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC121795_ses-rest_task-rest_megtransdef_epo.fif'
+trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC121795/sub-CC121795_coreg-trans.fif'
 
 # Save them manually in the gui
 fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')

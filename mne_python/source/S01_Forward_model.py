@@ -35,7 +35,7 @@ import mne
 
 
 # subject info 
-subjectID = '120469'  # FreeSurfer subject name
+subjectID = '121795'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -56,9 +56,9 @@ good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
 # OSL settings
-space = 'volume'  # what to use for source modeling? surface or volume- from OSL
-gridstep=8  # from OSL
-mindist=4.0
+space = 'surface'  # what to use for source modeling? surface or volume- from OSL
+gridstep=5  # from OSL
+mindist=5.0  # Exclude points closer than this distance (mm) to the bounding surface.
 
 # Specific file names
 meg_extension = '.fif'
@@ -102,7 +102,7 @@ elif space == 'volume':
                                         surface=surface,
                                         mri='T1.mgz',
                                         verbose=True,
-                                        gridstep=gridstep, 
+                                        # gridstep=gridstep,  # apparently removed in 1.8.0
                                         mindist=mindist)
     mne.write_source_spaces(vol_fname, src, overwrite=True)
     
