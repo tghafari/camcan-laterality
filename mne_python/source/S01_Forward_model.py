@@ -56,7 +56,7 @@ good_subject_pd = pd.read_csv(good_sub_sheet)
 good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
 # OSL settings
-space = 'surface'  # what to use for source modeling? surface or volume- from OSL
+space = 'surface'  # what to use for source modeling? surface or volume
 gridstep=5  # from OSL
 mindist=5.0  # Exclude points closer than this distance (mm) to the bounding surface.
 
@@ -67,7 +67,8 @@ trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
 surf_suffix = 'surf-src'
 vol_suffix = 'vol-src'
-fwd_suffix = 'fwd'
+fwd_vol_suffix = 'fwd-vol'
+fwd_surf_suffix = 'fwd-surf'
 
 fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
 deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
@@ -78,7 +79,8 @@ bem_fname = trans_fname.replace(trans_suffix, bem_suffix)
 surf_fname = trans_fname.replace(trans_suffix, surf_suffix)  # only used for suffices that are not recognizable to bids 
 vol_fname = surf_fname.replace(surf_suffix, vol_suffix)  # save in the bids folder
 bem_fname = surf_fname.replace(surf_suffix, bem_suffix)  
-fwd_fname = surf_fname.replace(surf_suffix, fwd_suffix)
+fwd_vol_fname = surf_fname.replace(surf_suffix, fwd_vol_suffix)
+fwd_surf_fname = surf_fname.replace(surf_suffix, fwd_surf_suffix)
 
 surface = op.join(fs_sub_dir, fs_sub, 'bem', 'inner_skull.surf')
 
@@ -151,8 +153,10 @@ fwd = mne.make_forward_solution(info,
                                 eeg=False, 
                                 verbose=True,) 
                                 # mindist=5.) # could be 2.5
-
-mne.write_forward_solution(fwd_fname, fwd)
+if space == 'surface':
+    mne.write_forward_solution(fwd_surf_fname, fwd)
+elif space == 'volume':
+    mne.write_forward_solution(fwd_vol_fname, fwd)
 
 # Print some details
 print(f'\nNumber of vertices: {fwd["src"]}')

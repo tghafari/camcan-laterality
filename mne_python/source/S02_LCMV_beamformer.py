@@ -86,12 +86,15 @@ trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol'
 surf_suffix = 'surf-src'
 vol_suffix = 'vol-src'
-fwd_suffix = 'fwd'
+fwd_vol_suffix = 'fwd-vol'
+fwd_surf_suffix = 'fwd-surf'
 
 fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
 deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
-fwd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_suffix + meg_extension)
+fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
+fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
 
+space = 'surface' # which space to use, surface or volume?
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 if fr_band == 'alpha':
    fmin = 7
@@ -150,11 +153,14 @@ noise_cov = compute_raw_covariance(noise_raw_filterd,
                                    reject_by_annotation=True, 
                                    rank=None, 
                                    verbose=None)
-
 common_cov.plot(epochs.info)
 
 print('Derive and apply spatial filters')
-forward = mne.read_forward_solution(fwd_fname)
+if space == 'surface':
+    forward = mne.read_forward_solution(fwd_surf_fname)
+elif space == 'volume':
+    forward = mne.read_forward_solution(fwd_vol_fname)
+
 filters = make_lcmv(epochs.info, 
                     forward, 
                     common_cov, 
@@ -170,20 +176,24 @@ filters = make_lcmv(epochs.info,
 stc = apply_lcmv_cov(common_cov, filters)
 
 # Plot source results to confirm
-# lims = [0.3, 0.45, 0.6]
-# dict(kind="value", pos_lims=lims)
+initial_time = 0.087
 
-kwargs = dict(
-    src=forward["src"],
-    subject=fs_sub,  # the FreeSurfer subject name
-    subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-    initial_time=0.087,
-    verbose=True,
+if space == 'volume':
+    kwargs = dict(
+        src=forward["src"],
+        subject=fs_sub,  # the FreeSurfer subject name
+        subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+        initial_time=initial_time,
+        verbose=True,
+        )
+    stc.plot(mode="stat_map", clim='auto', **kwargs)
+elif space == 'surface':
+    lims = [0.3, 0.45, 0.6]
+    brain = stc.plot(
+        src=forward["src"],
+        subject=fs_sub,  # the FreeSurfer subject name
+        subjects_dir=fs_sub_dir,
+        initial_time=initial_time,
+        smoothing_steps=7,
     )
-stc.plot(mode="stat_map", clim='auto', **kwargs)
-
-
-
-    # initial_time=initial_time,
-    # clim=dict(kind="value", lims=[3, 6, 9]),
-    # smoothing_steps=7,
+    # clim=dict(kind="value", pos_lims=lims)
