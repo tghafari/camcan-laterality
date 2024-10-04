@@ -3,7 +3,7 @@
 S02. Using beamformer to localize oscillatory 
 power modulations
 
-This script uses DICS or LCMV to localize 
+This script uses DICS to localize 
 oscillatory power moduations based on spatial
 filtering (DICS: in frequency domain). 
 
@@ -25,12 +25,15 @@ Notes:
 
 """
 
+import os
 import os.path as op
+import numpy as np
 import pandas as pd
 
 import mne
-from mne.cov import compute_covariance, compute_raw_covariance
-from mne.beamformer import make_lcmv, apply_lcmv_cov, make_dics, apply_dics_csd
+from mne_bids import BIDSPath
+from mne.cov import compute_covariance
+from mne.beamformer import make_dics, apply_dics_csd
 from mne.time_frequency import csd_multitaper
 
 def calculate_spectral_power(epochs, n_fft, fmin, fmax):
@@ -127,47 +130,55 @@ epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normali
 print('calculating the covariance matrix')
 
 # Compute rank - should be similar to OSL, but double check with Mats
-"""computing lcmv separately for mags and grads as noise_covariance can only be None if
+"""computing lcmv separately for mags and grads as noise_csd can only be None if
 data is not mixed."""
-mags = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("mag")
-grads = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("grad")
+mags = epochs.copy().pick("mag")
+grads = epochs.copy().pick("grad")
+
+"""this part is ignored for now
+# print('Estimating noise covariance with the empty room data')
+# noise_raw = mne.io.read_raw_fif(noise_fif, allow_maxshield=True, preload=True, verbose=True)
+# noise_raw_filterd = noise_raw.copy().filter(l_freq=fmin, h_freq=fmax)
+# noise_cov = compute_raw_covariance(noise_raw_filterd, 
+#                                    tmin=0, #epochs.tmin
+#                                    tmax=None, #epochs.tamx
+#                                    tstep=0.2, 
+#                                    reject=None, 
+#                                    flat=None, 
+#                                    picks=None, 
+#                                    method='empirical', 
+#                                    method_params=None, 
+#                                    cv=3, 
+#                                    scalings=None, 
+#                                    n_jobs=None, 
+#                                    return_estimators=False, 
+#                                    reject_by_annotation=True, 
+#                                    rank=rank, 
+#                                    verbose=None)
+"""
+
+print('Calculating the cross-spectral density matrices for the alpha band')
+csd_mag = csd_multitaper(mags, 
+                         fmin=fmin, 
+                         fmax=fmax, 
+                         tmin=None, 
+                         tmax=None, 
+                         bandwidth=3, 
+                         low_bias=True, 
+                         verbose=False, 
+                         n_jobs=-1)
+csd_grad = csd_multitaper(grads,
+                          fmin=fmin, 
+                          fmax=fmax, 
+                          tmin=None, 
+                          tmax=None, 
+                          bandwidth=3, 
+                          low_bias=True, 
+                          verbose=False, 
+                          n_jobs=-1)
 
 rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
-common_cov_mag = compute_covariance(mags, 
-                                method='empirical',
-                                rank=rank_mag,
-                                n_jobs=4,
-                                verbose=True)
-common_cov_mag.plot(mags.info)
-
-
 rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
-common_cov_grad = compute_covariance(grads, 
-                                method='empirical',
-                                rank=rank_grad,
-                                n_jobs=4,
-                                verbose=True)
-common_cov_grad.plot(grads.info)
-
-print('Estimating noise covariance with the empty room data')
-noise_raw = mne.io.read_raw_fif(noise_fif, allow_maxshield=True, preload=True, verbose=True)
-noise_raw_filterd = noise_raw.copy().filter(l_freq=fmin, h_freq=fmax)
-noise_cov = compute_raw_covariance(noise_raw_filterd, 
-                                   tmin=0, #epochs.tmin
-                                   tmax=None, #epochs.tamx
-                                   tstep=0.2, 
-                                   reject=None, 
-                                   flat=None, 
-                                   picks=None, 
-                                   method='empirical', 
-                                   method_params=None, 
-                                   cv=3, 
-                                   scalings=None, 
-                                   n_jobs=None, 
-                                   return_estimators=False, 
-                                   reject_by_annotation=True, 
-                                   rank=rank, 
-                                   verbose=None)
 
 print('Derive and apply spatial filters')
 if space == 'surface':
@@ -175,55 +186,39 @@ if space == 'surface':
 elif space == 'volume':
     forward = mne.read_forward_solution(fwd_vol_fname)
 
-filters_mag = make_lcmv(mags.info, 
-                    forward, 
-                    common_cov_mag, 
-                    reg=0.05,  # OSL:reg=0, Ole: 0.05
-                    noise_cov=None,  # OSL: None
-                    rank=rank_mag,  
-                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
-                    reduce_rank=True,
-                    depth=0,  # How to weight (or normalize) the forward using a depth prior.
-                    inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
-                    ) 
-stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
+filters_mag = make_dics(mags.info, 
+                     forward, 
+                     csd_mag.mean() , 
+                     noise_csd=None, 
+                     reg=0, 
+                     pick_ori='max-power', 
+                     reduce_rank=True, 
+                     real_filter=True, 
+                     rank=rank_mag, 
+                     depth=0)
+stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag)
 
 
-filters_grad = make_lcmv(grads.info, 
-                    forward, 
-                    common_cov_grad, 
-                    reg=0.05,  # OSL:reg=0, Ole: 0.05
-                    noise_cov=None,  # OSL: None
-                    rank=rank_grad,  
-                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
-                    reduce_rank=True,
-                    depth=0,  # How to weight (or normalize) the forward using a depth prior.
-                    inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
-                    ) 
-stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
+filters_grad = make_dics(grads.info, 
+                     forward, 
+                     csd_grad.mean() , 
+                     noise_csd=None, 
+                     reg=0, 
+                     pick_ori='max-power', 
+                     reduce_rank=True, 
+                     real_filter=True, 
+                     rank=rank_grad, 
+                     depth=0)
+stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
 
 # Plot source results to confirm
-initial_time = 0.087
-
-if space == 'volume':
-    kwargs = dict(
-        src=forward["src"],
-        subject=fs_sub,  # the FreeSurfer subject name
-        subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-        initial_time=initial_time,
-        verbose=True,
-        )
-    stc_mag.plot(mode="stat_map", clim='auto', **kwargs)
-    stc_grad.plot(mode="stat_map", clim='auto', **kwargs)
-elif space == 'surface':
-    lims = [0.3, 0.45, 0.6]
-    brain = stc_grad.plot(
-        src=forward["src"],
-        subject=fs_sub,  # the FreeSurfer subject name
-        subjects_dir=fs_sub_dir,
-        initial_time=initial_time,
-        smoothing_steps=7,
-    )
-    # clim=dict(kind="value", pos_lims=lims)
+stc_mag.plot(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            mode='stat_map', 
+            verbose = True)
+stc_grad.plot(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            mode='stat_map', 
+            verbose = True)
