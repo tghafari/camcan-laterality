@@ -56,7 +56,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '121795'  # FreeSurfer subject name
+subjectID = '220843'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -94,7 +94,7 @@ deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4]
 fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
 fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
 
-space = 'surface' # which space to use, surface or volume?
+space = 'volume' # which space to use, surface or volume?
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 if fr_band == 'alpha':
    fmin = 7
@@ -119,7 +119,7 @@ noise_fif = op.join(noise_dir, noise_fname)
     # try:
     #     print(f'Reading subject # {i}')
                     
-epochs = mne.read_epochs(epoched_fif, preload=False, verbose=True)  # one 7min50sec epochs
+epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
 epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250
 epochspectrum.plot()
 epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
@@ -127,19 +127,34 @@ epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normali
 print('calculating the covariance matrix')
 
 # Compute rank - should be similar to OSL, but double check with Mats
-rank = mne.compute_rank(epochs, tol=1e-6, tol_kind='relative')
-common_cov = compute_covariance(epochs, 
+"""computing lcmv separately for mags and grads as noise_covariance can only be None if
+data is not mixed."""
+mags = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("mag")
+grads = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("grad")
+
+rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
+common_cov_mag = compute_covariance(mags, 
                                 method='empirical',
-                                rank=rank,
+                                rank=rank_mag,
                                 n_jobs=4,
                                 verbose=True)
+common_cov_mag.plot(mags.info)
+
+
+rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
+common_cov_grad = compute_covariance(grads, 
+                                method='empirical',
+                                rank=rank_grad,
+                                n_jobs=4,
+                                verbose=True)
+common_cov_grad.plot(grads.info)
 
 print('Estimating noise covariance with the empty room data')
 noise_raw = mne.io.read_raw_fif(noise_fif, allow_maxshield=True, preload=True, verbose=True)
 noise_raw_filterd = noise_raw.copy().filter(l_freq=fmin, h_freq=fmax)
 noise_cov = compute_raw_covariance(noise_raw_filterd, 
-                                   tmin=0, 
-                                   tmax=None, 
+                                   tmin=0, #epochs.tmin
+                                   tmax=None, #epochs.tamx
                                    tstep=0.2, 
                                    reject=None, 
                                    flat=None, 
@@ -151,9 +166,8 @@ noise_cov = compute_raw_covariance(noise_raw_filterd,
                                    n_jobs=None, 
                                    return_estimators=False, 
                                    reject_by_annotation=True, 
-                                   rank=None, 
+                                   rank=rank, 
                                    verbose=None)
-common_cov.plot(epochs.info)
 
 print('Derive and apply spatial filters')
 if space == 'surface':
@@ -161,19 +175,34 @@ if space == 'surface':
 elif space == 'volume':
     forward = mne.read_forward_solution(fwd_vol_fname)
 
-filters = make_lcmv(epochs.info, 
+filters_mag = make_lcmv(mags.info, 
                     forward, 
-                    common_cov, 
+                    common_cov_mag, 
                     reg=0.05,  # OSL:reg=0, Ole: 0.05
-                    noise_cov=noise_cov,  # OSL: None
-                    rank=rank,  
+                    noise_cov=None,  # OSL: None
+                    rank=rank_mag,  
                     pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
                     reduce_rank=True,
                     depth=0,  # How to weight (or normalize) the forward using a depth prior.
                     inversion='matrix',
-                    weight_norm="unit-noise-gain" # OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
+                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
                     ) 
-stc = apply_lcmv_cov(common_cov, filters)
+stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
+
+
+filters_grad = make_lcmv(grads.info, 
+                    forward, 
+                    common_cov_grad, 
+                    reg=0.05,  # OSL:reg=0, Ole: 0.05
+                    noise_cov=None,  # OSL: None
+                    rank=rank_grad,  
+                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
+                    reduce_rank=True,
+                    depth=0,  # How to weight (or normalize) the forward using a depth prior.
+                    inversion='matrix',
+                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
+                    ) 
+stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
 
 # Plot source results to confirm
 initial_time = 0.087
@@ -186,10 +215,11 @@ if space == 'volume':
         initial_time=initial_time,
         verbose=True,
         )
-    stc.plot(mode="stat_map", clim='auto', **kwargs)
+    stc_mag.plot(mode="stat_map", clim='auto', **kwargs)
+    stc_grad.plot(mode="stat_map", clim='auto', **kwargs)
 elif space == 'surface':
     lims = [0.3, 0.45, 0.6]
-    brain = stc.plot(
+    brain = stc_grad.plot(
         src=forward["src"],
         subject=fs_sub,  # the FreeSurfer subject name
         subjects_dir=fs_sub_dir,
