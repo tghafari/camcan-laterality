@@ -63,6 +63,7 @@ subjectID = '220843'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
+
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -99,6 +100,7 @@ fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg
 
 space = 'volume' # which space to use, surface or volume?
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
+
 if fr_band == 'alpha':
    fmin = 7
    fmax = 13
@@ -123,17 +125,23 @@ noise_fif = op.join(noise_dir, noise_fname)
     #     print(f'Reading subject # {i}')
                     
 epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250
-epochspectrum.plot()
-epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
+n_fft = int(2 * epochs.info['sfreq'])  # used for psd and multitaper csd
+epochspectrum = calculate_spectral_power(epochs, n_fft=n_fft, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250
+# epochspectrum.plot()
+# epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
+
+# Epoch the one long epoch of resting state data to be able to run csd_multitaper
+for epochs_data in epochs:
+    raw_epoch = mne.io.RawArray(epochs_data, epochs.info)
+    epoched_epochs = mne.make_fixed_length_epochs(raw_epoch, duration=5, preload=True)
+
 
 print('calculating the covariance matrix')
-
 # Compute rank - should be similar to OSL, but double check with Mats
-"""computing lcmv separately for mags and grads as noise_csd can only be None if
+"""computing dics separately for mags and grads as noise_csd can only be None if
 data is not mixed."""
-mags = epochs.copy().pick("mag")
-grads = epochs.copy().pick("grad")
+mags = epoched_epochs.copy().pick("mag")
+grads = epoched_epochs.copy().pick("grad")
 
 """this part is ignored for now
 # print('Estimating noise covariance with the empty room data')
@@ -161,21 +169,31 @@ print('Calculating the cross-spectral density matrices for the alpha band')
 csd_mag = csd_multitaper(mags, 
                          fmin=fmin, 
                          fmax=fmax, 
-                         tmin=None, 
-                         tmax=None, 
+                         tmin=mags.tmin, 
+                         tmax=mags.tmax, 
                          bandwidth=3, 
+                        #  n_fft=n_fft,
                          low_bias=True, 
                          verbose=False, 
                          n_jobs=-1)
 csd_grad = csd_multitaper(grads,
                           fmin=fmin, 
                           fmax=fmax, 
-                          tmin=None, 
-                          tmax=None, 
+                          tmin=grads.tmin, 
+                          tmax=grads.tmax, 
                           bandwidth=3, 
                           low_bias=True, 
                           verbose=False, 
                           n_jobs=-1)
+
+# Plot csds for double checking 
+plot_dict = {
+    "multitaper csd: magnetometers": csd_mag,
+    "multitaper csd: gradiometers": csd_grad,
+}
+for title, csd in plot_dict.items():
+    fig, = csd.mean().plot()
+    fig.suptitle(title)
 
 rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
 rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
@@ -197,7 +215,6 @@ filters_mag = make_dics(mags.info,
                      rank=rank_mag, 
                      depth=0)
 stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag)
-
 
 filters_grad = make_dics(grads.info, 
                      forward, 
