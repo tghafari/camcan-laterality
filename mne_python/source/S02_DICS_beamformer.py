@@ -59,7 +59,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '220843'  # FreeSurfer subject name
+subjectID = '121795'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -124,10 +124,10 @@ noise_fif = op.join(noise_dir, noise_fname)
     # try:
     #     print(f'Reading subject # {i}')
                     
-epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
+epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True, proj=False)  # one 7min50sec epochs
 n_fft = int(2 * epochs.info['sfreq'])  # used for psd and multitaper csd
 epochspectrum = calculate_spectral_power(epochs, n_fft=n_fft, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250
-# epochspectrum.plot()
+epochspectrum.plot()
 # epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
 
 # Epoch the one long epoch of resting state data to be able to run csd_multitaper
@@ -135,8 +135,6 @@ for epochs_data in epochs:
     raw_epoch = mne.io.RawArray(epochs_data, epochs.info)
     epoched_epochs = mne.make_fixed_length_epochs(raw_epoch, duration=5, preload=True)
 
-
-print('calculating the covariance matrix')
 # Compute rank - should be similar to OSL, but double check with Mats
 """computing dics separately for mags and grads as noise_csd can only be None if
 data is not mixed."""
@@ -172,7 +170,7 @@ csd_mag = csd_multitaper(mags,
                          tmin=mags.tmin, 
                          tmax=mags.tmax, 
                          bandwidth=3, 
-                        #  n_fft=n_fft,
+                        #  n_fft=n_fft,  # do we need this?
                          low_bias=True, 
                          verbose=False, 
                          n_jobs=-1)
@@ -192,11 +190,11 @@ plot_dict = {
     "multitaper csd: gradiometers": csd_grad,
 }
 for title, csd in plot_dict.items():
-    fig, = csd.mean().plot()
+    fig, = csd.mean().plot(mode='coh')
     fig.suptitle(title)
 
-rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
-rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
+rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
+rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
 
 print('Derive and apply spatial filters')
 if space == 'surface':
@@ -206,15 +204,16 @@ elif space == 'volume':
 
 filters_mag = make_dics(mags.info, 
                      forward, 
-                     csd_mag.mean() , 
+                     csd_mag.mean() , # we don't have conditions to calculate common csd
                      noise_csd=None, 
-                     reg=0, 
+                     reg=0,  # because reduce rank results in mne python computing a truncated pseudo-inverse we don't need regularisation (I think!)
                      pick_ori='max-power', 
-                     reduce_rank=True, 
+                    #  reduce_rank=True, 
                      real_filter=True, 
                      rank=rank_mag, 
-                     depth=0)
-stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag)
+                     depth=0,
+                     weight_norm="unit-noise-gain")  # "unit-noise-gain" or 'nai', defaults to None where The unit-gain LCMV beamformer will be computed
+stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag)  # where do we use freqs?
 
 filters_grad = make_dics(grads.info, 
                      forward, 
@@ -226,6 +225,7 @@ filters_grad = make_dics(grads.info,
                      real_filter=True, 
                      rank=rank_grad, 
                      depth=0)
+                     #weight_norm="nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
 stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
 
 # Plot source results to confirm
@@ -233,9 +233,9 @@ stc_mag.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             mode='stat_map', 
-            verbose = True)
+            verbose=True)
 stc_grad.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             mode='stat_map', 
-            verbose = True)
+            verbose=True)

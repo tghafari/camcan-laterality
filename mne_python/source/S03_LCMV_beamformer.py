@@ -186,7 +186,7 @@ filters_mag = make_lcmv(mags.info,
                     reduce_rank=True,
                     depth=0,  # How to weight (or normalize) the forward using a depth prior.
                     inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
+                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
                     ) 
 stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
 
@@ -201,7 +201,7 @@ filters_grad = make_lcmv(grads.info,
                     reduce_rank=True,
                     depth=0,  # How to weight (or normalize) the forward using a depth prior.
                     inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain' 
+                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
                     ) 
 stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
 
