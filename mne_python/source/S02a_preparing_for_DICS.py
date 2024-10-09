@@ -48,6 +48,8 @@ fr_band = 'alpha'  # over which frequency band you'd like to run the inverse mod
 
 meg_extension = '.fif'
 meg_suffix = 'meg'
+mag_deriv_extension = 'mag_csd_multitaper'
+grad_deriv_extension = 'grad_csd_multitaper'
 
 platform = 'mac'  # are you running on bluebear or mac?
 # Define where to read and write the data
@@ -110,6 +112,8 @@ else:
 
 epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
 epoched_fif = op.join(epoched_dir, epoched_fname)
+deriv_mag_fname = op.join(deriv_folder,  f'{fs_sub[:-4]}_' +  + meg_extension)
+deriv_grad_fname = op.join(deriv_folder,  f'{fs_sub[:-4]}_' +  + meg_extension)
 
     # try:
     #     print(f'Reading subject # {i}')
