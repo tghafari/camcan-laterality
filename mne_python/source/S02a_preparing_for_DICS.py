@@ -11,7 +11,6 @@ written by Tara Ghafari
 ==============================================
 toDos:
     - plot csd topographically
-    - save csd separately for grads and mags
 """
 
 import os
@@ -28,10 +27,12 @@ def epoching_epochs(epoched_fif, epoched_epochs_duration):
     epoch them into shorter epochs with epoched_epochs_duration.
     this is to reduce the computation time of csd_multitaper."""
 
+    print('Reading epochs')
     epochs = mne.read_epochs(epoched_fif, 
                              preload=True, 
                              verbose=True, 
                              proj=False)  # one 7min50sec epochs
+    print(f'epoching to {epoched_epochs_duration} seconds')
     for epochs_data in epochs:
         raw_epoch = mne.io.RawArray(epochs_data, 
                                     epochs.info)
@@ -48,8 +49,10 @@ fr_band = 'alpha'  # over which frequency band you'd like to run the inverse mod
 
 meg_extension = '.fif'
 meg_suffix = 'meg'
-mag_deriv_extension = 'mag_csd_multitaper'
-grad_deriv_extension = 'grad_csd_multitaper'
+mag_epoched_extension = 'mag_epoched-epo'
+grad_epoched_extension = 'grad_epoched-epo'
+mag_csd_extension = f'mag_csd_multitaper_{fr_band}'
+grad_csd_extension = f'grad_csd_multitaper_{fr_band}'
 
 platform = 'mac'  # are you running on bluebear or mac?
 # Define where to read and write the data
@@ -112,21 +115,27 @@ else:
 
 epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
 epoched_fif = op.join(epoched_dir, epoched_fname)
-deriv_mag_fname = op.join(deriv_folder,  f'{fs_sub[:-4]}_' +  + meg_extension)
-deriv_grad_fname = op.join(deriv_folder,  f'{fs_sub[:-4]}_' +  + meg_extension)
+
+deriv_mag_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_epoched_extension + meg_extension)
+deriv_grad_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
+deriv_mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_csd_extension)
+deriv_grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_csd_extension)
 
     # try:
     #     print(f'Reading subject # {i}')
 epoched_epochs = epoching_epochs(epoched_fif, epoched_epochs_duration)
 
-
-# Compute rank - should be similar to OSL, but double check with Mats
+# Pick mags and grads for later analyses
 """computing dics separately for mags and grads as noise_csd can only be None if
 data is not mixed."""
 mags = epoched_epochs.copy().pick("mag")
 grads = epoched_epochs.copy().pick("grad")
 
-print('Calculating the cross-spectral density matrices for the alpha band')
+# Save mags and grads for later use
+mags.save(deriv_mag_epoched_fname)
+grads.save(deriv_grad_epoched_fname)
+
+print(f'Calculating the cross-spectral density matrices for the {fr_band} band')
 csd_mag = csd_multitaper(mags, 
                          fmin=fmin, 
                          fmax=fmax, 
@@ -152,6 +161,9 @@ plot_dict = {
     "multitaper csd: gradiometers": csd_grad,
 }
 for title, csd in plot_dict.items():
-    fig, = csd.mean().plot(mode='coh')
+    fig, = csd.mean().plot(mode='csd')
     fig.suptitle(title)
-# plot csd topographically
+
+# Save the csds
+csd_mag.save(deriv_mag_csd_fname, overwrite=True)
+csd_grad.save(deriv_grad_csd_fname, overwrite=True)
