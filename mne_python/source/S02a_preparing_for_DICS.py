@@ -69,6 +69,7 @@ epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
 deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
+deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/epoched-1sec')
 
 # Read only data from subjects with good preprocessed data
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
@@ -116,8 +117,8 @@ else:
 epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
 epoched_fif = op.join(epoched_dir, epoched_fname)
 
-deriv_mag_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_epoched_extension + meg_extension)
-deriv_grad_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
+deriv_mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + mag_epoched_extension + meg_extension)
+deriv_grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
 deriv_mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_csd_extension)
 deriv_grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_csd_extension)
 

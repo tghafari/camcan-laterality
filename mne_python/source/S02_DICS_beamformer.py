@@ -64,6 +64,7 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 
 fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
 deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
+deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/epoched-1sec')
 fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
 fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
 
@@ -74,8 +75,8 @@ fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg
     # try:
     #     print(f'Reading subject # {i}')
 
-mag_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_epoched_extension + meg_extension)
-grad_epoched_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
+mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + mag_epoched_extension + meg_extension)
+grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
 mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_csd_extension + csd_extension)
 grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_csd_extension + csd_extension)
 
@@ -97,7 +98,7 @@ if space == 'surface':
 elif space == 'volume':
     forward = mne.read_forward_solution(fwd_vol_fname)
 
-print('Filter and apply DICS')
+print('Making filter and apply DICS')
 filters_mag = make_dics(mags.info, 
                      forward, 
                      csd_mag.mean() , # we don't have conditions to calculate common csd
@@ -109,7 +110,7 @@ filters_mag = make_dics(mags.info,
                      rank=rank_mag, 
                      depth=0)
                     #  weight_norm="unit-noise-gain")  # "unit-noise-gain" or 'nai', defaults to None where The unit-gain LCMV beamformer will be computed
-stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag)  # where do we use freqs?
+stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag) 
 
 filters_grad = make_dics(grads.info, 
                      forward, 
