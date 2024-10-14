@@ -111,18 +111,19 @@ filters_mag = make_dics(mags.info,
                      depth=0)
                     #  weight_norm="unit-noise-gain")  # "unit-noise-gain" or 'nai', defaults to None where The unit-gain LCMV beamformer will be computed
 stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag) 
-
+# Final parameters:
 filters_grad = make_dics(grads.info, 
                      forward, 
                      csd_grad.mean() , 
                      noise_csd=None, 
-                     reg=0, 
+                     reg=0.05, 
                      pick_ori='max-power', 
                      reduce_rank=True, 
                      real_filter=True, 
                      rank=rank_grad, 
-                     depth=0)
-                     #=weight_norm="nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
+                     depth=None,
+                     inversion='matrix',
+                     weight_norm="unit-noise-gain") # "nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
 stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
 
 # Plot source results to confirm
@@ -130,6 +131,12 @@ stc_mag.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             mode='stat_map', 
+            verbose=True)
+
+stc_grad.plot_3d(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            time_viewer=True,
             verbose=True)
 stc_grad.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
