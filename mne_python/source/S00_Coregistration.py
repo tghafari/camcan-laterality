@@ -37,6 +37,7 @@ import pandas as pd
 import mne
 import matplotlib.pyplot as plt
 
+subjectID = '120309'  # FreeSurfer subject name - 120469  120462  120309
 platform = 'mac'  # are you running on bluebear or windows or mac?
 
 # Define where to read and write the data
@@ -60,7 +61,6 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol' 
-subjectID = '120264'  # FreeSurfer subject name - 120469  120462  120309
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names

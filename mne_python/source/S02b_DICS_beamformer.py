@@ -25,7 +25,7 @@ from mne.beamformer import make_dics, apply_dics_csd
 from mne.time_frequency import read_csd
 
 # subject info 
-subjectID = '120264'  # FreeSurfer subject name - will go in the below for loop
+subjectID = '120469'  # FreeSurfer subject name - will go in the below for loop
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 space = 'volume' # which space to use, surface or volume?
@@ -85,42 +85,17 @@ if space == 'surface':
 elif space == 'volume':
     forward = mne.read_forward_solution(fwd_vol_fname)
 
-print('Source reconstruction on gradiometers')
-grads = mne.read_epochs(grad_epoched_fname, preload=True, verbose=True, proj=False)  
-rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
-csd_grad = read_csd(grad_csd_fname)
-
-filters_grad = make_dics(grads.info, 
-                     forward, 
-                     csd_grad.mean() , 
-                     noise_csd=None, 
-                     reg=0.05, 
-                     pick_ori='max-power', 
-                     reduce_rank=True, 
-                     real_filter=True, 
-                     rank=rank_grad, 
-                     depth=None,
-                     inversion='matrix',
-                     weight_norm="unit-noise-gain") # "nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
-
-stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
-
-# Plot source results to confirm
-stc_grad.plot_3d(src=forward["src"],
-            subject=fs_sub,  # the FreeSurfer subject name
-            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-            time_viewer=True,
-            verbose=True)
-stc_grad.plot(src=forward["src"],
-            subject=fs_sub,  # the FreeSurfer subject name
-            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-            mode='stat_map', 
-            verbose=True)
-
-print('Source reconstruction on magnetometers')
+print('Source reconstruction on magnetometers and gradiometers separately')
 mags = mne.read_epochs(mag_epoched_fname, preload=True, verbose=True, proj=False)  
+grads = mne.read_epochs(grad_epoched_fname, preload=True, verbose=True, proj=False)  
+
+print('Computing rank')
 rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
+rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
+
+print('Reading CSD')
 csd_mag = read_csd(mag_csd_fname)
+csd_grad = read_csd(grad_csd_fname)
 
 print('Making filter and apply DICS')
 filters_mag = make_dics(mags.info, 
@@ -138,8 +113,36 @@ filters_mag = make_dics(mags.info,
 
 stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag) 
 
+filters_grad = make_dics(grads.info, 
+                     forward, 
+                     csd_grad.mean() , 
+                     noise_csd=None, 
+                     reg=0.05, 
+                     pick_ori='max-power', 
+                     reduce_rank=True, 
+                     real_filter=True, 
+                     rank=rank_grad, 
+                     depth=None,
+                     inversion='matrix',
+                     weight_norm="unit-noise-gain") # "nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
+
+stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
+
+# Plot source results to confirm
 stc_mag.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             mode='stat_map', 
+            verbose=True)
+
+stc_grad.plot(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            mode='stat_map', 
+            verbose=True)
+
+stc_grad.plot_3d(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            time_viewer=True,
             verbose=True)

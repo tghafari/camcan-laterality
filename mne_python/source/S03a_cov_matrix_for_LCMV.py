@@ -57,7 +57,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '120264'  # FreeSurfer subject name
+subjectID = '120469'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 plotting = True  # if you'd like to plot the outputs or not

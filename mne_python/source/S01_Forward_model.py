@@ -35,7 +35,7 @@ import mne
 
 
 # subject info 
-subjectID = '120264'  # FreeSurfer subject name
+subjectID = '120469'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -57,8 +57,8 @@ good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id code
 
 # OSL settings
 space = 'volume'  # what to use for source modeling? surface or volume
-gridstep=5  # from OSL
-mindist=5.0  # Exclude points closer than this distance (mm) to the bounding surface.
+gridstep = 5  # from OSL
+mindist = 5.0  # Exclude points closer than this distance (mm) to the bounding surface.
 
 # Specific file names
 meg_extension = '.fif'

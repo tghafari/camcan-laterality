@@ -33,7 +33,7 @@ from mne.beamformer import make_lcmv, apply_lcmv_cov
 
 
 # subject info 
-subjectID = '120264'  # FreeSurfer subject name - will go in the below for loop
+subjectID = '120469'  # FreeSurfer subject name - will go in the below for loop
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 space = 'volume' # which space to use, surface or volume?
