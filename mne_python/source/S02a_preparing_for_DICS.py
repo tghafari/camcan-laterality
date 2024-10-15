@@ -49,8 +49,8 @@ fr_band = 'alpha'  # over which frequency band you'd like to run the inverse mod
 
 meg_extension = '.fif'
 meg_suffix = 'meg'
-mag_epoched_extension = 'mag_epoched-epo'
-grad_epoched_extension = 'grad_epoched-epo'
+mag_epoched_extension = 'mag_epod-epo'
+grad_epoched_extension = 'grad_epod-epo'
 mag_csd_extension = f'mag_csd_multitaper_{fr_band}'
 grad_csd_extension = f'grad_csd_multitaper_{fr_band}'
 
