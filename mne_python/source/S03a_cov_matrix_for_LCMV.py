@@ -1,14 +1,16 @@
 """
 ===============================================
-S03. Using beamformer to localize oscillatory 
-power modulations
+S03a. Preparationg for LCMV
 
-This script uses LCMV to localize 
-oscillatory power moduations based on spatial
-filtering (DICS: in frequency domain). 
+This script reads in the epochs and does
+band pass filter to the oscillatory band of 
+interest. Then computes common covariance
+matrix and saves both filtered and common
+cov. 
+These outputs will then be used by S03b 
+for LCMV.
 
 written by Tara Ghafari
-adapted from flux pipeline
 ==============================================
 ToDos:
     1) 
@@ -55,7 +57,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
     return epochspectrum
 
 # subject info 
-subjectID = '220843'  # FreeSurfer subject name
+subjectID = '120264'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 plotting = True  # if you'd like to plot the outputs or not

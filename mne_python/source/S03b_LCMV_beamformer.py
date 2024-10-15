@@ -33,7 +33,7 @@ from mne.beamformer import make_lcmv, apply_lcmv_cov
 
 
 # subject info 
-subjectID = '220843'  # FreeSurfer subject name - will go in the below for loop
+subjectID = '120264'  # FreeSurfer subject name - will go in the below for loop
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 space = 'volume' # which space to use, surface or volume?
@@ -116,9 +116,9 @@ filters_mag = make_lcmv(mags.info,
                     rank=rank_mag,  
                     pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
                     reduce_rank=True,
-                    depth=0,  # How to weight (or normalize) the forward using a depth prior.
+                    depth=None,  # How to weight (or normalize) the forward using a depth prior.
                     inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
+                    weight_norm="unit-noise-gain" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
                     ) 
 stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
 
@@ -130,9 +130,9 @@ filters_grad = make_lcmv(grads.info,
                     rank=rank_grad,  
                     pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
                     reduce_rank=True,
-                    depth=0,  # How to weight (or normalize) the forward using a depth prior.
+                    depth=None,  # How to weight (or normalize) the forward using a depth prior.
                     inversion='matrix',
-                    weight_norm="nai" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
+                    weight_norm="unit-noise-gain" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
                     ) 
 stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
 

@@ -60,7 +60,7 @@ meg_extension = '.fif'
 meg_suffix = 'meg'
 trans_suffix = 'coreg-trans'
 bem_suffix = 'bem-sol' 
-subjectID = '121795'  # FreeSurfer subject name - 120469  120462  120309
+subjectID = '120264'  # FreeSurfer subject name - 120469  120462  120309
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 # Specify specific file names
@@ -74,36 +74,22 @@ bem_fname = trans_fname.replace(trans_suffix, bem_suffix)
 bem_figname = bem_fname.replace(meg_extension, '.png')
 coreg_figname = bem_figname.replace(bem_suffix, 'final_coreg')
 
-check_dig_points_csv_fname = op.join(deriv_folder, 'info_dig_head_points_fit2.csv')
-check_dig_dict_points_csv_fname = op.join(deriv_folder, 'dig_dict_head_points_fit2.csv')
-check_trans_points_csv_fname = op.join(deriv_folder, 'trans_head_points_fit2.csv')
+# First inspect the surface reconstruction
+Brain = mne.viz.get_brain_class()
 
-# for i, subjectID in enumerate(good_subject_pd.index):
-    # Read subjects one by one 
-epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
-epoched_fif = op.join(epoched_dir, epoched_fname)
+brain = Brain(subject=fs_sub, 
+              hemi='lh', 
+              surf='pial',
+              subjects_dir=fs_sub_dir, 
+              size=(800, 600))
 
-    # try:
-    #     print(f'Reading subject # {i}')
-                    
-info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info  # one 7min50sec epochs
+brain.add_annotation('aparc.a2009s', borders=False)
 
-# # First inspect the surface reconstruction
-# Brain = mne.viz.get_brain_class()
+# Get Boundary Element model (BEM) solution
+""" run this section after the watershed_bem surfaces are read in freesurfer,
+(using my_recon.sh batch script)"""
 
-# brain = Brain(subject=fs_sub, 
-#               hemi='lh', 
-#               surf='pial',
-#               subjects_dir=fs_sub_dir, 
-#               size=(800, 600))
-
-# brain.add_annotation('aparc.a2009s', borders=False)
-
-# # Get Boundary Element model (BEM) solution
-# """ run this section after the watershed_bem surfaces are read in freesurfer,
-# (using my_recon.sh batch script)"""
-
-# # Creat BEM model
+# Creat BEM model
 conductivity = (.3,)  # for single layer
 model = mne.make_bem_model(subject=fs_sub, 
                            subjects_dir=fs_sub_dir,
@@ -117,14 +103,34 @@ mne.write_bem_solution(bem_fname,
                        overwrite=True, 
                        verbose=True)
 
-# # Visualize the BEM
-# fig = mne.viz.plot_bem(subject=fs_sub, 
-#                        subjects_dir=fs_sub_dir,
-#                        orientation='coronal', 
-#                        brain_surfaces='white')
-# fig.savefig(bem_figname)
+# Visualize the BEM
+fig = mne.viz.plot_bem(subject=fs_sub, 
+                       subjects_dir=fs_sub_dir,
+                       orientation='coronal', 
+                       brain_surfaces='white')
+fig.savefig(bem_figname)
+### MANUAL COREGISTRATION ##
+""" manually pick the fiducials and coregister MEG with MRI.
+for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
+mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
-# Coregistration
+# Use this for info path in the gui
+info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif'
+trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC{subjectID}/sub-CC{subjectID}_coreg-trans.fif'
+fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
+
+### AUTOMATIC COREGISTRATION ##
+
+# for i, subjectID in enumerate(good_subject_pd.index):
+    # Read subjects one by one 
+epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
+epoched_fif = op.join(epoched_dir, epoched_fname)
+
+    # try:
+    #     print(f'Reading subject # {i}')
+                    
+info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info  # one 7min50sec epochs
+
 """ trans file is created here for later use in bids and then
 the source-base analysis.
 1) save the trans file in the MRI folder
@@ -132,7 +138,6 @@ the source-base analysis.
     01_bids_conversion... script
 """
 
-# ## AUTOMATED COREGISTRATION ## 
 plot_kwargs = dict(subject=fs_sub, 
                    subjects_dir=fs_sub_dir,
                    surfaces="head-dense", 
@@ -205,40 +210,41 @@ trans_after_final_fit_icp = coreg.trans
 coreg_fig = mne.viz.plot_alignment(info, 
                                    trans=coreg.trans, 
                                    **plot_kwargs)
-# mne.viz.set_3d_view(coreg_fig, **view_kwargs)
+mne.viz.set_3d_view(coreg_fig, **view_kwargs)
 
 # To save the fig above, take a screenshot of the 3D scene
-# screenshot = coreg_fig.plotter.screenshot()
+screenshot = coreg_fig.plotter.screenshot()
 
 # The screenshot is just a NumPy array, so we can display it via imshow()
 # and then save it to a file.
-# fig, ax = plt.subplots(figsize=(10, 10))
-# ax.imshow(screenshot, origin='upper')
-# ax.set_axis_off()  # Disable axis labels and ticks
-# fig.tight_layout()
-# fig.savefig(coreg_figname, dpi=150)
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.imshow(screenshot, origin='upper')
+ax.set_axis_off()  # Disable axis labels and ticks
+fig.tight_layout()
+fig.savefig(coreg_figname, dpi=150)
 
 # Write trans if you're happy with the coregistration
-# mne.write_trans(trans_fname, 
-#                 coreg.trans,
-#                 overwrite=True)
+mne.write_trans(trans_fname, 
+                coreg.trans,
+                overwrite=True)
 
-# # Compute distance between MRI and HSP
-# dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
-# print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
-#       f"/ {np.min(dists):.2f} mm / {np.max(dists):.2f} mm")
+# Compute distance between MRI and HSP
+dists = coreg.compute_dig_mri_distances() * 1e3  # in mm
+print(f"Distance between HSP and MRI (mean/min/max):\n{np.mean(dists):.2f} mm "
+      f"/ {np.min(dists):.2f} mm / {np.max(dists):.2f} mm")
 
-### MANUAL COREGISTRATION ##
-""" manually pick the fiducials and coregister MEG with MRI.
-for instructions check out:https://www.youtube.com/watch?v=ALV5qqMHLlQ""" 
-mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_sub_dir)
 
-# Use this for info path in the gui
-info_fname = '/Volumes/quinna-camcan/derivatives/meg/sensor/epoched-7min50/sub-CC121795_ses-rest_task-rest_megtransdef_epo.fif'
-trans_fname = '/Volumes/quinna-camcan/derivatives/meg/source/freesurfer/sub-CC121795/sub-CC121795_coreg-trans.fif'
 
-# Save them manually in the gui
-fiducials_fname = op.join(fs_sub_dir, fs_sub, 'bem', fs_sub + '-fiducials.fif')
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -265,6 +271,10 @@ This script creates the required table and saves it as a CSV file.
 
 import pandas as pd
 import re
+
+check_dig_points_csv_fname = op.join(deriv_folder, 'info_dig_head_points_fit2.csv')
+check_dig_dict_points_csv_fname = op.join(deriv_folder, 'dig_dict_head_points_fit2.csv')
+check_trans_points_csv_fname = op.join(deriv_folder, 'trans_head_points_fit2.csv')
 
 
 # Helper function to process the DigPoint strings

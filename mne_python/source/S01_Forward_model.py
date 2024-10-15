@@ -35,7 +35,7 @@ import mne
 
 
 # subject info 
-subjectID = '121795'  # FreeSurfer subject name
+subjectID = '120264'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 platform = 'mac'  # are you running on bluebear or windows or mac?

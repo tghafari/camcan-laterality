@@ -43,7 +43,7 @@ def epoching_epochs(epoched_fif, epoched_epochs_duration):
     return epoched_epochs
 
 # subject info 
-subjectID = '121795'  # FreeSurfer subject name
+subjectID = '120264'  # FreeSurfer subject name
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
 
@@ -133,8 +133,8 @@ mags = epoched_epochs.copy().pick("mag")
 grads = epoched_epochs.copy().pick("grad")
 
 # Save mags and grads for later use
-mags.save(deriv_mag_epoched_fname)
-grads.save(deriv_grad_epoched_fname)
+mags.save(deriv_mag_epoched_fname, overwrite=True)
+grads.save(deriv_grad_epoched_fname, overwrite=True)
 
 print(f'Calculating the cross-spectral density matrices for the {fr_band} band')
 csd_mag = csd_multitaper(mags, 

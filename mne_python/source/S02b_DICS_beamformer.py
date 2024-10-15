@@ -25,7 +25,7 @@ from mne.beamformer import make_dics, apply_dics_csd
 from mne.time_frequency import read_csd
 
 # subject info 
-subjectID = '121795'  # FreeSurfer subject name - will go in the below for loop
+subjectID = '120264'  # FreeSurfer subject name - will go in the below for loop
 fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
 
 space = 'volume' # which space to use, surface or volume?
@@ -68,7 +68,6 @@ deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/epoched-1sec')
 fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
 fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
 
-
 # Read epoched data + baseline correction + define frequency bands
 # for i, subjectID in enumerate(good_subject_pd.index):
     # Read subjects one by one 
@@ -80,38 +79,17 @@ grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_epoch
 mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_csd_extension + csd_extension)
 grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_csd_extension + csd_extension)
 
-print('Reading epochs- magnetometers and gradiometers separately')
-mags = mne.read_epochs(mag_epoched_fname, preload=True, verbose=True, proj=False)  
-grads = mne.read_epochs(grad_epoched_fname, preload=True, verbose=True, proj=False)  
-
-print('Compute rank of mags and grads')
-rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
-rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
-
-print('Reading csds')
-csd_mag = read_csd(mag_csd_fname)
-csd_grad = read_csd(grad_csd_fname)
-
 print('Reading forward model')
 if space == 'surface':
     forward = mne.read_forward_solution(fwd_surf_fname)
 elif space == 'volume':
     forward = mne.read_forward_solution(fwd_vol_fname)
 
-print('Making filter and apply DICS')
-filters_mag = make_dics(mags.info, 
-                     forward, 
-                     csd_mag.mean() , # we don't have conditions to calculate common csd
-                     noise_csd=None, 
-                     reg=0,  # because reduce rank results in mne python computing a truncated pseudo-inverse we don't need regularisation (I think!)
-                     pick_ori='max-power', 
-                     reduce_rank=True, 
-                     real_filter=True, 
-                     rank=rank_mag, 
-                     depth=0)
-                    #  weight_norm="unit-noise-gain")  # "unit-noise-gain" or 'nai', defaults to None where The unit-gain LCMV beamformer will be computed
-stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag) 
-# Final parameters:
+print('Source reconstruction on gradiometers')
+grads = mne.read_epochs(grad_epoched_fname, preload=True, verbose=True, proj=False)  
+rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
+csd_grad = read_csd(grad_csd_fname)
+
 filters_grad = make_dics(grads.info, 
                      forward, 
                      csd_grad.mean() , 
@@ -124,21 +102,43 @@ filters_grad = make_dics(grads.info,
                      depth=None,
                      inversion='matrix',
                      weight_norm="unit-noise-gain") # "nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
+
 stc_grad, freqs = apply_dics_csd(csd_grad.mean(), filters_grad)
 
 # Plot source results to confirm
-stc_mag.plot(src=forward["src"],
-            subject=fs_sub,  # the FreeSurfer subject name
-            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-            mode='stat_map', 
-            verbose=True)
-
 stc_grad.plot_3d(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             time_viewer=True,
             verbose=True)
 stc_grad.plot(src=forward["src"],
+            subject=fs_sub,  # the FreeSurfer subject name
+            subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
+            mode='stat_map', 
+            verbose=True)
+
+print('Source reconstruction on magnetometers')
+mags = mne.read_epochs(mag_epoched_fname, preload=True, verbose=True, proj=False)  
+rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
+csd_mag = read_csd(mag_csd_fname)
+
+print('Making filter and apply DICS')
+filters_mag = make_dics(mags.info, 
+                     forward, 
+                     csd_mag.mean() , # we don't have conditions to calculate common csd
+                     noise_csd=None, 
+                     reg=0.05,  # because reduce rank results in mne python computing a truncated pseudo-inverse we don't need regularisation (I think!)
+                     pick_ori='max-power', 
+                     reduce_rank=True, 
+                     real_filter=True, 
+                     rank=rank_mag, 
+                     depth=None,
+                     inversion='matrix',
+                     weight_norm="unit-noise-gain") # "nai" or "unit-noise-gain" only work with reduce_rank=False and results in rubbish
+
+stc_mag, freqs = apply_dics_csd(csd_mag.mean(), filters_mag) 
+
+stc_mag.plot(src=forward["src"],
             subject=fs_sub,  # the FreeSurfer subject name
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             mode='stat_map', 
