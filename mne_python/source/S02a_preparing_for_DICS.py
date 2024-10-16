@@ -80,31 +80,31 @@ if fr_band == 'delta':
    fmin = 1
    fmax = 4
    bandwidth = 1.
-   epoched_epochs_duration = 1  # duration of the epoched epochs
+   epoched_epochs_duration = 2  # duration of the epoched epochs
 
 elif fr_band == 'theta':
    fmin = 4
    fmax = 8
    bandwidth = 1.
-   epoched_epochs_duration = 1  
+   epoched_epochs_duration = 2  
 
 elif fr_band == 'alpha':
    fmin = 8
    fmax = 12
    bandwidth = 1.
-   epoched_epochs_duration = 1 
+   epoched_epochs_duration = 2 
 
 elif fr_band == 'beta':
    fmin = 12
    fmax = 30
    bandwidth = 1.
-   epoched_epochs_duration = 1  
+   epoched_epochs_duration = 2  
 
 elif fr_band == 'gamma':
     fmin = 30
     fmax = 60
     bandwidth = 4.
-    epoched_epochs_duration = 1  
+    epoched_epochs_duration = 2  
 
 else:
     raise ValueError("Error: 'fr_band' value not valid")

@@ -102,7 +102,7 @@ filters_mag = make_dics(mags.info,
                      forward, 
                      csd_mag.mean() , # we don't have conditions to calculate common csd
                      noise_csd=None, 
-                     reg=0.05,  # because reduce rank results in mne python computing a truncated pseudo-inverse we don't need regularisation (I think!)
+                     reg=0.01,  # because reduce rank results in mne python computing a truncated pseudo-inverse we don't need regularisation (I think!)
                      pick_ori='max-power', 
                      reduce_rank=True, 
                      real_filter=True, 
@@ -117,7 +117,7 @@ filters_grad = make_dics(grads.info,
                      forward, 
                      csd_grad.mean() , 
                      noise_csd=None, 
-                     reg=0.05, 
+                     reg=0.01, 
                      pick_ori='max-power', 
                      reduce_rank=True, 
                      real_filter=True, 
