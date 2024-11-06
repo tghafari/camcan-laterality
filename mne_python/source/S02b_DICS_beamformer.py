@@ -11,7 +11,6 @@ prepared in S02a and will be read in this
 script.
 
 written by Tara Ghafari
-adapted from flux pipeline
 ==============================================
 """
 
@@ -42,8 +41,9 @@ grad_epoched_extension = 'grad_epod-epo'
 csd_extension = '.h5'
 mag_csd_extension = f'mag_csd_multitaper_{fr_band}'
 grad_csd_extension = f'grad_csd_multitaper_{fr_band}'
+label_fname = 'aparc+aseg.mgz'
 
-platform = 'mac'  # are you running on bluebear or mac?
+platform = 'bluebear'  # are you running on bluebear or mac?
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -67,6 +67,7 @@ deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4]
 deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/epoched-1sec')
 fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
 fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
+label_fpath = op.join(fs_sub_dir, f'{fs_sub}/mri', label_fname)
 
 # Read epoched data + baseline correction + define frequency bands
 # for i, subjectID in enumerate(good_subject_pd.index):
