@@ -41,6 +41,8 @@ grad_epoched_extension = 'grad_epod-epo'
 csd_extension = '.h5'
 mag_csd_extension = f'mag_csd_multitaper_{fr_band}'
 grad_csd_extension = f'grad_csd_multitaper_{fr_band}'
+mag_stc_extension = f'mag_stc_multitaper_{fr_band}'
+grad_stc_extension = f'grad_stc_multitaper_{fr_band}'
 label_fname = 'aparc+aseg.mgz'
 
 platform = 'bluebear'  # are you running on bluebear or mac?
@@ -79,6 +81,9 @@ mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + mag_epoched
 grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_epoched_extension + meg_extension)
 mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_csd_extension + csd_extension)
 grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_csd_extension + csd_extension)
+
+deriv_mag_stc_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_stc_extension)
+deriv_grad_stc_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_stc_extension)
 
 print('Reading forward model')
 if space == 'surface':
@@ -147,3 +152,7 @@ stc_grad.plot_3d(src=forward["src"],
             subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
             time_viewer=True,
             verbose=True)
+
+# Save the stcs
+stc_mag.save(deriv_mag_stc_fname, overwrite=True)
+stc_grad.save(deriv_grad_stc_fname, overwrite=True)
