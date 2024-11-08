@@ -56,13 +56,12 @@ elif platform == 'mac':
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
     sub2ctx_dir = '/Volumes/jenseno-sub2ctx'
 
-epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
+# good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 
-# Read only data from subjects with good preprocessed data
-good_subject_pd = pd.read_csv(good_sub_sheet)
-good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+# # Read only data from subjects with good preprocessed data
+# good_subject_pd = pd.read_csv(good_sub_sheet)
+# good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
 
 fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
 deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
