@@ -48,7 +48,7 @@ mag_stc_extension = f'mag_stc_multitaper_{fr_band}'
 grad_stc_extension = f'grad_stc_multitaper_{fr_band}'
 label_fname = 'aparc+aseg.mgz'
 
-platform = 'bluebear'  # are you running on bluebear or mac?
+platform = 'mac'  # are you running on bluebear or mac?
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -100,8 +100,11 @@ elif space == 'volume':
 src = forward["src"]
 
 # Get the indices of the sources in the grid and the positions in 3D space
-grid_positions = [s['rr'] for s in src]  # 3D coordinates of the source points in the grid
-grid_indices = [s['vertno'] for s in src]  # indices of the dipoles in the grid
+grid_positions = [s['rr'] for s in src]  # 3D coordinates of the source points in the grid => list of one array of (37696, 3) 
+grid_indices = [s['vertno'] for s in src]  # indices of the dipoles in the grid => list of one array of (12183,)
+                                           # this shows the active grides that were used for forward model, 
+                                           # which is not necessarily equal to all the grids whose positions 
+                                           # are in grid_positions 
 
 # Step 3: Separate sources into left and right hemisphere based on x-coordinate
 left_hemisphere_time_courses = []
@@ -111,29 +114,60 @@ right_positions = []
 left_indices = []
 right_indices = []
 
-for pos_idx, pos in enumerate(grid_positions[0]):
-    print(f'pos {pos_idx}')
-    for ind_idx, indices in enumerate(grid_indices[0]):
-        print(f'index {ind_idx}')
-        if pos[0] < 0:  # Assuming x < 0 is left hemisphere
-            print(f'NEGATIVE {indices} - left stc')
-            left_hemisphere_time_courses.append(stc_grad.data[indices, :])
-            left_positions.append(pos)
-            left_indices.append(indices)
-        else:  # x > 0 is right hemisphere
-            print(f'POSITIVE {indices} - right stc')
-            right_hemisphere_time_courses.append(stc_grad.data[indices, :])
-            right_positions.append(pos)
-            right_indices.append(indices)
-i=0
-for pos, indices in zip(grid_positions[0], grid_indices[0]):
-    i+=1
-    print(f'pos: {pos} {i}')
-    if pos[0] < 0:  # Assuming x < 0 is left hemisphere
-        print(f'NEGATIVE {indices} - left stc')
+for region_idx, indices in enumerate(grid_indices[0]):
+    print(f'{region_idx}')
+    pos = grid_positions[0][indices]  # only select in-use positions in the source model
+    print(f'{pos}')
+    if pos[0] < 0:  # x < 0 is left hemisphere
+        left_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
+        left_positions.append(pos)
+        left_indices.append(indices)
     else:  # x > 0 is right hemisphere
-        print(f'POSITIVE {indices} - right stc')
- 
+        right_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
+        right_positions.append(pos)
+        right_indices.append(indices)
+
+# Find the right order of grid positions
+"""
+To match the positions in left_positions and right_positions by aligning the 
+x, y, and z coordinates such that each 
+(x,y,z) position in right_positions corresponds to a 
+(-x,y,z) position in left_positions, you can use a 
+sorting approach. 
+Once we find the correct order, we'll 
+reorder left_positions and right_positions along with 
+their respective left_indices and right_indices.
+"""
+# Convert lists to numpy arrays for easy manipulation
+left_positions = np.array(left_positions)
+right_positions = np.array(right_positions)
+
+# Step 1: Create a dictionary to map right position to index for ordering, rounding to three decimal places
+# because position numbers do not match to 4th decimal precision
+right_pos_dict = {tuple(round(coord, 3) for coord in pos): i for i, pos in enumerate(right_positions)}
+
+# Step 2: Prepare lists for ordered left and right positions/indices
+ordered_left_positions = []
+ordered_right_positions = []
+ordered_left_indices = []
+ordered_right_indices = []
+
+# Step 3: Match each left position to the corresponding right position
+for i, left_pos in enumerate(left_positions):
+    # Find the right position that corresponds to this left position by flipping the x-coordinate
+    corresponding_right_pos = (round(abs(left_pos[0]), 3), round(left_pos[1], 3), round(left_pos[2], 3))
+
+    # Check if the corresponding right position exists in the right positions dictionary
+    if corresponding_right_pos in right_pos_dict:
+        # Get the index of this right position
+        right_index = right_pos_dict[corresponding_right_pos]
+        
+        # Append positions and indices in the correct order
+        ordered_left_positions.append(left_pos)
+        ordered_right_positions.append(right_positions[right_index])
+        ordered_left_indices.append(left_indices[i])
+        ordered_right_indices.append(right_indices[right_index])
+
 
 # Step 4: Create tables for grid positions and indices
 positions_table = pd.DataFrame({'Left Hemisphere': left_positions, 'Right Hemisphere': right_positions})
