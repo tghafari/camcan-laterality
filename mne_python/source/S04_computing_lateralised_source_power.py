@@ -72,6 +72,9 @@ deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/epoched-1sec')
 fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
 fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
 label_fpath = op.join(fs_sub_dir, f'{fs_sub}/mri', label_fname)
+grid_positions_csv = op.join(deriv_folder, 'grid_positions.csv')
+grid_indices_csv = op.join(deriv_folder, 'grid_indices.csv')
+lateralised_src_power_csv = op.join(deriv_folder, 'lateralised_src_power.csv')
 
 # Read epoched data + baseline correction + define frequency bands
 # for i, subjectID in enumerate(good_subject_pd.index):
@@ -164,63 +167,85 @@ plt.show()
     their respective left_indices and right_indices.
 """
 
-# Step 1: Create a dictionary to map left position to index for ordering, rounding to three decimal places
-# because position numbers do not match to 4th decimal precision
-left_pos_dict = {tuple(round(coord, 3) for coord in pos): i for i, pos in enumerate(left_positions)}
+# Step 1: Create a dictionary to easily access left positions by their coordinates
+left_pos_dict = {tuple(pos): idx for idx, pos in enumerate(left_positions)}
 
-# Step 2: Prepare lists for ordered left and right positions/indices
+# Prepare lists for ordered positions and indices
 ordered_right_positions = []
 ordered_left_positions = []
 ordered_right_indices = []
 ordered_left_indices = []
+distances = []
 
-left_index_list = []
+# List to keep track of which indices have already been selected in left_positions
+used_left_indices = set()
 
-# Step 3: Match each left position to the corresponding right position
+# Step 2: Match each right position to the closest corresponding left position
 for i, right_pos in enumerate(right_positions):
-    # Find the right position that corresponds to this left position by flipping the x-coordinate
-    corresponding_left_pos = (round(-(right_pos[0]), 3), round(right_pos[1], 3), round(right_pos[2], 3))
-# distance between this point and all the points on the left hemisphere and choose the closest.
-# sqrt sum x**2,...
-    # Check if the corresponding right position exists in the right positions dictionary
-    if corresponding_left_pos in left_pos_dict:
-        # Get the index of this left position
-        left_index = left_pos_dict[corresponding_left_pos]
-        
-        # Append positions and indices in the correct order
+    # Flip the x-coordinate to find the corresponding left position
+    corresponding_left_pos = (-right_pos[0], right_pos[1], right_pos[2])
+
+    # Calculate the distance between corresponding_left_pos and all left positions
+    min_distance = float('inf')
+    closest_left_index = None
+
+    # Iterate over all left positions to find the closest match
+    for j, left_pos in enumerate(left_positions):
+        if j in used_left_indices:
+            continue  # Skip if the left position has already been assigned
+
+        # Calculate Euclidean distance
+        distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 + 
+                           (left_pos[1] - corresponding_left_pos[1])**2 + 
+                           (left_pos[2] - corresponding_left_pos[2])**2)
+
+        # Check if this is the closest match so far
+        if distance < min_distance:
+            min_distance = distance
+            closest_left_index = j
+
+    # If a matching left position is found, add it to the ordered lists
+    if closest_left_index is not None:
+        # Append positions, indices, and distance in the correct order
         ordered_right_positions.append(right_pos)
-        ordered_left_positions.append(left_positions[left_index])
+        ordered_left_positions.append(left_positions[closest_left_index])
         ordered_right_indices.append(right_indices[i])
-        ordered_left_indices.append(left_indices[left_index])
+        ordered_left_indices.append(left_indices[closest_left_index])
+        distances.append(min_distance)
 
-        # Append left_index for later use in indexing
-        left_index_list.append(left_index)
+        # Mark this left position as used
+        used_left_indices.add(closest_left_index)
 
-# Convert ordered lists back to numpy arrays 
+    # Break if there are no more available left or right positions to assign
+    if len(used_left_indices) >= len(left_positions) or len(used_left_indices) >= len(right_positions):
+        break
+
+# Convert ordered lists back to numpy arrays for easier manipulation
 ordered_right_positions = np.array(ordered_right_positions)
 ordered_left_positions = np.array(ordered_left_positions)
 ordered_right_indices = np.array(ordered_right_indices)
 ordered_left_indices = np.array(ordered_left_indices)
 
-# Reorder time courses according to the ordered indices
-ordered_right_time_courses = [right_hemisphere_time_courses[right_indices.index(i)] for i in ordered_right_indices]
-ordered_left_time_courses = [left_hemisphere_time_courses[left_indices.index(i)] for i in ordered_left_indices]
+# Step 3: Reorder time courses based on the ordered indices
+ordered_right_time_courses = [right_hemisphere_time_courses[right_indices.index(idx)] for idx in ordered_right_indices]
+ordered_left_time_courses = [left_hemisphere_time_courses[left_indices.index(idx)] for idx in ordered_left_indices]
 
-# Step 4: Create tables for grid positions and indices
-# For positions, separate the x, y, and z coordinates into different columns for each hemisphere
+# Step 4: Create tables for grid positions, indices, and distances
+# Create a DataFrame for positions, including the distance between each corresponding pair
 positions_table = pd.DataFrame({
     'Right Hemisphere X': [pos[0] for pos in ordered_right_positions],
     'Right Hemisphere Y': [pos[1] for pos in ordered_right_positions],
     'Right Hemisphere Z': [pos[2] for pos in ordered_right_positions],
     'Left Hemisphere X': [pos[0] for pos in ordered_left_positions],
     'Left Hemisphere Y': [pos[1] for pos in ordered_left_positions],
-    'Left Hemisphere Z': [pos[2] for pos in ordered_left_positions]
+    'Left Hemisphere Z': [pos[2] for pos in ordered_left_positions],
+    'Distance': distances
 })
 
-# For indices, they should already be one-dimensional, so we can directly assign them to the DataFrame
+# Create a DataFrame for indices
 indices_table = pd.DataFrame({
-    'Right Hemisphere': ordered_right_indices,
-    'Left Hemisphere': ordered_left_indices
+    'Right Hemisphere Index': ordered_right_indices,
+    'Left Hemisphere Index': ordered_left_indices
 })
 
 # Step 5: Calculate lateralised source power
@@ -233,8 +258,12 @@ for right_tc, left_tc  in zip(ordered_right_time_courses, ordered_left_time_cour
 lateralised_power_arr = np.squeeze(np.array(lateralised_power)) # shape into (198,) 
 lateralised_power_df = pd.DataFrame(lateralised_power_arr, columns=['Lateralised Source Power Index'])
 
-# Step 6: Plot time courses for each hemisphere
+# Save all dataframes to disk
+positions_table.to_csv(grid_positions_csv)
+indices_table.to_csv(grid_indices_csv)
+lateralised_power_df.to_csv(lateralised_src_power_csv)
 
+# Step 6: Plot time courses for each hemisphere
 stc_lateral_power = mne.SourceEstimate(
     data=lateralised_power_arr[:, np.newaxis],  # Shape (n_sources, n_times); here, n_times=1 for static plot
     vertices=[[], ordered_right_indices],  # Left empty for left hemisphere
