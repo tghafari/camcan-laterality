@@ -139,11 +139,11 @@ fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 
 # Plot left hemisphere positions in blue
-ax.scatter(left_positions[:, 0], left_positions[:, 1], left_positions[:, 2], 
+ax.scatter(ordered_left_positions[:, 0], ordered_left_positions[:, 1], ordered_left_positions[:, 2], 
            color='blue', label='Left Hemisphere', alpha=0.6)
 
 # Plot right hemisphere positions in red
-ax.scatter(right_positions[:, 0], right_positions[:, 1], right_positions[:, 2], 
+ax.scatter(ordered_right_positions[:, 0], ordered_right_positions[:, 1], ordered_right_positions[:, 2], 
            color='red', label='Right Hemisphere', alpha=0.6)
 
 # Labels and title
@@ -170,6 +170,8 @@ plt.show()
 # Step 1: Create a dictionary to easily access left positions by their coordinates
 left_pos_dict = {tuple(pos): idx for idx, pos in enumerate(left_positions)}
 
+min_distance_accepted = 0.01  # the minimum euclidian distance that's accepted from corresponding points
+
 # Prepare lists for ordered positions and indices
 ordered_right_positions = []
 ordered_left_positions = []
@@ -195,9 +197,9 @@ for i, right_pos in enumerate(right_positions):
             continue  # Skip if the left position has already been assigned
 
         # Calculate Euclidean distance
-        distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 + 
-                           (left_pos[1] - corresponding_left_pos[1])**2 + 
-                           (left_pos[2] - corresponding_left_pos[2])**2)
+        distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 
+                           + (left_pos[1] - corresponding_left_pos[1])**2
+                           + (left_pos[2] - corresponding_left_pos[2])**2)
 
         # Check if this is the closest match so far
         if distance < min_distance:
@@ -205,7 +207,7 @@ for i, right_pos in enumerate(right_positions):
             closest_left_index = j
 
     # If a matching left position is found, add it to the ordered lists
-    if closest_left_index is not None:
+    if closest_left_index is not None and min_distance <= min_distance_accepted:
         # Append positions, indices, and distance in the correct order
         ordered_right_positions.append(right_pos)
         ordered_left_positions.append(left_positions[closest_left_index])
