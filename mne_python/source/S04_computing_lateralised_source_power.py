@@ -193,8 +193,8 @@ for i, right_pos in enumerate(right_positions):
 
     # Iterate over all left positions to find the closest match
     for j, left_pos in enumerate(left_positions):
-        if j in used_left_indices:
-            continue  # Skip if the left position has already been assigned
+        # if j in used_left_indices:
+        #     continue  # Skip if the left position has already been assigned - not necessary
 
         # Calculate Euclidean distance
         distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 
@@ -265,10 +265,38 @@ positions_table.to_csv(grid_positions_csv)
 indices_table.to_csv(grid_indices_csv)
 lateralised_power_df.to_csv(lateralised_src_power_csv)
 
+# Plot findings in grid positions
+fig = plt.figure(figsize=(10, 8))
+ax = fig.add_subplot(111, projection='3d')
+
+# Scatter plot of grid positions with color representing lateralised power
+sc = ax.scatter(
+    ordered_right_positions[:, 0],  # x-coordinates
+    ordered_right_positions[:, 1],  # y-coordinates
+    ordered_right_positions[:, 2],  # z-coordinates
+    c=lateralised_power_arr,        # color by lateralised power
+    cmap='coolwarm',                # color map
+    label='Right Hemisphere', 
+    alpha=0.6,
+    s=50                            # size of points
+)
+
+# Add a colorbar to show the range of lateralised power values
+cbar = plt.colorbar(sc, ax=ax, shrink=0.5, aspect=10)
+cbar.set_label('Lateralised Power')
+
+# Set plot labels
+ax.set_xlabel('X')
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
+plt.title('Lateralised Power on Right Hemisphere Grid Points')
+plt.legend()
+plt.show()
+
 # Step 6: Plot time courses for each hemisphere
-stc_lateral_power = mne.SourceEstimate(
+stc_lateral_power = mne.VolSourceEstimate(
     data=lateralised_power_arr[:, np.newaxis],  # Shape (n_sources, n_times); here, n_times=1 for static plot
-    vertices=[[], ordered_right_indices],  # Left empty for left hemisphere
+    vertices=[ordered_right_indices],  # Left empty for left hemisphere
     tmin=0,
     tstep=1,
     subject=fs_sub
@@ -279,8 +307,8 @@ stc_lateral_power.plot(
     src=forward["src"],
     subject=fs_sub,
     subjects_dir=fs_sub_dir,
+    mode='stat_map',
     # hemi='rh',  # Right hemisphere
-    title='Lateralized Power',
     colorbar=True
 )
 
