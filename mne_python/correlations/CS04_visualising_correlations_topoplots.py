@@ -134,9 +134,7 @@ fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-s
 
 # List of the things for which you want topoplots
 substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu']
-# ['Caud', 'Hipp']
 freqs = np.arange(1,40,1)
-#[10,10.5,11,11.5,12,12.5]
 #freqs=[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,60,60.5,61,61.5,62,62.5,63,63.5,64,64.5,110,110.5,111,111.5,112]
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs

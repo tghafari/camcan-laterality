@@ -138,13 +138,13 @@ left_positions = np.array(left_positions)
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection='3d')
 
-# Plot left hemisphere positions in blue
-ax.scatter(ordered_left_positions[:, 0], ordered_left_positions[:, 1], ordered_left_positions[:, 2], 
-           color='blue', label='Left Hemisphere', alpha=0.6)
-
 # Plot right hemisphere positions in red
-ax.scatter(ordered_right_positions[:, 0], ordered_right_positions[:, 1], ordered_right_positions[:, 2], 
+ax.scatter(right_positions[:, 0], right_positions[:, 1], right_positions[:, 2], 
            color='red', label='Right Hemisphere', alpha=0.6)
+
+# Plot left hemisphere positions in blue
+ax.scatter(left_positions[:, 0], left_positions[:, 1], left_positions[:, 2], 
+           color='blue', label='Left Hemisphere', alpha=0.6)
 
 # Labels and title
 ax.set_xlabel("X")
@@ -257,7 +257,7 @@ for right_tc, left_tc  in zip(ordered_right_time_courses, ordered_left_time_cour
     lateral_power_index = (right_tc - left_tc) / (right_tc + left_tc)
     lateralised_power.append(lateral_power_index)
 
-lateralised_power_arr = np.squeeze(np.array(lateralised_power)) # shape into (198,) 
+lateralised_power_arr = np.squeeze(np.array(lateralised_power)) 
 lateralised_power_df = pd.DataFrame(lateralised_power_arr, columns=['Lateralised Source Power Index'])
 
 # Save all dataframes to disk
@@ -279,8 +279,7 @@ stc_lateral_power.plot(
     src=forward["src"],
     subject=fs_sub,
     subjects_dir=fs_sub_dir,
-    # mode='stat_map',
-    hemi='rh',  # Right hemisphere
+    # hemi='rh',  # Right hemisphere
     title='Lateralized Power',
     colorbar=True
 )
