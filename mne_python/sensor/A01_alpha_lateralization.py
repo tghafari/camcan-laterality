@@ -23,6 +23,33 @@ import pandas as pd
 import numpy as np
 import mne
 
+def calculate_alpha_lat_sensor(right_sensor, left_sensor):
+    tfr_right_sensor = mne.time_frequency.tfr_multitaper(epochs, 
+                                                    freqs=freqs, 
+                                                    n_cycles=n_cycles,
+                                                    time_bandwidth=time_bandwidth, 
+                                                    picks=right_sensor,
+                                                    use_fft=True, 
+                                                    return_itc=False,
+                                                    average=True, 
+                                                    decim=2,
+                                                    n_jobs=4,
+                                                    verbose=True)
+    tfr_left_sensor = mne.time_frequency.tfr_multitaper(epochs, 
+                                                    freqs=freqs, 
+                                                    n_cycles=n_cycles,
+                                                    time_bandwidth=time_bandwidth, 
+                                                    picks=left_sensor,
+                                                    use_fft=True, 
+                                                    return_itc=False,
+                                                    average=True, 
+                                                    decim=2,
+                                                    n_jobs=4,
+                                                    verbose=True)
+    alpha_lat_sensor = (tfr_right_sensor.data.mean() - tfr_left_sensor.data.mean()) /\
+        (tfr_right_sensor.data.mean() + tfr_left_sensor.data.mean())
+    return alpha_lat_sensor
+
 plot = False
 
 # Define where to read and write the data
@@ -64,33 +91,6 @@ for i, subjectID in enumerate(good_subject_pd.index):
         freqs = np.arange(8, 14)
         n_cycles = freqs / 2 
         time_bandwidth = 2.0
-        
-        def calculate_alpha_lat_sensor(right_sensor, left_sensor):
-            tfr_right_sensor = mne.time_frequency.tfr_multitaper(epochs, 
-                                                          freqs=freqs, 
-                                                          n_cycles=n_cycles,
-                                                          time_bandwidth=time_bandwidth, 
-                                                          picks=right_sensor,
-                                                          use_fft=True, 
-                                                          return_itc=False,
-                                                          average=True, 
-                                                          decim=2,
-                                                          n_jobs=4,
-                                                          verbose=True)
-            tfr_left_sensor = mne.time_frequency.tfr_multitaper(epochs, 
-                                                          freqs=freqs, 
-                                                          n_cycles=n_cycles,
-                                                          time_bandwidth=time_bandwidth, 
-                                                          picks=left_sensor,
-                                                          use_fft=True, 
-                                                          return_itc=False,
-                                                          average=True, 
-                                                          decim=2,
-                                                          n_jobs=4,
-                                                          verbose=True)
-            alpha_lat_sensor = (tfr_right_sensor.data.mean() - tfr_left_sensor.data.mean()) /\
-                (tfr_right_sensor.data.mean() + tfr_left_sensor.data.mean())
-            return alpha_lat_sensor
         
         alpha_lateralization_all_sensors = [] 
         for _,row in sensors_layout_names_df.iterrows():
