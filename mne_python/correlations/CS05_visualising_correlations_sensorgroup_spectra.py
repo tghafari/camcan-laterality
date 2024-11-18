@@ -1,24 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-====================================
-CS02_correlation_frequency_plot_topo:
-    this script:
-    1. navigates to correlations/sensor_pairs dir
-    2. navigates to one sensor_pair folder
-    3. reads csv file of correlation values
-    for all frequencies and all substr
-    4. for each substr plots frequencies vs.
-    correlation values
-    5. draws a line under the correlation values
-    that are significant (from pval csv)
-    6. saves the plot with the name of right sensor
-    in substr directory
-    6. loops over substr
-    7. loops over sensor pairs
+==========================================
+CS05_visualise correlations in significant 
+sensor groupd over spectra
     
 Written by Tara Ghafari
 t.ghafari@bham.ac.uk
-=====================================
+==========================================
 """
 
 import pandas as pd

@@ -43,7 +43,7 @@ from scipy import stats
 import json
 
 
-platform = 'bluebear'  # are you running on bluebear or windows or mac?
+platform = 'mac'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
 
@@ -105,7 +105,7 @@ def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
         from epochspectrum (output of previous function).
         the shape of psd is (1, 1, 239) = #epochs, #sensors, #freqs
-        freqs = np.arange(1, 120, 0.5)"""
+        freqs = np.arange(1, 120.5, 0.5)"""
     
     psd_right_sensor, freqs = epochspectrum.copy().pick(picks=right_sensor).get_data(return_freqs=True)  # freqs is just for a reference
     psd_left_sensor = epochspectrum.copy().pick(picks=left_sensor).get_data()

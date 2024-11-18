@@ -1,31 +1,24 @@
-# -*- coding: utf-8 -*-
 """
 ====================================
-CS04_visualising_correlations_topoplots:
-    this script:
+A02_alpha_lateralisation_topoplot:
     the goal is to creat topo plots using 
-    correlation values instead of power
+    lateralised power of alpha
+    1. first navigate to the folder containing
+    the lateralisation index of interest
+    2. average over the frequencies
+    that constitute your band of
+    interest.
+    3. use the info from a raw object
+    and the indices of the channels
+    in the order of the lateralised
+    powers to visualise the lateralised 
+    power (instead of power) on the
+    right half of the topoplot.
 
-    1. navigates to the correlation directory
-    2. then lists all the folders (with 
-    sensor pair names)
-    3. then navigates to each of the sensor
-    pair folders 
-    4. then inside each of the subcortical
-    structure folders
-    5. then opens the correlation table
-    6. finds the correlation value for
-    the frequency of interest
-    7. put it in a list of all correlation
-    values for that substr and all sensor pairs
-    8. does the same for p-value
-    
 
-Written by Andrew Quinn
-Adapted by Tara Ghafari
-t.ghafari@bham.ac.uk
-=====================================
+===================================
 """
+
 
 import pandas as pd
 import numpy as np
@@ -94,14 +87,16 @@ def freq_substr_corr_p_values(corr_dir, substr, freq):
         for filename in os.listdir(substr_folder_path):
             if not filename.endswith("spearmanr.csv") or filename.startswith('._'):
                 continue
-
-            # Read correlation and p-value tables
-            correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
-            pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'spearman_pvals')))
+                
+            # without changing the name of correlation_table, replace this with the lateralised spec table
+            # then average over the band frequencies to have 153 lateralised powers per band
+            # # Read correlation and p-value tables
+            # correlation_table = pd.read_csv(os.path.join(substr_folder_path, filename))
+            # pvals_table = pd.read_csv(os.path.join(substr_folder_path, filename.replace('spearmanr', 'spearman_pvals')))
             
-            # Get the correlation value for the desired frequency
-            correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
-            p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
+            # # Get the correlation value for the desired frequency
+            # correlation_value = correlation_table.loc[correlation_table['Unnamed: 0'] == freq, '0'].values[0]
+            # p_value = pvals_table.loc[pvals_table['Unnamed: 0'] == freq, '0'].values[0]
 
             # Update the corresponding lists
             if is_magnetometer:
@@ -135,7 +130,6 @@ fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-s
 # List of the things for which you want topoplots
 substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu']
 freqs = np.arange(1,40,1)
-#freqs=[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,60,60.5,61,61.5,62,62.5,63,63.5,64,64.5,110,110.5,111,111.5,112]
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all frequencies dfs
 correlations_dfs_grad = {}
