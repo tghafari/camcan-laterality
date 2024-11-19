@@ -318,14 +318,16 @@ for sensor_idx, file_name in enumerate(sensor_files):
     # Convert column names to float for proper comparison
     table.columns = table.columns.astype(float)
 
+    # Ensure alignment of indices between `band_tables` and `table`
+    if not band_tables["Delta"].index.equals(subject_ids):
+        print(f"Aligning indices for {file_name}")
+        subject_ids = subject_ids.reset_index(drop=True)
+
     # Loop over frequency bands and compute the averages
     for band, (low, high) in freq_bands.items():
         # Select columns corresponding to the frequency range
         freq_cols = table.loc[:, (table.columns >= low) & (table.columns < high)]
-        # Average over the selected frequencies
-        band_tables[band][sensor_name] = freq_cols.mean(axis=1)
-
-# Add subject IDs back to each table
-for band, table in band_tables.items():
-    table.insert(0, "Subject_ID", subject_ids)
-
+        # Average over the selected frequencies and assign to the corresponding column
+        band_tables[band].loc[:, sensor_name] = freq_cols.mean(axis=1).values
+        table_fname = op.join(deriv_dir, f'lateralized_index/{band}_lateralised_power_allsens_subtraction_nonoise.csv')
+        band_tables[band].to_csv(table_fname, index=False)
