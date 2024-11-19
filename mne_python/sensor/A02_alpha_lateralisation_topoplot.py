@@ -255,3 +255,77 @@ for f, freq in enumerate(freqs):
     #plt.savefig(op.join(correlation_path, f'{band}_correlations.tiff'), format='tiff', dpi=300)
     plt.savefig(op.join(fig_output_dir, substr, f'{freq}_correlations.jpg'), format='jpg', dpi=300)
     plt.close()
+
+
+
+
+
+
+# Let's hear from chatGPT
+import numpy as np
+import pandas as pd
+import mne
+import os
+import os.path as op
+import matplotlib.pyplot as plt
+
+# Define frequency bands
+freq_bands = {
+    "Delta": (1, 4),
+    "Theta": (4, 8),
+    "Alpha": (8, 12),
+    "Beta": (12, 30)
+}
+
+            
+platform = 'mac'
+# Define where to read and write the data
+if platform == 'bluebear':
+    rds_dir = '/rds/projects/q/quinna-camcan'
+    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+elif platform == 'mac':
+    rds_dir = '/Volumes/quinna-camcan'
+    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+
+# Define directories 
+deriv_dir = op.join(rds_dir, 'derivatives/meg/sensor') 
+lat_dir = op.join(deriv_dir, 'lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise')
+
+# Load the first file to extract the number of subjects
+sample_file = op.join(lat_dir, sorted(os.listdir(lat_dir))[10])
+subject_ids = pd.read_csv(sample_file)['Unnamed: 0']
+
+# Initialize empty DataFrames for each frequency band with sensor names as columns
+band_tables = {
+    band: pd.DataFrame(index=subject_ids, 
+                       columns=[file_name[8:-4] for file_name in os.listdir(lat_dir) if file_name.startswith('MEG')])
+        for band in freq_bands
+    }
+
+# Process all sensor pair CSV files
+sensor_files = sorted(os.listdir(lat_dir))  # Ensure files are processed in order
+for sensor_idx, file_name in enumerate(sensor_files):
+    if not file_name.startswith('MEG') or file_name.startswith('._'):
+        continue
+
+    sensor_name = file_name[8:-4]
+    file_path = op.join(lat_dir, file_name)
+    # Load the table (589 rows x 240 columns) and set 'Unnamed: 0' as the index
+    table = pd.read_csv(file_path)
+    subject_ids = table['Unnamed: 0']  # Extract subject IDs
+    table = table.drop(columns=["Unnamed: 0"])  # Drop the non-frequency column
+
+    # Convert column names to float for proper comparison
+    table.columns = table.columns.astype(float)
+
+    # Loop over frequency bands and compute the averages
+    for band, (low, high) in freq_bands.items():
+        # Select columns corresponding to the frequency range
+        freq_cols = table.loc[:, (table.columns >= low) & (table.columns < high)]
+        # Average over the selected frequencies
+        band_tables[band][sensor_name] = freq_cols.mean(axis=1)
+
+# Add subject IDs back to each table
+for band, table in band_tables.items():
+    table.insert(0, "Subject_ID", subject_ids)
+
