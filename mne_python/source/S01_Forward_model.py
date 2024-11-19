@@ -103,6 +103,11 @@ elif space == 'volume':
                                         subjects_dir=fs_sub_dir,
                                         surface=surface,
                                         mri='T1.mgz',
+                                        #pos=5.0,  # default-  Positions to use for sources. 
+                                        # If float, a grid will be constructed
+                                        # with the spacing given by ``pos`` in mm, 
+                                        # generating a volume source
+                                        # space.
                                         verbose=True,
                                         # gridstep=gridstep,  # apparently removed in 1.8.0
                                         mindist=mindist)

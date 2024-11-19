@@ -276,7 +276,7 @@ sc = ax.scatter(
     ordered_right_positions[:, 2],  # z-coordinates
     c=lateralised_power_arr,        # color by lateralised power
     cmap='coolwarm',                # color map
-    label='Right Hemisphere', 
+    label='Source lateralised power', 
     alpha=0.6,
     s=50                            # size of points
 )
@@ -293,23 +293,70 @@ plt.title('Lateralised Power on Right Hemisphere Grid Points')
 plt.legend()
 plt.show()
 
-# Step 6: Plot time courses for each hemisphere
+# Create a volume estimate 
+"""Create an mne.VolSourceEstimate object for lateralised_power_arr, 
+ensuring the data structure is correctly formatted"""
+
+# Step 1: Prepare the data and vertices
+# `lateralised_power_arr` is converted to a (n_sources, n_times) array where n_times=1 for a static plot
+lateralised_power_arr_2d = lateralised_power_arr[:, np.newaxis]  # Shape (n_sources, n_times)
+
+# Ensure the vertices correspond to the dipole indices in the right hemisphere
+# Note: MNE expects the vertices to be split per sub-volume or hemisphere, so use [np.array(right_indices)]
+vertices = [np.array(ordered_right_indices)]  # Right hemisphere indices
+
+# Step 2: Create a VolSourceEstimate object
 stc_lateral_power = mne.VolSourceEstimate(
-    data=lateralised_power_arr[:, np.newaxis],  # Shape (n_sources, n_times); here, n_times=1 for static plot
-    vertices=[ordered_right_indices],  # Left empty for left hemisphere
+    data=lateralised_power_arr_2d,  # Shape (n_sources, n_times)
+    vertices=vertices,             # Dipole indices
+    tmin=0,                        # Start time of the estimate (static here)
+    tstep=1,                       # Time step (irrelevant for static data)
+    subject=fs_sub                 # Subject name from FreeSurfer
+)
+
+# Step 3: Plot the lateralized power on the brain
+# The plot function requires a source space object, typically from the forward model
+stc_lateral_power.plot(
+    src=forward["src"],            # Source space from forward model
+    subject=fs_sub,                # FreeSurfer subject
+    subjects_dir=fs_sub_dir,       # Directory of FreeSurfer subjects
+    mode='stat_map',               # Use statistical map to represent data
+    colorbar=True,                 # Show color bar for lateralized power
+    verbose=True
+)
+
+# Step 1: Prepare the data
+# Initialize an empty array with zeros for all dipoles in the source space
+n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total dipoles
+n_times = 1  # Single time point for static data
+lateralised_power_full = np.zeros((n_dipoles_in_src, n_times))
+
+# Map the lateralized power data to the appropriate dipole indices
+# Get the right hemisphere vertex indices
+right_hemisphere_vertices = forward['src'][0]['vertno']
+vertex_map = {v: i for i, v in enumerate(right_hemisphere_vertices)}
+
+# Fill the lateralized power data into the appropriate indices
+for i, index in enumerate(ordered_right_indices):
+    if index in vertex_map:  # Ensure the index exists in the right hemisphere
+        lateralised_power_full[vertex_map[index], 0] = lateralised_power_arr[i]
+
+# Step 2: Create the VolSourceEstimate object
+vertices = [np.array(forward['src'][0]['vertno']), np.array(forward['src'][1]['vertno'])]  # LH and RH vertices
+stc_lateral_power = mne.VolSourceEstimate(
+    data=lateralised_power_full,
+    vertices=vertices,
     tmin=0,
     tstep=1,
     subject=fs_sub
 )
 
-# Step 6: Plot the lateralized power on the brain's right hemisphere - BaseSourceSpace can only be initiated by end user (not VolSourceSpace)
+# Step 3: Plot the lateralized power on the brain
 stc_lateral_power.plot(
     src=forward["src"],
     subject=fs_sub,
     subjects_dir=fs_sub_dir,
     mode='stat_map',
-    # hemi='rh',  # Right hemisphere
-    colorbar=True
+    colorbar=True,
+    verbose=True
 )
-
-
