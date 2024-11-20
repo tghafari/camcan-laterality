@@ -48,7 +48,7 @@ mag_stc_extension = f'mag_stc_multitaper_{fr_band}'
 grad_stc_extension = f'grad_stc_multitaper_{fr_band}'
 label_fname = 'aparc+aseg.mgz'
 
-platform = 'mac'  # are you running on bluebear or mac?
+platform = 'bluebear'  # are you running on bluebear or mac?
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -115,6 +115,8 @@ left_positions = []
 right_positions = []
 left_indices = []
 right_indices = []
+left_reg_indices = []
+right_reg_indices = []
 
 for region_idx, indices in enumerate(grid_indices[0]):
     print(f'{region_idx}')
@@ -124,10 +126,12 @@ for region_idx, indices in enumerate(grid_indices[0]):
         left_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
         left_positions.append(pos)
         left_indices.append(indices)
+        left_reg_indices.append(region_idx)
     elif pos[0] > 0:  # x > 0 is right hemisphere
         right_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
         right_positions.append(pos)
         right_indices.append(indices)
+        right_reg_indices.append(region_idx)
 
 # Plot the in-use grid positions
 # Convert lists to numpy arrays for easy manipulation
@@ -177,6 +181,8 @@ ordered_right_positions = []
 ordered_left_positions = []
 ordered_right_indices = []
 ordered_left_indices = []
+ordered_right_region_indices = []  # for later creating the volume source estimate
+ordered_left_region_indices = []
 distances = []
 
 # List to keep track of which indices have already been selected in left_positions
@@ -193,8 +199,6 @@ for i, right_pos in enumerate(right_positions):
 
     # Iterate over all left positions to find the closest match
     for j, left_pos in enumerate(left_positions):
-        # if j in used_left_indices:
-        #     continue  # Skip if the left position has already been assigned - not necessary
 
         # Calculate Euclidean distance
         distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 
@@ -212,7 +216,9 @@ for i, right_pos in enumerate(right_positions):
         ordered_right_positions.append(right_pos)
         ordered_left_positions.append(left_positions[closest_left_index])
         ordered_right_indices.append(right_indices[i])
+        ordered_right_region_indices.append(right_reg_indices[i])
         ordered_left_indices.append(left_indices[closest_left_index])
+        ordered_left_region_indices.append(left_reg_indices[closest_left_index])
         distances.append(min_distance)
 
         # Mark this left position as used
@@ -227,6 +233,8 @@ ordered_right_positions = np.array(ordered_right_positions)
 ordered_left_positions = np.array(ordered_left_positions)
 ordered_right_indices = np.array(ordered_right_indices)
 ordered_left_indices = np.array(ordered_left_indices)
+ordered_right_region_indices = np.array(ordered_right_region_indices)
+ordered_left_region_indices = np.array(ordered_left_region_indices)
 
 # Step 3: Reorder time courses based on the ordered indices
 ordered_right_time_courses = [right_hemisphere_time_courses[right_indices.index(idx)] for idx in ordered_right_indices]
@@ -297,52 +305,22 @@ plt.show()
 """Create an mne.VolSourceEstimate object for lateralised_power_arr, 
 ensuring the data structure is correctly formatted"""
 
-# Step 1: Prepare the data and vertices
-# `lateralised_power_arr` is converted to a (n_sources, n_times) array where n_times=1 for a static plot
-lateralised_power_arr_2d = lateralised_power_arr[:, np.newaxis]  # Shape (n_sources, n_times)
-
-# Ensure the vertices correspond to the dipole indices in the right hemisphere
-# Note: MNE expects the vertices to be split per sub-volume or hemisphere, so use [np.array(right_indices)]
-vertices = [np.array(ordered_right_indices)]  # Right hemisphere indices
-
-# Step 2: Create a VolSourceEstimate object
-stc_lateral_power = mne.VolSourceEstimate(
-    data=lateralised_power_arr_2d,  # Shape (n_sources, n_times)
-    vertices=vertices,             # Dipole indices
-    tmin=0,                        # Start time of the estimate (static here)
-    tstep=1,                       # Time step (irrelevant for static data)
-    subject=fs_sub                 # Subject name from FreeSurfer
-)
-
-# Step 3: Plot the lateralized power on the brain
-# The plot function requires a source space object, typically from the forward model
-stc_lateral_power.plot(
-    src=forward["src"],            # Source space from forward model
-    subject=fs_sub,                # FreeSurfer subject
-    subjects_dir=fs_sub_dir,       # Directory of FreeSurfer subjects
-    mode='stat_map',               # Use statistical map to represent data
-    colorbar=True,                 # Show color bar for lateralized power
-    verbose=True
-)
-
 # Step 1: Prepare the data
 # Initialize an empty array with zeros for all dipoles in the source space
-n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total dipoles
+n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total in-use dipoles
 n_times = 1  # Single time point for static data
 lateralised_power_full = np.zeros((n_dipoles_in_src, n_times))
 
-# Map the lateralized power data to the appropriate dipole indices
-# Get the right hemisphere vertex indices
-right_hemisphere_vertices = forward['src'][0]['vertno']
-vertex_map = {v: i for i, v in enumerate(right_hemisphere_vertices)}
+# Fill the right side of the vol estimate with lateralised powers
+for i, index in enumerate(ordered_right_region_indices):
+    lateralised_power_full[index, 0] = lateralised_power_arr[i]
 
-# Fill the lateralized power data into the appropriate indices
-for i, index in enumerate(ordered_right_indices):
-    if index in vertex_map:  # Ensure the index exists in the right hemisphere
-        lateralised_power_full[vertex_map[index], 0] = lateralised_power_arr[i]
+for i, index in enumerate(ordered_left_region_indices):
+    lateralised_power_full[index, 0] = np.nan
 
 # Step 2: Create the VolSourceEstimate object
-vertices = [np.array(forward['src'][0]['vertno']), np.array(forward['src'][1]['vertno'])]  # LH and RH vertices
+vertices = [np.array(forward['src'][0]['vertno'])]
+
 stc_lateral_power = mne.VolSourceEstimate(
     data=lateralised_power_full,
     vertices=vertices,
