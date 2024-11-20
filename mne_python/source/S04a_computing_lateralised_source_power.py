@@ -1,6 +1,6 @@
 """
 ===============================================
-S04. Calculate source lateralisation
+S04a. Calculate source lateralisation
 
 This script will read the source time
 courses (calculated in S02 or S03) and
@@ -48,7 +48,7 @@ mag_stc_extension = f'mag_stc_multitaper_{fr_band}'
 grad_stc_extension = f'grad_stc_multitaper_{fr_band}'
 label_fname = 'aparc+aseg.mgz'
 
-platform = 'bluebear'  # are you running on bluebear or mac?
+platform = 'mac'  # are you running on bluebear or mac?
 # Define where to read and write the data
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
@@ -191,6 +191,7 @@ used_left_indices = set()
 # Step 2: Match each right position to the closest corresponding left position
 for i, right_pos in enumerate(right_positions):
     # Flip the x-coordinate to find the corresponding left position
+    print(f'Reading {i}th grid position')
     corresponding_left_pos = (-right_pos[0], right_pos[1], right_pos[2])
 
     # Calculate the distance between corresponding_left_pos and all left positions
@@ -311,12 +312,10 @@ n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total in-u
 n_times = 1  # Single time point for static data
 lateralised_power_full = np.zeros((n_dipoles_in_src, n_times))
 
-# Fill the right side of the vol estimate with lateralised powers
+# Fill the right side of the vol estimate with lateralised powers (left side is all zero)
 for i, index in enumerate(ordered_right_region_indices):
     lateralised_power_full[index, 0] = lateralised_power_arr[i]
 
-for i, index in enumerate(ordered_left_region_indices):
-    lateralised_power_full[index, 0] = np.nan
 
 # Step 2: Create the VolSourceEstimate object
 vertices = [np.array(forward['src'][0]['vertno'])]
