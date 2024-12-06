@@ -159,7 +159,7 @@ coreg = mne.coreg.Coregistration(info,
                                  fiducials=fiducials)
 dig_info_before = coreg._info["dig"]
 dig_dict_before = coreg._dig_dict  # save the list of digitalised points in coreg
-trans_before = coreg.trans
+tr1 = coreg.trans
 
 fig = mne.viz.plot_alignment(info, 
                              trans=coreg.trans, 
@@ -170,8 +170,9 @@ fig = mne.viz.plot_alignment(info,
 initial solution before optimization using head shape points"""
 coreg.fit_fiducials(verbose=True)
 dig_info_after_fit_fiducials = coreg._info["dig"]
-dig_dict_after_fit_fiducials = coreg._dig_dict   # save the list of digitalised points in coreg
-trans_after_fit_fiducials = coreg.trans
+dig_dict_after_fit_fiducials = coreg._filtered_extra_points   # save the list of digitalised points in coreg
+tr2 = coreg.trans
+#assert(np.all(tr1 == tr2))  # checked if the trans is different than before- should be and raises assertion error
 
 fig = mne.viz.plot_alignment(info, 
                              trans=coreg.trans, 
@@ -184,8 +185,11 @@ coreg.fit_icp(n_iterations=20,
               nasion_weight=1., 
               verbose=True)
 dig_info_after_fit_icp = coreg._info["dig"]
-dig_dict_after_fit_icp = coreg._dig_dict  # save the list of digitalised points in coreg
+dig_dict_after_fit_icp = coreg._filtered_extra_points  # save the list of digitalised points in coreg
 trans_after_fit_icp = coreg.trans
+tr3 = coreg.trans
+assert(np.all(tr2 == tr3))
+
 
 fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 
@@ -193,8 +197,11 @@ fig = mne.viz.plot_alignment(info, trans=coreg.trans, **plot_kwargs)
 """ we now remove the points that are not on the scalp"""
 coreg.omit_head_shape_points(distance=5/1000)  # distance is in meters- try smaller distances
 dig_info_after_omit_head_points = coreg._info["dig"]
-dig_dict_after_omit_head_points = coreg._dig_dict   # save the list of digitalised points in coreg
-trans_after_omit_head_points = coreg.trans
+dig_dict_after_omit_head_points = coreg._filtered_extra_points # save the list of digitalised points in coreg
+tr4 = coreg.trans
+assert(np.all(tr3 == tr4))   # checked if the trans is different than before- should not be and no error
+
+
 fig = mne.viz.plot_alignment(info, 
                             trans=coreg.trans, 
                             **plot_kwargs)
@@ -204,8 +211,12 @@ coreg.fit_icp(n_iterations=20,
               nasion_weight=10., 
               verbose=True)
 dig_info_after_final_fit_icp = coreg._info["dig"]
-dig_dict_after_final_fit_icp = coreg._dig_dict  # save the list of digitalised points in coreg
-trans_after_final_fit_icp = coreg.trans
+dig_dict_after_final_fit_icp = coreg._dig_dict["hsp"][coreg._extra_points_filter]  # save the list of digitalised points in coreg
+tr5 = coreg.trans
+assert(np.all(tr4 == tr5)) # checked if the trans is different than before- should be and raises assertion error
+"""this shows the coregistration process is being done correctly, the visualisation doesn't
+take into account the head shape points that are excluded and therefore show all of them. This isn't
+an issue with coregistration."""
 
 coreg_fig = mne.viz.plot_alignment(info, 
                                    trans=coreg.trans, 
