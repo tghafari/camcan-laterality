@@ -64,13 +64,19 @@ def construct_paths(subject_id, paths, fr_band, space):
         "mag_cov": op.join(deriv_folder, f"{fs_sub[:-4]}_mag_cov_{fr_band}.fif"),
         "grad_cov": op.join(deriv_folder, f"{fs_sub[:-4]}_grad_cov_{fr_band}.fif"),
         "forward_model": op.join(deriv_folder, f"{fs_sub[:-4]}_fwd-{space}.fif"),
+        "mag_plot_fname": op.join(deriv_folder, f"{subject_id}_mag_{fr_band}_{space}.png"),
+        "grad_plot_fname": op.join(deriv_folder, f"{subject_id}_grad_{fr_band}_{space}.png"),
     }
 
-def save_plot(stc, file_name, **kwargs):
+def save_plot(stc, file_name, space, **kwargs):
     """
     Save plots of source estimates for visualization.
     """
-    img = stc.plot(**kwargs)
+    if space == "vol":
+        img = stc.plot(mode="stat_map", clim='auto', **kwargs)
+    elif space == "surf":
+        img = stc.plot(smoothing_steps=7, **kwargs)
+
     img.save_image(file_name)
 
 def process_subject(subject_id, fr_band, space, paths):
@@ -78,14 +84,15 @@ def process_subject(subject_id, fr_band, space, paths):
     Process a single subject for a given frequency band and space.
     """
     paths_subject = construct_paths(subject_id, paths, fr_band, space)
-    
+    reg = 0.01  # defined here for easier modifications
+
     print(f"Processing subject: {subject_id}, Frequency band: {fr_band}, Space: {space}")
     
     # Load filtered epochs and covariance matrices
     mags = mne.read_epochs(paths_subject["mag_filtered"], preload=True, proj=False)
     grads = mne.read_epochs(paths_subject["grad_filtered"], preload=True, proj=False)
-    common_cov_mag = mne.read_cov(paths_subject["mag_cov"])
-    common_cov_grad = mne.read_cov(paths_subject["grad_cov"])
+    common_cov_mag = mne.read_cov(paths_subject["mag_cov"], verbose=None)
+    common_cov_grad = mne.read_cov(paths_subject["grad_cov"], verbose=None)
     
     # Compute rank
     rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind="relative", proj=False)
@@ -94,43 +101,50 @@ def process_subject(subject_id, fr_band, space, paths):
     # Read forward model
     forward = mne.read_forward_solution(paths_subject["forward_model"])
     
+    print('Making filter and apply LCMV')
     # Create and apply LCMV for magnetometers
     filters_mag = make_lcmv(
-        mags.info,
-        forward,
-        common_cov_mag,
-        reg=0.05,
-        rank=rank_mag,
-        pick_ori="max-power",
-        reduce_rank=True,
-        weight_norm="unit-noise-gain",
-    )
+                    mags.info,
+                    forward,
+                    common_cov_mag,
+                    reg=reg,
+                    noise_cov=None, 
+                    rank=rank_mag,
+                    pick_ori="max-power",
+                    reduce_rank=True,
+                    depth=None,
+                    inversion='matrix',
+                    weight_norm="unit-noise-gain",
+                    )
     stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
     
     # Create and apply LCMV for gradiometers
     filters_grad = make_lcmv(
-        grads.info,
-        forward,
-        common_cov_grad,
-        reg=0.05,
-        rank=rank_grad,
-        pick_ori="max-power",
-        reduce_rank=True,
-        weight_norm="unit-noise-gain",
-    )
+                    grads.info,
+                    forward,
+                    common_cov_grad,
+                    reg=reg,
+                    noise_cov=None, 
+                    rank=rank_grad,
+                    pick_ori="max-power",
+                    reduce_rank=True,
+                    depth=None,
+                    inversion='matrix',
+                    weight_norm="unit-noise-gain",
+                    )
     stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
     
     # Save plots
     plot_kwargs = dict(
         src=forward["src"],
-        subject=f"sub-CC{subject_id}_T1w",
+        subject=paths_subject["fs_sub"],
         subjects_dir=paths["fs_sub_dir"],
         initial_time=0.087,
         verbose=True,
     )
     
-    save_plot(stc_mag, op.join(paths["deriv_folder_source"], f"{subject_id}_mag_{fr_band}_{space}.png"), **plot_kwargs)
-    save_plot(stc_grad, op.join(paths["deriv_folder_source"], f"{subject_id}_grad_{fr_band}_{space}.png"), **plot_kwargs)
+    save_plot(stc_mag, paths_subject["grad_plot_fname"], **plot_kwargs)
+    save_plot(stc_grad, paths_subject["grad_plot_fname"], **plot_kwargs)
 
 def main():
     """
@@ -139,8 +153,12 @@ def main():
     platform = "mac"  # Change to your platform
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths["info_dir"])
-    frequency_bands = {"delta": (1, 4), "theta": (4, 8), "alpha": (8, 12), "beta": (12, 30), "gamma": (30, 60)}
-    space = "volume"  # Adjust spaces as needed- "volume" or "surface"
+    frequency_bands = {"delta": (1, 4), 
+                       "theta": (4, 8), 
+                       "alpha": (8, 12), 
+                       "beta": (12, 30), 
+                       "gamma": (30, 60)}
+    space = "vol"  # Adjust spaces as needed- "vol" or "surf"
     
     for subject_id in good_subjects.index:
         for fr_band, (fmin, fmax) in frequency_bands.items():
