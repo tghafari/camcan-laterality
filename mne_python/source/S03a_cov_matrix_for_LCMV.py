@@ -1,175 +1,145 @@
 """
 ===============================================
-S03a. Preparationg for LCMV
+S03a. Preparation for LCMV
 
-This script reads in the epochs and does
-band pass filter to the oscillatory band of 
-interest. Then computes common covariance
-matrix and saves both filtered and common
-cov. 
-These outputs will then be used by S03b 
-for LCMV.
+This script reads in epochs and band-pass filters them
+to the oscillatory band of interest. It then computes 
+a common covariance matrix and saves both the filtered 
+epochs and covariance matrix. These outputs will be used 
+in S03b for LCMV.
+
+Updates:
+- Modularized code with reusable functions
+- Support for all frequency bands
+- Runs for all subjects listed in the demographics file
+- Skips subjects if outputs already exist
 
 written by Tara Ghafari
-==============================================
-ToDos:
-    1) 
-    
-Issues/ contributions to community:
-    1) 
-    
-Questions:
-    1)
-
-Notes:
-    Step 1: Computing source space
-    Step 2: Forward model
-
+===============================================
 """
 
 import os.path as op
 import pandas as pd
-import matplotlib.pyplot as plt
-
 import mne
 from mne.cov import compute_covariance
 
-def calculate_spectral_power(epochs, n_fft, fmin, fmax):
-    """
-    The data are divided into sections being 2 s long. 
-      (n_fft = 500 samples) with a 1 s overlap 
-      (250 samples). This results in a 0.5 Hz 
-      resolution Prior to calculating the FFT of each 
-      section a Hamming taper is multiplied.
-      n_fft=500, fmin=1, fmax=60"""
+# Utility functions
+def setup_paths(platform='mac'):
+    """Set up file paths for the given platform."""
+    if platform == 'bluebear':
+        rds_dir = '/rds/projects/q/quinna-camcan'
+    elif platform == 'mac':
+        rds_dir = '/Volumes/quinna-camcan'
+    else:
+        raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
-   # define constant parameters
-    welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft, n_overlap=int(n_fft/2))
+    return {
+        'rds_dir': rds_dir,
+        'epoched_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50'),
+        'info_dir': op.join(rds_dir, 'dataman/data_information'),
+        'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
+        'meg_source_dir': op.join(rds_dir, 'derivatives/meg/source/freesurfer'),
+        'filtered_epo_dir': op.join(rds_dir, 'derivatives/meg/sensor/filtered'),
+        'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat')
+    }
 
-    # calculate power spectrum for right and left sensors separately
-    """the returned array will have the same
-      shape as the input data plus an additional frequency dimension"""
-    epochspectrum = epochs.compute_psd(method='welch',  
-                                        **welch_params,
-                                        n_jobs=30,
+def load_subjects(good_sub_sheet):
+    """Load subject IDs from the demographics CSV file."""
+    good_subject_pd = pd.read_csv(good_sub_sheet)
+    return good_subject_pd.set_index('Unnamed: 0')
+
+def construct_paths(subjectID, paths, fr_band):
+    """Construct file paths for a given subject and frequency band."""
+    fs_sub = f'sub-CC{subjectID}_T1w'
+    deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
+    deriv_folder_sensor = paths['filtered_epo_dir']
+    
+    return {
+        'epoched_fname': op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif'),
+        'mag_filtered_fname': op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_mag_{fr_band}-epo.fif'),
+        'grad_filtered_fname': op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_grad_{fr_band}-epo.fif'),
+        'mag_cov_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_mag_cov_{fr_band}.fif'),
+        'grad_cov_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_grad_cov_{fr_band}.fif')
+    }
+
+def check_existing(paths_dict):
+    """Check if filtered data and covariance already exist."""
+    if op.exists(paths_dict['mag_cov_fname']):
+        print(f"Magnetometer files already exist for {paths_dict['mag_cov_fname']}. Skipping...")
+        return True
+    if op.exists(paths_dict['grad_cov_fname']):
+        print(f"Gradiometer files already exist for {paths_dict['grad_cov_fname']}. Skipping...")
+        return True
+    return False
+
+# Main script
+def process_subject(subjectID, fr_band, paths):
+    """Process a single subject for a given frequency band."""
+    paths_dict = construct_paths(subjectID, paths, fr_band)
+    
+    if check_existing(paths_dict):
+        return  # Skip processing if files already exist
+
+    # Set frequency range for the band
+    freq_bands = {
+        'delta': (1, 4),
+        'theta': (4, 8),
+        'alpha': (8, 12),
+        'beta': (12, 30),
+        'gamma': (30, 60)
+    }
+    if fr_band not in freq_bands:
+        raise ValueError(f"Invalid frequency band: {fr_band}")
+    fmin, fmax = freq_bands[fr_band]
+
+    # Load epochs
+    print(f"Preparing LCMV for subject {subjectID}, band: {fr_band}")
+    epochs = mne.read_epochs(paths_dict['epoched_fname'], preload=True, verbose=True)
+    
+    # Filter epochs to the desired band
+    mags = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("mag")
+    grads = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("grad")
+    
+    # Save filtered data
+    mags.save(paths_dict['mag_filtered_fname'], overwrite=True)
+    grads.save(paths_dict['grad_filtered_fname'], overwrite=True)
+    
+    # Compute covariance matrices
+    print("Calculating covariance matrices...")
+    """compute rank again in the main LCMV file."""
+    rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
+    common_cov_mag = compute_covariance(mags, 
+                                        method='empirical', 
+                                        rank=rank_mag,
+                                        n_jobs=4, 
                                         verbose=True)
+    rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
+    common_cov_grad = compute_covariance(grads, 
+                                         method='empirical', 
+                                        rank=rank_grad,
+                                         n_jobs=4, 
+                                         verbose=True)
+    
 
-    return epochspectrum
+    # Save covariance matrices
+    common_cov_mag.save(paths_dict['mag_cov_fname'], overwrite=True)
+    common_cov_grad.save(paths_dict['grad_cov_fname'], overwrite=True)
+    print(f"Finished processing subject {subjectID}, band: {fr_band}")
 
-# subject info 
-subjectID = '120469'  # FreeSurfer subject name
-fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
-fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
-plotting = True  # if you'd like to plot the outputs or not
+def main():
+    platform = 'mac'  # Change to 'bluebear' if running on a different platform
+    paths = setup_paths(platform)
+    good_subject_pd = load_subjects(paths['good_sub_sheet'])
+    
+    # Iterate over all subjects and frequency bands
+    freq_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
 
-meg_extension = '.fif'
-meg_suffix = 'meg'
-mag_filtered_extension = f'mag_{fr_band}-epo'
-grad_filtered_extension = f'grad_{fr_band}-epo'
-mag_cov_extension = f'mag_cov_{fr_band}'
-grad_cov_extension = f'grad_cov_{fr_band}'
+    for subjectID in good_subject_pd.index:
+        for fr_band in freq_bands:
+            try:
+                process_subject(subjectID, fr_band, paths)
+            except Exception as e:
+                print(f"Error processing subject {subjectID}: {e}")
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
-# Define where to read and write the data
-if platform == 'bluebear':
-    rds_dir = '/rds/projects/q/quinna-camcan'
-    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx'
-elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan'
-    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/Volumes/jenseno-sub2ctx'
-
-epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-info_dir = op.join(rds_dir, 'dataman/data_information')
-fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
-deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
-deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/filtered')
-
-# Read only data from subjects with good preprocessed data
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-good_subject_pd = pd.read_csv(good_sub_sheet)
-good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
-
-if fr_band == 'delta':
-   fmin = 1
-   fmax = 4
-
-elif fr_band == 'theta':
-   fmin = 4
-   fmax = 8
-
-elif fr_band == 'alpha':
-   fmin = 8
-   fmax = 12
-
-elif fr_band == 'beta':
-   fmin = 12
-   fmax = 30
-
-elif fr_band == 'gamma':
-    fmin = 30
-    fmax = 60
-
-else:
-    raise ValueError("Error: 'fr_band' value not valid")
-
-# Read epoched data + baseline correction + define frequency bands
-# for i, subjectID in enumerate(good_subject_pd.index):
-    # Read subjects one by one 
-    # Read forward model
-
-epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
-epoched_fif = op.join(epoched_dir, epoched_fname)
-
-deriv_mag_filtered_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + mag_filtered_extension + meg_extension)
-deriv_grad_filtered_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_filtered_extension + meg_extension)
-deriv_mag_cov_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_cov_extension + meg_extension)
-deriv_grad_cov_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_cov_extension + meg_extension)
-
-    # try:
-    #     print(f'Reading subject # {i}')
-                    
-epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
-if plotting:
-    epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250
-    epochspectrum.plot()
-    epochspectrum.plot_topomap(bands={fr_band:(fmin, fmax)}, ch_type="grad", normalize=True)
-
-print(f"Filtering to {fr_band} and picking grads and mags")
-"""computing lcmv separately for mags and grads as noise_covariance can only be None if
-data is not mixed."""
-mags = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("mag")
-grads = epochs.copy().filter(l_freq=fmin, h_freq=fmax).pick("grad")
-
-# Save mags and grads for later use
-mags.save(deriv_mag_filtered_fname)
-grads.save(deriv_grad_filtered_fname)
-
-print('Calculating rank and the covariance matrix')
-"""compute rank again in the main LCMV file."""
-rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative')
-common_cov_mag = compute_covariance(mags, 
-                                method='empirical',
-                                rank=rank_mag,
-                                n_jobs=4,
-                                verbose=True)
-
-rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative')
-common_cov_grad = compute_covariance(grads, 
-                                method='empirical',
-                                rank=rank_grad,
-                                n_jobs=4,
-                                verbose=True)
-if plotting:
-    common_cov_mag.plot(mags.info)
-    common_cov_grad.plot(grads.info)
-
-    topo_mag_cov = common_cov_mag.plot_topomap(mags.info)
-    topo_mag_cov.suptitle("Common covariance: Magnetometers")
-    topo_grad_cov = common_cov_grad.plot_topomap(grads.info)
-    topo_grad_cov.suptitle("Common covariance: Gradiometers")
-
-# Save the covariance matrices
-common_cov_mag.save(deriv_mag_cov_fname, overwrite=True)
-common_cov_grad.save(deriv_grad_cov_fname, overwrite=True)
+if __name__ == "__main__":
+    main()

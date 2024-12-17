@@ -90,11 +90,11 @@ def process_subject(subjectID, paths, fr_band):
 
     # Define file paths
     fs_sub = f"sub-CC{subjectID}_T1w"
-    epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_{duration}sec_epo.fif')
+    epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif')
     deriv_folder_sensor = paths['deriv_folder_sensor']
     deriv_folder = op.join(paths['deriv_folder'], f'{fs_sub[:-4]}')
-    deriv_mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_mag_epod-epo.fif')
-    deriv_grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_grad_epod-epo.fif')
+    deriv_mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_mag_{duration}sec_epod-epo.fif')
+    deriv_grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_grad_{duration}sec_epod-epo.fif')
     deriv_mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_mag_csd_multitaper_{fr_band}')
     deriv_grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_grad_csd_multitaper_{fr_band}')
 

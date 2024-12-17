@@ -53,10 +53,9 @@ def setup_paths(platform='mac'):
     return paths
 
 def load_subjects(good_sub_sheet):
-    """Load subject IDs from a CSV file."""
+    """Load subject IDs from the demographics CSV file."""
     good_subject_pd = pd.read_csv(good_sub_sheet)
-    good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # Set subject IDs as the index
-    return good_subject_pd
+    return good_subject_pd.set_index('Unnamed: 0')  # Set subject IDs as the index
 
 def create_bem(subject, fs_dir, bem_fname):
     """Create and save a BEM solution for a subject."""
