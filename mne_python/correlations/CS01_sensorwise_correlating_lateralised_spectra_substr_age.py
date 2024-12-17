@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ====================================
-CS01_sensorwise_correlating_lateralised_spectra_substr:
+CS01_sensorwise_correlating_lateralised_spectra_substr_age:
     this script is in use:
     1. reads lateralised indices of one 
     pair of sensors (one csv file)
     from each frequency bin (each folder) into
     one variable called pair_lat_freq
     2. reads lateralised values of each 
-    subcortical structure into hipp/thal_lat
+    subcortical structure into hipp/thal_lat + age
     3. removes the participants without spectra
     or lateralised volume based on the subID 
     column
@@ -102,7 +102,7 @@ substr_lat_df = pd.read_csv(substr_sheet_fname)
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu', 'Age']
 
 for i, row in sensors_layout_names_df.iterrows():
     print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
@@ -125,7 +125,7 @@ for i, row in sensors_layout_names_df.iterrows():
         os.makedirs(output_corr_dir)
  
     # Calculate correlation in each substr
-    for substr in substrs:
+    for substr in substrs[-1]:
         print(f'Working on {substr}')
 
         # Predefine lists

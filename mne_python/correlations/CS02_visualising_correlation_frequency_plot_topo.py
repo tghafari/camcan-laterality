@@ -5,7 +5,7 @@ CS02_correlation_frequency_plot_topo:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
     3. reads csv file of correlation values
-    for all frequencies and all substr
+    for all frequencies and all substr + age
     4. for each substr plots frequencies vs.
     correlation values
     5. draws a line under the correlation values
@@ -51,12 +51,12 @@ raw = mne.io.read_raw_fif(meg_fname)
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu', 'Age']
 
 # Create a placeholder for correlation values of all sensor pairs
 freqs = np.arange(1, 120.5, 0.5)
 
-for substr in substrs:
+for substr in substrs[-1]:
     print(f'working on {substr}')
     correlation_df = pd.DataFrame(index=freqs)  # frequencies of correlations = index of pearsonr_freq_substr_df
 

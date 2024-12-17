@@ -12,14 +12,16 @@ CS04_visualising_correlations_topoplots:
     3. then navigates to each of the sensor
     pair folders 
     4. then inside each of the subcortical
-    structure folders
+    structure/age folders
     5. then opens the correlation table
     6. finds the correlation value for
     the frequency of interest
     7. put it in a list of all correlation
-    values for that substr and all sensor pairs
+    values for that substr/age and all sensor pairs
     8. does the same for p-value
     
+Note: age is considered one column of subcortical 
+structure for easier coding.
 
 Written by Andrew Quinn
 Adapted by Tara Ghafari
@@ -133,7 +135,7 @@ corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-p
 fig_output_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/freqs/subtraction_nonoise_nooutliers-psd')
 
 # List of the things for which you want topoplots
-substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu']
+substrs = ['Thal', 'Puta', 'Pall', 'Amyg', 'Accu', 'Age']
 freqs = np.arange(1,40,1)
 #freqs=[6,6.5,7,7.5,8,8.5,9,9.5,10,10.5,11,11.5,12,12.5,13,13.5,60,60.5,61,61.5,62,62.5,63,63.5,64,64.5,110,110.5,111,111.5,112]
 
