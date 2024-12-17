@@ -32,7 +32,7 @@ def setup_paths(platform='mac'):
         'epoched_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
-        'deriv_folder_sensor': op.join(rds_dir, 'derivatives/meg/sensor/epoched-csd'),
+        'deriv_folder_sensor': op.join(rds_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
         'deriv_folder': op.join(rds_dir, 'derivatives/meg/source/freesurfer')
     }
     return paths
@@ -46,8 +46,8 @@ def load_subjects(good_sub_sheet):
 def get_fr_band_params(fr_band):
     """Return frequency band parameters based on the selected band."""
     bands = {
-        'delta': {'fmin': 1, 'fmax': 4, 'bandwidth': 1., 'duration': 10},
-        'theta': {'fmin': 4, 'fmax': 8, 'bandwidth': 1., 'duration': 5},
+        'delta': {'fmin': 1, 'fmax': 4, 'bandwidth': 1., 'duration': 8},
+        'theta': {'fmin': 4, 'fmax': 8, 'bandwidth': 1., 'duration': 4},
         'alpha': {'fmin': 8, 'fmax': 12, 'bandwidth': 1., 'duration': 2},
         'beta': {'fmin': 12, 'fmax': 30, 'bandwidth': 1., 'duration': 2},
         'gamma': {'fmin': 30, 'fmax': 60, 'bandwidth': 4., 'duration': 1}
@@ -90,7 +90,7 @@ def process_subject(subjectID, paths, fr_band):
 
     # Define file paths
     fs_sub = f"sub-CC{subjectID}_T1w"
-    epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif')
+    epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_{duration}sec_epo.fif')
     deriv_folder_sensor = paths['deriv_folder_sensor']
     deriv_folder = op.join(paths['deriv_folder'], f'{fs_sub[:-4]}')
     deriv_mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_mag_epod-epo.fif')
