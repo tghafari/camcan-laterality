@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 """
 ===============================================
-S02. Using beamformer to localize oscillatory 
+S02b. Using beamformer to localize oscillatory 
 power modulations
 
 This script uses DICS to localize 

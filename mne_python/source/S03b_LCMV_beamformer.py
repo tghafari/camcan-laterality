@@ -1,160 +1,153 @@
+# -*- coding: utf-8 -*-
 """
 ===============================================
-S03. Using beamformer to localize oscillatory 
+S03b. Using beamformer to localize oscillatory 
 power modulations
 
 This script uses LCMV to localize 
-oscillatory power moduations based on spatial
+oscillatory power modulations based on spatial
 filtering (DICS: in frequency domain). 
 
 written by Tara Ghafari
-adapted from flux pipeline
+t.ghafari@bham.ac.uk
 ==============================================
-ToDos:
-    1) 
-    
-Issues/ contributions to community:
-    1) 
-    
-Questions:
-    1)
-
 Notes:
-    Step 1: Computing source space
-    Step 2: Forward model
-
+    - Step 1: Compute source space
+    - Step 2: Forward model
 """
 
 import os.path as op
 import pandas as pd
-
 import mne
 from mne.beamformer import make_lcmv, apply_lcmv_cov
 
+def setup_paths(platform="mac"):
+    """
+    Set up the directory paths based on the platform (mac or bluebear).
+    """
+    if platform == "bluebear":
+        rds_dir = "/rds/projects/q/quinna-camcan"
+    elif platform == "mac":
+        rds_dir = "/Volumes/quinna-camcan"
+    else:
+        raise ValueError("Invalid platform. Choose 'bluebear' or 'mac'.")
+    
+    return {
+        "rds_dir": rds_dir,
+        "epoched_dir": op.join(rds_dir, "derivatives/meg/sensor/epoched-7min50"),
+        "info_dir": op.join(rds_dir, "dataman/data_information"),
+        "fs_sub_dir": op.join(rds_dir, "cc700/mri/pipeline/release004/BIDS_20190411/anat"),
+        "filtered_epo_dir": op.join(rds_dir, "derivatives/meg/sensor/filtered"),
+        "meg_source_dir": op.join(rds_dir, "derivatives/meg/source/freesurfer"),
+    }
 
-# subject info 
-subjectID = '120469'  # FreeSurfer subject name - will go in the below for loop
-fs_sub = f'sub-CC{subjectID}_T1w'  # name of fs folder for each subject
+def load_subjects(info_dir):
+    """
+    Load the list of subjects with good preprocessed data.
+    """
+    good_sub_sheet = op.join(info_dir, "demographics_goodPreproc_subjects.csv")
+    good_subject_pd = pd.read_csv(good_sub_sheet)
+    return good_subject_pd.set_index("Unnamed: 0")
 
-space = 'volume' # which space to use, surface or volume?
-fr_band = 'alpha'  # over which frequency band you'd like to run the inverse model?
+def construct_paths(subject_id, paths, fr_band, space):
+    """
+    Construct file paths for filtered data, covariance matrices, and forward models.
+    note that space can be "vol" or "surf"
+    """
+    fs_sub = f"sub-CC{subject_id}_T1w"
+    deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
+    base_name = op.join(paths["filtered_epo_dir"], f"{fs_sub[:-4]}_")
+    
+    return {
+        "mag_filtered": base_name + f"mag_{fr_band}-epo.fif",
+        "grad_filtered": base_name + f"grad_{fr_band}-epo.fif",
+        "mag_cov": op.join(deriv_folder, f"{fs_sub[:-4]}_mag_cov_{fr_band}.fif"),
+        "grad_cov": op.join(deriv_folder, f"{fs_sub[:-4]}_grad_cov_{fr_band}.fif"),
+        "forward_model": op.join(deriv_folder, f"{fs_sub[:-4]}_fwd-{space}.fif"),
+    }
 
-meg_extension = '.fif'
-meg_suffix = 'meg'
-surf_suffix = 'surf-src'
-vol_suffix = 'vol-src'
-fwd_vol_suffix = 'fwd-vol'
-fwd_surf_suffix = 'fwd-surf'
-mag_filtered_extension = f'mag_{fr_band}-epo'
-grad_filtered_extension = f'grad_{fr_band}-epo'
-mag_cov_extension = f'mag_cov_{fr_band}'
-grad_cov_extension = f'grad_cov_{fr_band}'
+def save_plot(stc, file_name, **kwargs):
+    """
+    Save plots of source estimates for visualization.
+    """
+    img = stc.plot(**kwargs)
+    img.save_image(file_name)
 
-platform = 'mac'  # are you running on bluebear or mac?
-# Define where to read and write the data
-if platform == 'bluebear':
-    rds_dir = '/rds/projects/q/quinna-camcan'
-    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx'
-elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan'
-    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/Volumes/jenseno-sub2ctx'
-
-epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-info_dir = op.join(rds_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-
-# Read only data from subjects with good preprocessed data
-good_subject_pd = pd.read_csv(good_sub_sheet)
-good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
-
-fs_sub_dir = op.join(rds_dir, f'cc700/mri/pipeline/release004/BIDS_20190411/anat')  # FreeSurfer directory (after running recon all)
-deriv_folder = op.join(rds_dir, 'derivatives/meg/source/freesurfer', fs_sub[:-4])
-deriv_folder_sensor = op.join(rds_dir, 'derivatives/meg/sensor/filtered')
-fwd_vol_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_vol_suffix + meg_extension)
-fwd_surf_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + fwd_surf_suffix + meg_extension)
-
-
-# Read epoched data + baseline correction + define frequency bands
-# for i, subjectID in enumerate(good_subject_pd.index):
-    # Read subjects one by one 
+def process_subject(subject_id, fr_band, space, paths):
+    """
+    Process a single subject for a given frequency band and space.
+    """
+    paths_subject = construct_paths(subject_id, paths, fr_band, space)
+    
+    print(f"Processing subject: {subject_id}, Frequency band: {fr_band}, Space: {space}")
+    
+    # Load filtered epochs and covariance matrices
+    mags = mne.read_epochs(paths_subject["mag_filtered"], preload=True, proj=False)
+    grads = mne.read_epochs(paths_subject["grad_filtered"], preload=True, proj=False)
+    common_cov_mag = mne.read_cov(paths_subject["mag_cov"])
+    common_cov_grad = mne.read_cov(paths_subject["grad_cov"])
+    
+    # Compute rank
+    rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind="relative", proj=False)
+    rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind="relative", proj=False)
+    
     # Read forward model
-
-mag_filtered_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + mag_filtered_extension + meg_extension)
-grad_filtered_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_' + grad_filtered_extension + meg_extension)
-mag_cov_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + mag_cov_extension + meg_extension)
-grad_cov_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_' + grad_cov_extension + meg_extension)
-
-    # try:
-    #     print(f'Reading subject # {i}')
-                    
-print('Reading epochs- magnetometers and gradiometers separately')
-mags = mne.read_epochs(mag_filtered_fname, preload=True, verbose=True, proj=False)  
-grads = mne.read_epochs(grad_filtered_fname, preload=True, verbose=True, proj=False)  
-
-print('Compute rank of mags and grads')
-rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
-rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
-
-print('Reading common covariance matrices')
-common_cov_mag = mne.read_cov(mag_cov_fname, verbose=None)
-common_cov_grad = mne.read_cov(grad_cov_fname, verbose=None)
-
-print('Reading forward model')
-if space == 'surface':
-    forward = mne.read_forward_solution(fwd_surf_fname)
-elif space == 'volume':
-    forward = mne.read_forward_solution(fwd_vol_fname)
-
-print('Making filter and apply LCMV')
-filters_mag = make_lcmv(mags.info, 
-                    forward, 
-                    common_cov_mag, 
-                    reg=0.05,  # OSL:reg=0, Ole: 0.05
-                    noise_cov=None,  # OSL: None
-                    rank=rank_mag,  
-                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
-                    reduce_rank=True,
-                    depth=None,  # How to weight (or normalize) the forward using a depth prior.
-                    inversion='matrix',
-                    weight_norm="unit-noise-gain" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
-                    ) 
-stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
-
-filters_grad = make_lcmv(grads.info, 
-                    forward, 
-                    common_cov_grad, 
-                    reg=0.05,  # OSL:reg=0, Ole: 0.05
-                    noise_cov=None,  # OSL: None
-                    rank=rank_grad,  
-                    pick_ori="max-power",  # OSL:pick_ori="max-power-pre-weight-norm"  isn't an original parameter, Ole: 'max-power'
-                    reduce_rank=True,
-                    depth=None,  # How to weight (or normalize) the forward using a depth prior.
-                    inversion='matrix',
-                    weight_norm="unit-noise-gain" # "unit-noise-gain" OSL:weight_norm="unit-noise-gain-invariant", Ole: 'unit-noise-gain', 'nai' when no empty room
-                    ) 
-stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
-
-# Plot source results to confirm
-initial_time = 0.087
-
-if space == 'volume':
-    kwargs = dict(
-        src=forward["src"],
-        subject=fs_sub,  # the FreeSurfer subject name
-        subjects_dir=fs_sub_dir,  # the path to the directory containing the FreeSurfer subjects reconstructions.
-        initial_time=initial_time,
-        verbose=True,
-        )
-    stc_mag.plot(mode="stat_map", clim='auto', **kwargs)
-    stc_grad.plot(mode="stat_map", clim='auto', **kwargs)
-elif space == 'surface':
-    lims = [0.3, 0.45, 0.6]
-    brain = stc_grad.plot(
-        src=forward["src"],
-        subject=fs_sub, 
-        subjects_dir=fs_sub_dir,
-        initial_time=initial_time,
-        smoothing_steps=7,
+    forward = mne.read_forward_solution(paths_subject["forward_model"])
+    
+    # Create and apply LCMV for magnetometers
+    filters_mag = make_lcmv(
+        mags.info,
+        forward,
+        common_cov_mag,
+        reg=0.05,
+        rank=rank_mag,
+        pick_ori="max-power",
+        reduce_rank=True,
+        weight_norm="unit-noise-gain",
     )
+    stc_mag = apply_lcmv_cov(common_cov_mag, filters_mag)
+    
+    # Create and apply LCMV for gradiometers
+    filters_grad = make_lcmv(
+        grads.info,
+        forward,
+        common_cov_grad,
+        reg=0.05,
+        rank=rank_grad,
+        pick_ori="max-power",
+        reduce_rank=True,
+        weight_norm="unit-noise-gain",
+    )
+    stc_grad = apply_lcmv_cov(common_cov_grad, filters_grad)
+    
+    # Save plots
+    plot_kwargs = dict(
+        src=forward["src"],
+        subject=f"sub-CC{subject_id}_T1w",
+        subjects_dir=paths["fs_sub_dir"],
+        initial_time=0.087,
+        verbose=True,
+    )
+    
+    save_plot(stc_mag, op.join(paths["deriv_folder_source"], f"{subject_id}_mag_{fr_band}_{space}.png"), **plot_kwargs)
+    save_plot(stc_grad, op.join(paths["deriv_folder_source"], f"{subject_id}_grad_{fr_band}_{space}.png"), **plot_kwargs)
+
+def main():
+    """
+    Run the processing for all subjects and all frequency bands.
+    """
+    platform = "mac"  # Change to your platform
+    paths = setup_paths(platform)
+    good_subjects = load_subjects(paths["info_dir"])
+    frequency_bands = {"delta": (1, 4), "theta": (4, 8), "alpha": (8, 12), "beta": (12, 30), "gamma": (30, 60)}
+    space = "volume"  # Adjust spaces as needed- "volume" or "surface"
+    
+    for subject_id in good_subjects.index:
+        for fr_band, (fmin, fmax) in frequency_bands.items():
+            try:
+                process_subject(subject_id, fr_band, space, paths)
+            except Exception as e:
+                print(f"Error processing subject {subject_id}, band {fr_band}, space {space}: {e}")
+
+if __name__ == "__main__":
+    main()
