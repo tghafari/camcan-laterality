@@ -17,8 +17,12 @@ Steps:
 The script supports batch processing for multiple subjects using automatic coregistration 
 and can also handle manual coregistration for specific subjects.
 
+To run this code on all subjects, define the number
+of subjects in main definition and then type
+"python S00_coregistration.py" in an mne environment.
+
 Written by: Tara Ghafari
-Adapted from: Oscar Ferrante
+t.ghafari@bham.ac.uk
 """
 
 import os
@@ -44,7 +48,7 @@ def setup_paths(platform='mac'):
         'epoched_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
-        'anat_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
+        'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
     }
     return paths
 
@@ -110,22 +114,46 @@ def save_coregistration_results(coreg, info, coreg_figname, trans_fname, coreg_p
     mne.write_trans(trans_fname, coreg.trans, overwrite=True)
 
 def process_subject(subjectID, paths, coreg_type='auto'):
-    """Process a single subject: create BEM, perform coregistration, and save results."""
+    """
+    Process a single subject: create BEM, perform coregistration, and save results.
+    Skips processing if coregistration file already exists.
+
+    Parameters:
+    -----------
+    subjectID : str
+        Subject ID to process.
+    paths : dict
+        Dictionary containing paths for directories like 'rds_dir', 'fs_sub_dir', and 'epoched_dir'.
+    coreg_type : str, optional
+        Type of coregistration ('auto' or 'manual'), default is 'auto'.
+
+    Returns:
+    --------
+    None
+    """
+
     try:
         print(f"Processing subject {subjectID}...")
 
+        # Define subject-specific paths and filenames
         fs_sub = f"sub-CC{subjectID}_T1w"
         deriv_folder = op.join(paths['rds_dir'], 'derivatives/meg/source/freesurfer', fs_sub[:-4])
 
-        if not os.path.exists(deriv_folder):
+        if not op.exists(deriv_folder):
             os.makedirs(deriv_folder)
 
         trans_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_coreg-trans.fif')
+
+        # Check if coregistration file already exists
+        if op.exists(trans_fname):
+            print(f"Coregistration already done for subject {subjectID}, skipping...")
+            return
+
         bem_fname = trans_fname.replace('coreg-trans', 'bem-sol')
         coreg_figname = bem_fname.replace('bem-sol', 'final_coreg').replace('.fif', '.png')
 
         # Create BEM
-        bem = create_bem(fs_sub, paths['anat_dir'], bem_fname)
+        _ = create_bem(fs_sub, paths['fs_sub_dir'], bem_fname)
 
         # Read MEG info
         epoched_fname = f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif'
@@ -133,13 +161,13 @@ def process_subject(subjectID, paths, coreg_type='auto'):
         info = mne.read_epochs(epoched_fif, preload=True, verbose=True).info
 
         # Coregistration
-        coreg = perform_coregistration(info, fs_sub, paths['anat_dir'], 
-                                       auto=(coreg_type == 'auto'))
+        coreg = perform_coregistration(info, fs_sub, paths['fs_sub_dir'], 
+                                    auto=(coreg_type == 'auto'))
 
         # Save results
-        plot_kwargs = dict(subject=fs_sub, subjects_dir=paths['anat_dir'], 
-                           surfaces="head-dense", dig=True, eeg=[], meg='sensors', 
-                           show_axes=True, coord_frame='meg')
+        plot_kwargs = dict(subject=fs_sub, subjects_dir=paths['fs_sub_dir'], 
+                        surfaces="head-dense", dig=True, eeg=[], meg='sensors', 
+                        show_axes=True, coord_frame='meg')
         save_coregistration_results(coreg, info, coreg_figname, 
                                     trans_fname, plot_kwargs)
 
