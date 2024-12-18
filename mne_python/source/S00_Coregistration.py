@@ -19,7 +19,7 @@ and can also handle manual coregistration for specific subjects.
 
 To run this code on all subjects, define the number
 of subjects in main definition and then type
-"python S00_coregistration.py" in an mne environment.
+"python S00_Coregistration.py" in an mne environment.
 
 Written by: Tara Ghafari
 t.ghafari@bham.ac.uk
@@ -65,7 +65,7 @@ def create_bem(subject, fs_dir, bem_fname):
     mne.write_bem_solution(bem_fname, bem, overwrite=True)
     return bem
 
-def perform_coregistration(info, fs_sub, fs_dir, auto=True):
+def perform_coregistration(info, fs_sub, fs_dir, trans_fname, auto=True):
     """Perform coregistration (automatic or manual)."""
     fiducials = "estimated" if auto else None
     coreg = mne.coreg.Coregistration(info, subject=fs_sub, subjects_dir=fs_dir, fiducials=fiducials)
@@ -77,6 +77,10 @@ def perform_coregistration(info, fs_sub, fs_dir, auto=True):
         coreg.fit_icp(n_iterations=20, nasion_weight=10.0)
         tr2 = coreg.trans
 
+        # Save transformation file
+        print("wiritng trans file")
+        mne.write_trans(trans_fname, coreg.trans, overwrite=True)
+
         # Before saving the trans file check if second fit icp is doing something.
         print(f"{tr1} \n{tr2}")  # Check if the transformation matrix is valid
 
@@ -84,7 +88,7 @@ def perform_coregistration(info, fs_sub, fs_dir, auto=True):
         mne.gui.coregistration(subject=fs_sub, subjects_dir=fs_dir)
     return coreg
 
-def save_coregistration_results(coreg, info, coreg_figname, trans_fname, coreg_plot_kwargs):
+def plot_coregistration_results(coreg, info, coreg_figname, coreg_plot_kwargs):
     """Save coregistration results: screenshots and transformation files."""
     # Visualize final coregistration
     coreg_fig = mne.viz.plot_alignment(info, trans=coreg.trans, **coreg_plot_kwargs)
@@ -109,10 +113,7 @@ def save_coregistration_results(coreg, info, coreg_figname, trans_fname, coreg_p
 
     coreg_fig.plotter.close()
 
-    # Save transformation file
-    mne.write_trans(trans_fname, coreg.trans, overwrite=True)
-
-def process_subject(subjectID, paths, coreg_type='auto'):
+def process_subject(subjectID, paths, coreg_type='auto', platform='mac'):
     """
     Process a single subject: create BEM, perform coregistration, and save results.
     Skips processing if coregistration file already exists.
@@ -161,28 +162,29 @@ def process_subject(subjectID, paths, coreg_type='auto'):
 
         # Coregistration
         coreg = perform_coregistration(info, fs_sub, paths['fs_sub_dir'], 
-                                    auto=(coreg_type == 'auto'))
+                                       trans_fname, auto=(coreg_type == 'auto'))
 
-        # Save results
-        plot_kwargs = dict(subject=fs_sub, subjects_dir=paths['fs_sub_dir'], 
-                        surfaces="head-dense", dig=True, eeg=[], meg='sensors', 
-                        show_axes=True, coord_frame='meg')
-        save_coregistration_results(coreg, info, coreg_figname, 
-                                    trans_fname, plot_kwargs)
-
+        # plot results
+        if platform == 'mac':  # only plot 3d if on mac (bluebear doesn't support)
+            plot_kwargs = dict(subject=fs_sub, subjects_dir=paths['fs_sub_dir'], 
+                            surfaces="head-dense", dig=True, eeg=[], meg='sensors', 
+                            show_axes=True, coord_frame='meg')
+            plot_coregistration_results(coreg, info, coreg_figname, plot_kwargs)
+        
         print(f"Subject {subjectID} processed successfully.")
 
     except Exception as e:
         print(f"Error processing subject {subjectID}: {e}")
 
 def main():
-    platform = 'mac'  # Change to 'bluebear' if running on BlueBear
+    platform = 'bluebear'  # Change to 'bluebear' if running on BlueBear
     coreg_type = 'auto'  # Change to 'manual' for manual coregistration
     paths = setup_paths(platform)
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
     for subjectID in good_subject_pd.index[1:50]:
-        process_subject(subjectID, paths, coreg_type=coreg_type)
+        process_subject(subjectID, paths, coreg_type=coreg_type, platform=platform)
+
 
 
 if __name__ == "__main__":
