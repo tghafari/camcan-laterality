@@ -86,9 +86,45 @@ def check_existing(file_paths):
         return True
     return False
 
-def compute_lateralisation_index(fs_stc_sensortype, src):
+def morph_subject_to_fsaverage(file_paths, src, sensortype):
+    """ This function brings each subject to fsaverage space
+    for more reliable comparisons later.
+    """
+    fetch_fsaverage(file_paths["fs_sub_dir"])  # ensure fsaverage src exists
+    fname_fsaverage_src = op.join(file_paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+
+    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+    morph = mne.compute_source_morph(
+        src,
+        subject_from=file_paths["fs_sub"],
+        src_to=src_fs,
+        subjects_dir=file_paths["fs_sub_dir"],
+        niter_sdr=[5, 5, 2],
+        niter_affine=[5, 5, 2],
+        zooms='auto',  # just for speed
+        verbose=True,
+    )
+    stc_fs = morph.apply(file_paths[f'{sensortype}_stc'])
+    stc_fs.save(file_paths[f'fsmorph_{sensortype}_stc_fname'], overwrite=True)
+
+    lims = [0.3, 0.45, 0.6]
+    stc_fs.plot(
+        src=src_fs,
+        mode="stat_map",
+        initial_time=0.085,
+        subjects_dir=file_paths["fs_sub_dir"],
+        clim=dict(kind="value", pos_lims=lims),
+        verbose=True,
+    ).savefig(file_paths['stc_fsmorphd_lateral_power_figname'])
+
+    return stc_fs
+
+def compute_hemispheric_index(stc_fs_sensortype, src):
     """Computes lateralisation index from the source time courses.
-    stc_sensortype = stc_grad or stc_mag
+    stc_fs_sensortype = morphed stc_grad or stc_mag into fsaverage 
+        (return of "morph_subject_to_fsaverage")
+    to compute hemispheric grid indices, this code uses 
+    src (not fs_src as it is the same in all subjects) and fs_stc.
     """
     grid_positions = [s['rr'] for s in src]
     grid_indices = [s['vertno'] for s in src]
@@ -108,12 +144,12 @@ def compute_lateralisation_index(fs_stc_sensortype, src):
         pos = grid_positions[0][indices]  # only select in-use positions in the source model
         print(f'{pos}')
         if pos[0] < 0:  # x < 0 is left hemisphere
-            left_hemisphere_time_courses.append(fs_stc_sensortype.data[region_idx, :])
+            left_hemisphere_time_courses.append(stc_fs_sensortype.data[region_idx, :])
             left_positions.append(pos)
             left_indices.append(indices)
             left_reg_indices.append(region_idx)
         elif pos[0] > 0:  # x > 0 is right hemisphere
-            right_hemisphere_time_courses.append(fs_stc_sensortype.data[region_idx, :])
+            right_hemisphere_time_courses.append(stc_fs_sensortype.data[region_idx, :])
             right_positions.append(pos)
             right_indices.append(indices)
             right_reg_indices.append(region_idx)
@@ -323,38 +359,6 @@ def plot_lateralisation(ordered_right_positions, lateralised_power_arr,
         verbose=True
     ).savefig(file_paths['stc_VolEst_lateral_power_figname'])
 
-def morph_subject_to_fsaverage(file_paths, src, sensortype):
-    """ This function brings each subject to fsaverage space
-    for more reliable comparisons later.
-    """
-    fetch_fsaverage(file_paths["fs_sub_dir"])  # ensure fsaverage src exists
-    fname_fsaverage_src = op.join(file_paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
-
-    src_fs = mne.read_source_spaces(fname_fsaverage_src)
-    morph = mne.compute_source_morph(
-        src,
-        subject_from=file_paths["fs_sub"],
-        src_to=src_fs,
-        subjects_dir=file_paths["fs_sub_dir"],
-        niter_sdr=[5, 5, 2],
-        niter_affine=[5, 5, 2],
-        zooms='auto',  # just for speed
-        verbose=True,
-    )
-    stc_fs = morph.apply(file_paths[f'{sensortype}_stc'])
-    stc_fs.save(file_paths[f'fsmorph_{sensortype}_stc_fname'], overwrite=True)
-
-    lims = [0.3, 0.45, 0.6]
-    stc_fs.plot(
-        src=src_fs,
-        mode="stat_map",
-        initial_time=0.085,
-        subjects_dir=file_paths["fs_sub_dir"],
-        clim=dict(kind="value", pos_lims=lims),
-        verbose=True,
-    ).savefig(file_paths['stc_fsmorphd_lateral_power_figname'])
-
-
 def process_subject(subjectID, paths, sensortype, space, fr_band):
     """Processes a single subject for a specific frequency band.
     sensortyep= 'grad' or 'mag' 
@@ -365,15 +369,15 @@ def process_subject(subjectID, paths, sensortype, space, fr_band):
         return
 
     # Read data - add mags
-    stc_sensortype = mne.read_source_estimate(file_paths[f'{sensortype}_stc'])
     forward = mne.read_forward_solution(file_paths[f'fwd_{space}'])
     src = forward['src']
 
     # Compute lateralisation
+    stc_fs = morph_subject_to_fsaverage(file_paths, src, sensortype)
     (left_hemisphere_time_courses, right_hemisphere_time_courses,
             left_positions, right_positions,
             left_indices, right_indices,
-            left_reg_indices, right_reg_indices) = compute_lateralisation_index(stc_sensortype, src)
+            left_reg_indices, right_reg_indices) = compute_hemispheric_index(stc_fs, src)
     (ordered_right_positions, _,
     _, _, ordered_right_region_indices, _,
     ordered_right_time_courses, ordered_left_time_courses) = order_grid_positions(right_positions, 
@@ -390,6 +394,7 @@ def process_subject(subjectID, paths, sensortype, space, fr_band):
                         forward, file_paths)
     print(f"Processed subject {subjectID}, freq_band {fr_band}.")
 
+
 # ============================================
 # Main script
 # ============================================
@@ -403,7 +408,6 @@ def main():
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
-
 
     for subjectID in good_subjects.index:
         for sensortype in sensortypes:
