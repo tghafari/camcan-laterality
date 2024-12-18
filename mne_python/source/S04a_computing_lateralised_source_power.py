@@ -8,8 +8,6 @@ using the formula:
 
 It runs for all subjects with good preprocessing 
 and all frequency bands.
-Plots and results are saved in the appropriate 
-derivative folders.
 
 Written by Tara Ghafari
 t.ghafari@bham.ac.uk
@@ -56,8 +54,19 @@ def load_subjects(good_sub_sheet):
     return good_subjects.index.tolist()
 
 def construct_paths(subjectID, paths, sensortype, space, fr_band):
-    """Constructs all required file paths for a given subject and frequency band.
-    space can be "vol" or "surf" """
+    """
+    Construct required file paths for a given subject and frequency band.
+
+    Parameters:
+    - subjectID (str): Subject ID.
+    - paths (dict): Dictionary of data paths.
+    - sensortype (str): 'grad' or 'mag'.
+    - space (str): 'vol' or 'surf'.
+    - fr_band (str): Frequency band.
+
+    Returns:
+    - dict: File paths for the subject and frequency band.
+    """
 
     fs_sub = f'sub-CC{subjectID}_T1w'
     deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
@@ -87,9 +96,19 @@ def check_existing(file_paths):
     return False
 
 def morph_subject_to_fsaverage(file_paths, src, sensortype):
-    """ This function brings each subject to fsaverage space
-    for more reliable comparisons later.
     """
+    Morph subject data to fsaverage space for more 
+    reliable comparisons later.
+
+    Parameters:
+    - file_paths (dict): Dictionary of file paths.
+    - src: Source space object.
+    - sensortype (str): 'grad' or 'mag'.
+
+    Returns:
+    - mne.SourceEstimate: Morphed source estimate.
+    """
+
     fetch_fsaverage(file_paths["fs_sub_dir"])  # ensure fsaverage src exists
     fname_fsaverage_src = op.join(file_paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
 
@@ -119,37 +138,43 @@ def morph_subject_to_fsaverage(file_paths, src, sensortype):
 
     return stc_fs
 
-def compute_hemispheric_index(stc_fs_sensortype, src):
-    """Computes lateralisation index from the source time courses.
-    stc_fs_sensortype = morphed stc_grad or stc_mag into fsaverage 
-        (return of "morph_subject_to_fsaverage")
-    to compute hemispheric grid indices, this code uses 
-    src (not fs_src as it is the same in all subjects) and fs_stc.
+def compute_hemispheric_index(stc_fs, src):
+    """
+    Compute the hemispheric lateralisation index from source estimates.
+
+    Parameters:
+    -----------
+    stc_fs : mne.SourceMorph
+        Morphed source estimate from this subject to fsaverage.
+        this is calculated based on sensortype
+    src : instance of mne.VolSourceEstimate
+        Original source space from this subject.
+        note that this is NOT fs_src.
+
+    Returns:
+    --------
+    tuple
+        Data for left and right hemisphere time courses, positions, and indices.
     """
     grid_positions = [s['rr'] for s in src]
     grid_indices = [s['vertno'] for s in src]
 
     # Separate sources into left and right hemisphere based on x-coordinate
-    left_hemisphere_time_courses = []
-    right_hemisphere_time_courses = []
-    left_positions = []
-    right_positions = []
-    left_indices = []
-    right_indices = []
-    left_reg_indices = []
-    right_reg_indices = []
+    right_hemisphere_time_courses, left_hemisphere_time_courses = [], []
+    right_positions, left_positions = [], []
+    right_indices, left_indices = [], []
+    right_reg_indices, left_reg_indices = [], []
+    
 
     for region_idx, indices in enumerate(grid_indices[0]):
-        print(f'{region_idx}')
         pos = grid_positions[0][indices]  # only select in-use positions in the source model
-        print(f'{pos}')
         if pos[0] < 0:  # x < 0 is left hemisphere
-            left_hemisphere_time_courses.append(stc_fs_sensortype.data[region_idx, :])
+            left_hemisphere_time_courses.append(stc_fs.data[region_idx, :])
             left_positions.append(pos)
             left_indices.append(indices)
             left_reg_indices.append(region_idx)
         elif pos[0] > 0:  # x > 0 is right hemisphere
-            right_hemisphere_time_courses.append(stc_fs_sensortype.data[region_idx, :])
+            right_hemisphere_time_courses.append(stc_fs.data[region_idx, :])
             right_positions.append(pos)
             right_indices.append(indices)
             right_reg_indices.append(region_idx)
