@@ -61,14 +61,14 @@ def construct_paths(subjectID, paths, fr_band='alpha'):
         'deriv_folder': deriv_folder,
         'fwd_surf_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-surf.fif'),
         'fwd_vol_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-vol.fif'),
-        'mag_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_mag_epod-epo.fif'),
-        'grad_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_grad_epod-epo.fif'),
+        'mag_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_mag_{fr_band}_epod-epo.fif'),
+        'grad_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_grad_{fr_band}_epod-epo.fif'),
         'mag_csd_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_mag_csd_multitaper_{fr_band}.h5'),
         'grad_csd_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_grad_csd_multitaper_{fr_band}.h5'),
         'mag_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_mag_stc_multitaper_{fr_band}'),
         'grad_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_grad_stc_multitaper_{fr_band}'),
-        'stc_mag_plot_fname': op.join(deriv_folder, f"{file_paths['fs_sub']}_mag_dics_plot{fr_band}.png"),
-        'stc_grad_plot_fname': op.join(deriv_folder, f"{file_paths['fs_sub']}_grad_dics_plot{fr_band}.png")
+        'stc_mag_plot_fname': op.join(deriv_folder, f"{fs_sub}_mag_dics_plot{fr_band}.png"),
+        'stc_grad_plot_fname': op.join(deriv_folder, f"{fs_sub}_grad_dics_plot{fr_band}.png")
     }
 
     return file_paths
@@ -160,14 +160,14 @@ def run_dics(subjectID, paths, space='volume', fr_band='alpha'):
 
 
 def main():
-    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
     fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
     space = 'volume'  # Space type: 'surface' or 'volume'
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subjects.index:
+    for subjectID in good_subjects.index[0:10]:
         for fr_band in fr_bands:
             try:
                 run_dics(subjectID, paths, space=space, fr_band=fr_band)

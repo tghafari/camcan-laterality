@@ -32,7 +32,7 @@ def setup_paths(platform='mac'):
         'epoched_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
-        'deriv_folder_sensor': op.join(rds_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
+        'meg_sensor_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
         'deriv_folder': op.join(rds_dir, 'derivatives/meg/source/freesurfer')
     }
     return paths
@@ -91,10 +91,10 @@ def process_subject(subjectID, paths, fr_band):
     # Define file paths
     fs_sub = f"sub-CC{subjectID}_T1w"
     epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif')
-    deriv_folder_sensor = paths['deriv_folder_sensor']
+    meg_sensor_dir = paths['meg_sensor_dir']
     deriv_folder = op.join(paths['deriv_folder'], f'{fs_sub[:-4]}')
-    deriv_mag_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_mag_{duration}sec_epod-epo.fif')
-    deriv_grad_epoched_fname = op.join(deriv_folder_sensor, f'{fs_sub[:-4]}_grad_{duration}sec_epod-epo.fif')
+    deriv_mag_epoched_fname = op.join(meg_sensor_dir, f'{fs_sub[:-4]}_mag_{fr_band}_epod-epo.fif')
+    deriv_grad_epoched_fname = op.join(meg_sensor_dir, f'{fs_sub[:-4]}_grad_{fr_band}_epod-epo.fif')
     deriv_mag_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_mag_csd_multitaper_{fr_band}')
     deriv_grad_csd_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_grad_csd_multitaper_{fr_band}')
 
@@ -103,8 +103,8 @@ def process_subject(subjectID, paths, fr_band):
         print(f"CSD already exists for subject {subjectID} in {fr_band} band. Skipping...")
         return
     
-    if not op.exists(deriv_folder_sensor):
-        os.makedirs(deriv_folder_sensor)
+    if not op.exists(meg_sensor_dir):
+        os.makedirs(meg_sensor_dir)
     # Epoch the data
     epoched_epochs = epoching_epochs(epoched_fname, duration)
 
@@ -144,7 +144,7 @@ def process_subject(subjectID, paths, fr_band):
     print(f"Subject {subjectID} processed successfully for {fr_band} band.")
 
 def main():
-    platform = 'mac'  # Change to 'bluebear' if running on BlueBear
+    platform = 'bluebear'  # Change to 'bluebear' if running on BlueBear
     fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
 
     # Set up paths and load subjects
@@ -152,7 +152,7 @@ def main():
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
     # Process each subject and frequency band
-    for subjectID in good_subjects.index:
+    for subjectID in good_subjects.index[0:10]:
         for fr_band in fr_bands:
             try:
                 process_subject(subjectID, paths, fr_band)

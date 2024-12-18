@@ -152,14 +152,14 @@ def process_subject(subjectID, paths, space='volume'):
 
 
 def main():
-    platform = 'mac'  # 'bluebear' or 'mac'
+    platform = 'bluebear'  # 'bluebear' or 'mac'
     space = 'volume'  # 'surface' or 'volume'
     paths = setup_paths(platform)
 
     # Load subjects with good preprocessing
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subject_pd.index:
+    for subjectID in good_subject_pd.index[1:50]:
         try:
             process_subject(subjectID, paths, space=space)
         except Exception as e:
