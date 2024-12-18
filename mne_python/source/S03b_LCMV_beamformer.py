@@ -39,13 +39,13 @@ def setup_paths(platform="mac"):
         "fs_sub_dir": op.join(rds_dir, "cc700/mri/pipeline/release004/BIDS_20190411/anat"),
         "filtered_epo_dir": op.join(rds_dir, "derivatives/meg/sensor/filtered"),
         "meg_source_dir": op.join(rds_dir, "derivatives/meg/source/freesurfer"),
+        "good_sub_sheet": op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
     }
 
-def load_subjects(info_dir):
+def load_subjects(good_sub_sheet):
     """
     Load the list of subjects with good preprocessed data.
     """
-    good_sub_sheet = op.join(info_dir, "demographics_goodPreproc_subjects.csv")
     good_subject_pd = pd.read_csv(good_sub_sheet)
     return good_subject_pd.set_index("Unnamed: 0")
 
@@ -152,7 +152,7 @@ def main():
     """
     platform = "mac"  # Change to your platform
     paths = setup_paths(platform)
-    good_subjects = load_subjects(paths["info_dir"])
+    good_subjects = load_subjects(paths["good_sub_sheet"])
     frequency_bands = {"delta": (1, 4), 
                        "theta": (4, 8), 
                        "alpha": (8, 12), 

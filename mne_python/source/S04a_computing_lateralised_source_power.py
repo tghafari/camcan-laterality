@@ -2,11 +2,14 @@
 ===============================================
 S04a. Calculate Source Lateralisation
 
-This script computes source lateralisation indices using the formula:
+This script computes source lateralisation indices 
+using the formula:
     (right_stc - left_stc) / (right_stc + left_stc)
 
-It runs for all subjects with good preprocessing and all frequency bands.
-Plots and results are saved in the appropriate derivative folders.
+It runs for all subjects with good preprocessing 
+and all frequency bands.
+Plots and results are saved in the appropriate 
+derivative folders.
 
 Written by Tara Ghafari
 t.ghafari@bham.ac.uk
@@ -19,6 +22,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import mne
+from mne.datasets import fetch_fsaverage
 from mpl_toolkits.mplot3d import Axes3D
 
 # ============================================
@@ -26,87 +30,327 @@ from mpl_toolkits.mplot3d import Axes3D
 # ============================================
 
 def setup_paths(platform='mac'):
-    """Sets up directory paths based on the platform."""
+    """Set up file paths for the given platform."""
     if platform == 'bluebear':
-        base_dir = '/rds/projects/q/quinna-camcan'
+        rds_dir = '/rds/projects/q/quinna-camcan'
+        jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
     elif platform == 'mac':
-        base_dir = '/Volumes/quinna-camcan'
+        rds_dir = '/Volumes/quinna-camcan'
+        jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
     else:
-        raise ValueError("Unknown platform. Choose 'mac' or 'bluebear'.")
-    
-    deriv_folder = op.join(base_dir, 'derivatives/meg/source/freesurfer')
-    sensor_folder = op.join(base_dir, 'derivatives/meg/sensor/epoched-1sec')
-    info_dir = op.join(base_dir, 'dataman/data_information')
-    fs_sub_dir = op.join(base_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat')
-    
-    return deriv_folder, sensor_folder, info_dir, fs_sub_dir
+        raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
-def load_subjects(info_dir):
+    paths = {
+        'rds_dir': rds_dir,
+        'info_dir': op.join(rds_dir, 'dataman/data_information'),
+        'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
+        'meg_source_dir': op.join(rds_dir, 'derivatives/meg/source/freesurfer'),
+        'meg_sensor_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
+        'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
+    }
+    return paths
+
+def load_subjects(good_sub_sheet):
     """Loads the list of subjects with good preprocessing."""
-    good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
     good_subjects = pd.read_csv(good_sub_sheet)
     return good_subjects.index.tolist()
 
-def construct_paths(subject, deriv_folder, sensor_folder, freq_band):
-    """Constructs all required file paths for a given subject and frequency band."""
-    subject_prefix = f'sub-CC{subject}'
-    paths = {
-        'mag_epoched': op.join(sensor_folder, f'{subject_prefix}_mag_epod-epo.fif'),
-        'grad_epoched': op.join(sensor_folder, f'{subject_prefix}_grad_epod-epo.fif'),
-        'mag_stc': op.join(deriv_folder, f'{subject_prefix}_mag_stc_multitaper_{freq_band}-vl.stc'),
-        'grad_stc': op.join(deriv_folder, f'{subject_prefix}_grad_stc_multitaper_{freq_band}-vl.stc'),
-        'fwd_vol': op.join(deriv_folder, f'{subject_prefix}_fwd-vol.fif'),
-        'output_dir': op.join(deriv_folder, subject_prefix)
-    }
-    os.makedirs(paths['output_dir'], exist_ok=True)
-    return paths
+def construct_paths(subjectID, paths, sensortype, space, fr_band):
+    """Constructs all required file paths for a given subject and frequency band.
+    space can be "vol" or "surf" """
 
-def check_existing(paths):
-    """Checks whether required files exist for the given subject."""
-    for key, path in paths.items():
-        if 'output_dir' in key:  # Skip output directory
-            continue
-        if not op.exists(path):
-            print(f"Missing file: {key} -> {path}")
-            return False
-    return True
+    fs_sub = f'sub-CC{subjectID}_T1w'
+    deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
+
+    file_paths = {
+        'fs_sub': fs_sub,
+        'deriv_folder': deriv_folder,
+        f'{sensortype}_stc': op.join(deriv_folder, f'{fs_sub[:-4]}_{sensortype}_stc_multitaper_{fr_band}-vl.stc'),
+        f'fsmorph_{sensortype}_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fsmorph_{sensortype}_stc_{fr_band}-vl.stc'),
+        f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
+        'grid_positions_csv': op.join(deriv_folder, 'grid_positions.csv'),
+        'grid_indices_csv': op.join(deriv_folder, 'grid_indices.csv'),
+        'lateralised_src_power_csv': op.join(deriv_folder, 'lateralised_src_power.csv'),
+        'lateralised_grid_figname': op.join(deriv_folder, 'lateralised_grid.png'),
+        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'stc_VolEst_lateral_power_figname'),
+        'stc_fsmorphd_lateral_power_figname': op.join(deriv_folder, 'stc_morphd_lateral_power_figname'),
+    }
+    return file_paths
+
+def check_existing(file_paths):
+    """Checks whether output files already exist for the given subject."""
+    if op.exists(file_paths['grid_positions_csv']) or \
+    op.exists(file_paths['grid_indices_csv']) or \
+    op.exists(file_paths['lateralised_src_power_csv']):
+        print(f"source lateralisation results already exist for {file_paths['fs_sub']}. Skipping...")
+        return True
+    return False
 
 def lateralisation_index(stc_grad, src):
     """Computes lateralisation index from the source time courses."""
-    grid_positions = src[0]['rr']
-    grid_indices = src[0]['vertno']
-    
-    left_tc, right_tc, left_pos, right_pos = [], [], [], []
-    for idx, vertex in enumerate(grid_indices):
-        pos = grid_positions[vertex]
-        if pos[0] < 0:  # Left hemisphere
-            left_tc.append(stc_grad.data[idx, :])
-            left_pos.append(pos)
-        elif pos[0] > 0:  # Right hemisphere
-            right_tc.append(stc_grad.data[idx, :])
-            right_pos.append(pos)
-    
-    left_tc = np.array(left_tc)
-    right_tc = np.array(right_tc)
-    
-    lateralised_power = (right_tc - left_tc) / (right_tc + left_tc)
-    return lateralised_power, np.array(right_pos), np.array(left_pos)
+    grid_positions = [s['rr'] for s in src]
+    grid_indices = [s['vertno'] for s in src]
 
-def plot_lateralisation(right_pos, left_pos, lateralised_power, output_path):
-    """Plots lateralised power on 3D brain grid positions."""
+    # Separate sources into left and right hemisphere based on x-coordinate
+    left_hemisphere_time_courses = []
+    right_hemisphere_time_courses = []
+    left_positions = []
+    right_positions = []
+    left_indices = []
+    right_indices = []
+    left_reg_indices = []
+    right_reg_indices = []
+
+    for region_idx, indices in enumerate(grid_indices[0]):
+        print(f'{region_idx}')
+        pos = grid_positions[0][indices]  # only select in-use positions in the source model
+        print(f'{pos}')
+        if pos[0] < 0:  # x < 0 is left hemisphere
+            left_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
+            left_positions.append(pos)
+            left_indices.append(indices)
+            left_reg_indices.append(region_idx)
+        elif pos[0] > 0:  # x > 0 is right hemisphere
+            right_hemisphere_time_courses.append(stc_grad.data[region_idx, :])
+            right_positions.append(pos)
+            right_indices.append(indices)
+            right_reg_indices.append(region_idx)
+
+        # Convert lists to numpy arrays for easy manipulation
+        right_positions = np.array(right_positions)
+        left_positions = np.array(left_positions)
+
+    return (left_hemisphere_time_courses, right_hemisphere_time_courses,
+            left_positions, right_positions,
+            left_indices, right_indices,
+            left_reg_indices, right_reg_indices)
+
+
+def order_grid_positions(right_positions, left_positions, 
+                         right_indices, left_indices, 
+                         right_reg_indices, left_reg_indices,
+                         right_hemisphere_time_courses, left_hemisphere_time_courses,
+                         file_path):
+    """
+    To match the positions in left_positions and right_positions by aligning the 
+    x, y, and z coordinates such that each 
+    (x,y,z) position in right_positions corresponds to a 
+    (-x,y,z) position in left_positions, you can use a 
+    sorting approach. 
+    Once we find the correct order, we'll 
+    reorder left_positions and right_positions along with 
+    their respective left_indices and right_indices.
+    """
+    # Minimum euclidian distance accepted from corresponding points
+    min_distance_accepted = 0.01 
+
+    # Prepare lists for ordered positions and indices
+    ordered_right_positions = []
+    ordered_left_positions = []
+    ordered_right_indices = []
+    ordered_left_indices = []
+    ordered_right_region_indices = []  # for later creating the volume source estimate
+    ordered_left_region_indices = []
+    distances = []
+
+    # List to keep track of which indices have already been selected in left_positions
+    used_left_indices = set()
+
+    # Step 2: Match each right position to the closest corresponding left position
+    for i, right_pos in enumerate(right_positions):
+        # Flip the x-coordinate to find the corresponding left position
+        print(f'Reading {i}th grid position')
+        corresponding_left_pos = (-right_pos[0], right_pos[1], right_pos[2])
+
+        # Calculate the distance between corresponding_left_pos and all left positions
+        min_distance = float('inf')
+        closest_left_index = None
+
+        # Iterate over all left positions to find the closest match
+        for j, left_pos in enumerate(left_positions):
+
+            # Calculate Euclidean distance
+            distance = np.sqrt((left_pos[0] - corresponding_left_pos[0])**2 
+                            + (left_pos[1] - corresponding_left_pos[1])**2
+                            + (left_pos[2] - corresponding_left_pos[2])**2)
+
+            # Check if this is the closest match so far
+            if distance < min_distance:
+                min_distance = distance
+                closest_left_index = j
+
+        # If a matching left position is found, add it to the ordered lists
+        if closest_left_index is not None and min_distance <= min_distance_accepted:
+            # Append positions, indices, and distance in the correct order
+            ordered_right_positions.append(right_pos)
+            ordered_left_positions.append(left_positions[closest_left_index])
+            ordered_right_indices.append(right_indices[i])
+            ordered_right_region_indices.append(right_reg_indices[i])
+            ordered_left_indices.append(left_indices[closest_left_index])
+            ordered_left_region_indices.append(left_reg_indices[closest_left_index])
+            distances.append(min_distance)
+
+            # Mark this left position as used
+            used_left_indices.add(closest_left_index)
+
+        # Break if there are no more available left or right positions to assign
+        if len(used_left_indices) >= len(left_positions) or len(used_left_indices) >= len(right_positions):
+            break
+
+    # Convert ordered lists back to numpy arrays for easier manipulation
+    ordered_right_positions = np.array(ordered_right_positions)
+    ordered_left_positions = np.array(ordered_left_positions)
+    ordered_right_indices = np.array(ordered_right_indices)
+    ordered_left_indices = np.array(ordered_left_indices)
+    ordered_right_region_indices = np.array(ordered_right_region_indices)
+    ordered_left_region_indices = np.array(ordered_left_region_indices)
+
+    # Step 3: Reorder time courses based on the ordered indices
+    ordered_right_time_courses = [right_hemisphere_time_courses[right_indices.index(idx)] for idx in ordered_right_indices]
+    ordered_left_time_courses = [left_hemisphere_time_courses[left_indices.index(idx)] for idx in ordered_left_indices]
+
+    # Step 4: Create tables for grid positions, indices, and distances
+    # Create a DataFrame for positions, including the distance between each corresponding pair
+    positions_table = pd.DataFrame({
+        'Right Hemisphere X': [pos[0] for pos in ordered_right_positions],
+        'Right Hemisphere Y': [pos[1] for pos in ordered_right_positions],
+        'Right Hemisphere Z': [pos[2] for pos in ordered_right_positions],
+        'Left Hemisphere X': [pos[0] for pos in ordered_left_positions],
+        'Left Hemisphere Y': [pos[1] for pos in ordered_left_positions],
+        'Left Hemisphere Z': [pos[2] for pos in ordered_left_positions],
+        'Distance': distances
+    })
+
+    # Create a DataFrame for indices
+    indices_table = pd.DataFrame({
+        'Right Hemisphere Index': ordered_right_indices,
+        'Left Hemisphere Index': ordered_left_indices
+    })
+
+    positions_table.to_csv(file_path["grid_positions_csv"])
+    indices_table.to_csv(file_path["grid_indices_csv"])
+
+    return ordered_right_time_courses, ordered_left_time_courses
+
+def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_courses, file_path):
+    # Calculate lateralised source power
+    lateralised_power = []
+
+    for right_tc, left_tc  in zip(ordered_right_time_courses, ordered_left_time_courses):
+        lateral_power_index = (right_tc - left_tc) / (right_tc + left_tc)
+        lateralised_power.append(lateral_power_index)
+
+    lateralised_power_arr = np.squeeze(np.array(lateralised_power)) 
+    lateralised_power_df = pd.DataFrame(lateralised_power_arr, columns=['Lateralised Source Power Index'])
+
+    lateralised_power_df.to_csv(file_path["lateralised_src_power_csv"])
+
+    return lateralised_power_arr
+
+def plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
+                        ordered_right_region_indices,
+                        forward, file_paths):
+    """ 
+    Plot findings in grid positions and 
+    on a VolumeEstimate.
+    """
+
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
-    
-    sc = ax.scatter(right_pos[:, 0], right_pos[:, 1], right_pos[:, 2], 
-                     c=lateralised_power, cmap='coolwarm', s=50, alpha=0.6)
-    plt.colorbar(sc, ax=ax, shrink=0.5, label='Lateralised Power')
-    
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    plt.title("Lateralised Power in Right Hemisphere")
-    plt.savefig(output_path)
+
+    # Scatter plot of grid positions with color representing lateralised power
+    sc = ax.scatter(
+        ordered_right_positions[:, 0],  # x-coordinates
+        ordered_right_positions[:, 1],  # y-coordinates
+        ordered_right_positions[:, 2],  # z-coordinates
+        c=lateralised_power_arr,        # color by lateralised power
+        cmap='coolwarm',                # color map
+        label='Source lateralised power', 
+        alpha=0.6,
+        s=50                            # size of points
+    )
+
+    # Add a colorbar to show the range of lateralised power values
+    cbar = plt.colorbar(sc, ax=ax, shrink=0.5, aspect=10)
+    cbar.set_label('Lateralised Power')
+
+    # Set plot labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    plt.title('Lateralised Power on Right Hemisphere Grid Points')
+    plt.legend()
+    plt.savefig(file_paths["lateralised_grid_figname"])
     plt.close()
+
+    # Create a volume estimate 
+    """Create an mne.VolSourceEstimate object for lateralised_power_arr, 
+    ensuring the data structure is correctly formatted"""
+
+    # Step 1: Prepare the data
+    # Initialize an empty array with zeros for all dipoles in the source space
+    n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total in-use dipoles
+    n_times = 1  # Single time point for static data
+    lateralised_power_full = np.zeros((n_dipoles_in_src, n_times))
+
+    # Fill the right side of the vol estimate with lateralised powers (left side is all zero)
+    for i, index in enumerate(ordered_right_region_indices):
+        lateralised_power_full[index, 0] = lateralised_power_arr[i]
+
+    # Step 2: Create the VolSourceEstimate object
+    vertices = [np.array(forward['src'][0]['vertno'])]
+
+    stc_lateral_power = mne.VolSourceEstimate(
+        data=lateralised_power_full,
+        vertices=vertices,
+        tmin=0,
+        tstep=1,
+        subject=file_paths["fs_sub"]
+    )
+
+    # Step 3: Plot the lateralized power on the brain
+    stc_lateral_power.plot(
+        src=forward["src"],
+        subject=file_paths["fs_sub"],
+        subjects_dir=file_paths["fs_sub_dir"],
+        mode='stat_map',
+        colorbar=True,
+        verbose=True
+    ).savefig(file_paths['stc_VolEst_lateral_power_figname'])
+
+def morph_subject_to_fsaverage(file_paths, src, sensortype):
+    """ This function brings each subject to fsaverage space
+    for more reliable comparisons later.
+    """
+    fetch_fsaverage(file_paths["fs_sub_dir"])  # ensure fsaverage src exists
+    fname_fsaverage_src = op.join(file_paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+
+    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+    morph = mne.compute_source_morph(
+        src,
+        subject_from=file_paths["fs_sub"],
+        src_to=src_fs,
+        subjects_dir=file_paths["fs_sub_dir"],
+        niter_sdr=[5, 5, 2],
+        niter_affine=[5, 5, 2],
+        zooms='auto',  # just for speed
+        verbose=True,
+    )
+    stc_fs = morph.apply(stc)
+    stc_fs.save(file_paths[f'fsmorph_{sensortype}_stc_fname'], overwrite=True)
+
+    del stc
+
+    lims = [0.3, 0.45, 0.6]
+    stc_fs.plot(
+        src=src_fs,
+        mode="stat_map",
+        initial_time=0.085,
+        subjects_dir=file_paths["fs_sub_dir"],
+        clim=dict(kind="value", pos_lims=lims),
+        verbose=True,
+    ).savefig(file_paths['stc_fsmorphd_lateral_power_figname'])
+
 
 def process_subject(subject, freq_band, deriv_folder, sensor_folder, fs_sub_dir):
     """Processes a single subject for a specific frequency band."""
@@ -115,7 +359,7 @@ def process_subject(subject, freq_band, deriv_folder, sensor_folder, fs_sub_dir)
         print(f"Skipping subject {subject}, missing files.")
         return
 
-    # Read data
+    # Read data - add mags
     stc_grad = mne.read_source_estimate(paths['grad_stc'])
     forward = mne.read_forward_solution(paths['fwd_vol'])
     src = forward['src']
@@ -129,13 +373,22 @@ def process_subject(subject, freq_band, deriv_folder, sensor_folder, fs_sub_dir)
 # ============================================
 # Main script
 # ============================================
-if __name__ == "__main__":
-    deriv_folder, sensor_folder, info_dir, fs_sub_dir = setup_paths(platform='mac')
-    subjects = load_subjects(info_dir)
-    frequency_bands = ['alpha', 'beta', 'gamma']
 
-    for subject in subjects:
-        for freq_band in frequency_bands:
+def main():
+
+    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
+    space = 'volume'  # Space type: 'surface' or 'volume'
+
+    paths = setup_paths(platform)
+    good_subjects = load_subjects(paths['good_sub_sheet'])
+
+
+    for subjectID in good_subjects.index:
+        for fr_band in fr_bands:
             process_subject(subject, freq_band, deriv_folder, sensor_folder, fs_sub_dir)
 
     print("Processing complete for all subjects and frequency bands.")
+
+if __name__ == "__main__":
+    main()
