@@ -36,16 +36,16 @@ def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
     if platform == 'bluebear':
         rds_dir = '/rds/projects/q/quinna-camcan'
-        jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
-        rds_dir = '/Volumes/quinna-camcan-1'
-        jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+        rds_dir = '/Volumes/quinna-camcan'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
     paths = {
         'rds_dir': rds_dir,
-        'epoched_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50'),
+        'epoched_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
         'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
@@ -137,7 +137,7 @@ def process_subject(subjectID, paths, coreg_type='auto', platform='mac'):
 
         # Define subject-specific paths and filenames
         fs_sub = f"sub-CC{subjectID}_T1w"
-        deriv_folder = op.join(paths['rds_dir'], 'derivatives/meg/source/freesurfer', fs_sub[:-4])
+        deriv_folder = op.join(paths['sub2ctx_dir'], 'derivatives/meg/source/freesurfer', fs_sub[:-4])
 
         if not op.exists(deriv_folder):
             os.makedirs(deriv_folder)

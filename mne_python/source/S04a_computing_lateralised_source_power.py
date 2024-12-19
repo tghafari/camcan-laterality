@@ -31,10 +31,10 @@ def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
     if platform == 'bluebear':
         rds_dir = '/rds/projects/q/quinna-camcan'
-        jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
         rds_dir = '/Volumes/quinna-camcan'
-        jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
@@ -42,8 +42,8 @@ def setup_paths(platform='mac'):
         'rds_dir': rds_dir,
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
-        'meg_source_dir': op.join(rds_dir, 'derivatives/meg/source/freesurfer'),
-        'meg_sensor_dir': op.join(rds_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
+        'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer'),
+        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
     }
     return paths

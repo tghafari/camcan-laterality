@@ -25,20 +25,22 @@ def setup_paths(platform="mac"):
     """
     Set up the directory paths based on the platform (mac or bluebear).
     """
-    if platform == "bluebear":
-        rds_dir = "/rds/projects/q/quinna-camcan"
-    elif platform == "mac":
-        rds_dir = "/Volumes/quinna-camcan"
+    if platform == 'bluebear':
+        rds_dir = '/rds/projects/q/quinna-camcan'
+        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
+    elif platform == 'mac':
+        rds_dir = '/Volumes/quinna-camcan'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Invalid platform. Choose 'bluebear' or 'mac'.")
     
     return {
         "rds_dir": rds_dir,
-        "epoched_dir": op.join(rds_dir, "derivatives/meg/sensor/epoched-7min50"),
+        "epoched_dir": op.join(sub2ctx_dir, "derivatives/meg/sensor/epoched-7min50"),
         "info_dir": op.join(rds_dir, "dataman/data_information"),
         "fs_sub_dir": op.join(rds_dir, "cc700/mri/pipeline/release004/BIDS_20190411/anat"),
-        "filtered_epo_dir": op.join(rds_dir, "derivatives/meg/sensor/filtered"),
-        "meg_source_dir": op.join(rds_dir, "derivatives/meg/source/freesurfer"),
+        "filtered_epo_dir": op.join(sub2ctx_dir, "derivatives/meg/sensor/filtered"),
+        "meg_source_dir": op.join(sub2ctx_dir, "derivatives/meg/source/freesurfer"),
         "good_sub_sheet": op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
     }
 
