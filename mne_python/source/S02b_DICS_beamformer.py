@@ -141,6 +141,9 @@ def run_dics(mags, grads, freq, forward, csd_mags, csd_grads,
     stc_grad_freq, _ = apply_dics_csd(csd_grads_freq, filters_grad)
     
     # Save DICS results
+    if not op.exists(op.join(file_paths["deriv_folder"], 'stc_results')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'stc_results'))
+
     stc_mag_freq.save(f"{file_paths['mag_stc_fname']}_{freq}", overwrite=True)
     stc_grad_freq.save(f"{file_paths['grad_stc_fname']}_{freq}", overwrite=True)
 
@@ -163,6 +166,9 @@ def plotting_stc(csd_mags, csd_grads, forward, file_paths, paths):
                             inversion='matrix', 
                             weight_norm="unit-noise-gain")
     stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)
+   
+    if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
     stc_mag.plot(src=forward["src"], 
                     subject=file_paths['fs_sub'], 
