@@ -97,7 +97,7 @@ def run_dics(subjectID, paths, space='volume', fr_band='alpha'):
     print('Reading forward model')
     forward = mne.read_forward_solution(file_paths['fwd_vol_fname'] if space == 'volume' else file_paths['fwd_surf_fname'])
 
-    print('Source reconstruction on magnetometers and gradiometers separately')
+    print('Source reconstruction on magnetometers and gradiometers separately') - #separate mags and grads from here.
     mags = mne.read_epochs(file_paths['mag_epoched_fname'], preload=True, verbose=True, proj=False)
     grads = mne.read_epochs(file_paths['grad_epoched_fname'], preload=True, verbose=True, proj=False)
 
