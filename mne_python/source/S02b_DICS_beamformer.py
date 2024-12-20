@@ -15,6 +15,8 @@ written by Tara Ghafari
 ==============================================
 """
 
+import numpy as np
+
 import os
 import os.path as op
 import pandas as pd
@@ -39,7 +41,7 @@ def setup_paths(platform='mac'):
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
         'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer'),
-        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
+        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-2sec'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
     }
     return paths
@@ -51,8 +53,10 @@ def load_subjects(good_sub_sheet):
     return good_subject_pd.set_index('Unnamed: 0')
 
 
-def construct_paths(subjectID, paths, fr_band='alpha'):
-    """Construct file paths for a given subject, space type, and frequency band."""
+def construct_paths(subjectID, paths, csd_method='fourier'):
+    """Construct file paths for a given subject, space type, and frequency band.
+    csd_method = 'fourier' or 'multitaper' """
+
     fs_sub = f'sub-CC{subjectID}_T1w'
     deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
 
@@ -61,14 +65,13 @@ def construct_paths(subjectID, paths, fr_band='alpha'):
         'deriv_folder': deriv_folder,
         'fwd_surf_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-surf.fif'),
         'fwd_vol_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-vol.fif'),
-        'mag_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_mag_{fr_band}_epod-epo.fif'),
-        'grad_epoched_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_grad_{fr_band}_epod-epo.fif'),
-        'mag_csd_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_mag_csd_multitaper_{fr_band}.h5'),
-        'grad_csd_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_grad_csd_multitaper_{fr_band}.h5'),
-        'mag_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_mag_stc_multitaper_{fr_band}'),
-        'grad_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_grad_stc_multitaper_{fr_band}'),
-        'stc_mag_plot_fname': op.join(deriv_folder, f"{fs_sub}_mag_dics_plot{fr_band}.png"),
-        'stc_grad_plot_fname': op.join(deriv_folder, f"{fs_sub}_grad_dics_plot{fr_band}.png")
+        'epoched_epo_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_2sec_epod-epo.fif'),
+        f'csd_{csd_method}_mag_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_csd_{csd_method}_mag.h5'),
+        f'csd_{csd_method}_grad_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_csd_{csd_method}_grad.h5'),
+        'mag_stc_fname': op.join(deriv_folder, 'stc_results', f'{fs_sub[:-4]}_stc_{csd_method}_mag'),
+        'grad_stc_fname': op.join(deriv_folder,'stc_results', f'{fs_sub[:-4]}_stc_{csd_method}_grad'),
+        'stc_mag_plot_fname': op.join(deriv_folder, 'plots', f"{fs_sub}_dics_{csd_method}_mag"),
+        'stc_grad_plot_fname': op.join(deriv_folder, 'plots', f"{fs_sub}_dics_{csd_method}_grad")
     }
 
     return file_paths
@@ -82,37 +85,35 @@ def check_existing_dics(file_paths):
     return False
 
 
-def run_dics(subjectID, paths, space='volume', fr_band='alpha'):
-    """Run DICS for a given subject."""
-    file_paths = construct_paths(subjectID, paths, fr_band)
-
-    # Skip subjects with existing DICS results
-    if check_existing_dics(file_paths):
-        return
-
-    print(f"Running DICS for subject {subjectID}, space: {space}, frequency band: {fr_band}")
-    reg = 0.01  # defined here for easier modifications
-    print(f"regularisation = {reg}")
+def forward_rank_csd(file_paths, space='volume', csd_method='fourier'):
 
     print('Reading forward model')
     forward = mne.read_forward_solution(file_paths['fwd_vol_fname'] if space == 'volume' else file_paths['fwd_surf_fname'])
 
-    print('Source reconstruction on magnetometers and gradiometers separately') - #separate mags and grads from here.
-    mags = mne.read_epochs(file_paths['mag_epoched_fname'], preload=True, verbose=True, proj=False)
-    grads = mne.read_epochs(file_paths['grad_epoched_fname'], preload=True, verbose=True, proj=False)
+    print('Source reconstruction on magnetometers and gradiometers separately')  #separate mags and grads from here.
+    epoched_epochs = mne.read_epochs(file_paths['epoched_epo_fname'], preload=True, verbose=True, proj=False)
+    mags = epoched_epochs.copy().pick("mag")
+    grads = epoched_epochs.copy().pick("grad")
 
     print('Computing rank')
     rank_mag = mne.compute_rank(mags, tol=1e-6, tol_kind='relative', proj=False)
     rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
 
     print('Reading CSD')
-    csd_mag = read_csd(file_paths['mag_csd_fname'])
-    csd_grad = read_csd(file_paths['grad_csd_fname'])
+    csd_mags = read_csd(file_paths[f'csd_{csd_method}_mag_fname'])
+    csd_grads = read_csd(file_paths[f'csd_{csd_method}_grad_fname'])
 
-    print('Create DICS filters and apply')
+    return forward, mags, grads, rank_mag, rank_grad, csd_mags, csd_grads
+
+def run_dics(mags, grads, freq, forward, csd_mags, csd_grads, 
+             rank_mag, rank_grad, file_paths, reg = 0.01, csd_method='fourier'):
+    """Run DICS for a given subject for the given freqs (1hz by 1hz)."""
+
+    print(f'Create DICS filters on {csd_method} csd and apply with egularisation = {reg} for {freq}Hz')
+    csd_mags_freq = csd_mags.copy().pick_frequency(freq)
     filters_mag = make_dics(mags.info, 
                             forward, 
-                            csd_mag.mean(), 
+                            csd_mags_freq, 
                             noise_csd=None, 
                             reg=reg, 
                             pick_ori='max-power', 
@@ -122,55 +123,79 @@ def run_dics(subjectID, paths, space='volume', fr_band='alpha'):
                             depth=None, 
                             inversion='matrix', 
                             weight_norm="unit-noise-gain")
-    stc_mag, _ = apply_dics_csd(csd_mag.mean(), filters_mag)
+    stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)
 
+    csd_grads_freq = csd_grads.copy().pick_frequency(freq)
     filters_grad = make_dics(grads.info, 
-                             forward, 
-                             csd_grad.mean(), 
-                             noise_csd=None, 
-                             reg=reg, 
-                             pick_ori='max-power', 
-                             reduce_rank=True, 
-                             real_filter=True, 
-                             rank=rank_grad, 
-                             depth=None, 
-                             inversion='matrix', 
-                             weight_norm="unit-noise-gain")
-    stc_grad, _ = apply_dics_csd(csd_grad.mean(), filters_grad)
+                            forward, 
+                            csd_grads_freq, 
+                            noise_csd=None, 
+                            reg=reg, 
+                            pick_ori='max-power', 
+                            reduce_rank=True, 
+                            real_filter=True, 
+                            rank=rank_grad, 
+                            depth=None, 
+                            inversion='matrix', 
+                            weight_norm="unit-noise-gain")
+    stc_grad_freq, _ = apply_dics_csd(csd_grads_freq, filters_grad)
+    
+    # Save DICS results
+    stc_mag_freq.save(f"{file_paths['mag_stc_fname']}_{freq}", overwrite=True)
+    stc_grad_freq.save(f"{file_paths['grad_stc_fname']}_{freq}", overwrite=True)
 
+    print(f"DICS results successfully saved for {freq}Hz")
+
+
+def plotting_stc(csd_mags, csd_grads, forward, file_paths, paths):
     # Plot and save results
     print("Plotting results for double-checking...")
+    filters_mag = make_dics(mags.info, 
+                            forward, 
+                            csd_mags_freq, 
+                            noise_csd=None, 
+                            reg=reg, 
+                            pick_ori='max-power', 
+                            reduce_rank=True, 
+                            real_filter=True, 
+                            rank=rank_mag, 
+                            depth=None, 
+                            inversion='matrix', 
+                            weight_norm="unit-noise-gain")
+    stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)
 
     stc_mag.plot(src=forward["src"], 
-                 subject=file_paths['fs_sub'], 
-                 subjects_dir=paths['fs_sub_dir'], 
-                 mode='stat_map',
-                 verbose=True).savefig(file_paths['stc_mag_plot_fname'])
-    
-    stc_grad.plot(src=forward["src"], 
-                  subject=file_paths['fs_sub'], 
-                  subjects_dir=paths['fs_sub_dir'], 
-                  mode='stat_map', 
-                  verbose=True).savefig(file_paths['stc_grad_plot_fname'])
+                    subject=file_paths['fs_sub'], 
+                    subjects_dir=paths['fs_sub_dir'], 
+                    mode='stat_map',
+                    verbose=True).savefig(f"{file_paths['stc_mag_plot_fname']}.png")
 
-    # Save DICS results
-    stc_mag.save(file_paths['mag_stc_fname'], overwrite=True)
-    stc_grad.save(file_paths['grad_stc_fname'], overwrite=True)
-    print(f"DICS results successfully saved for {subjectID}")
+    stc_grad.plot(src=forward["src"], 
+                    subject=file_paths['fs_sub'], 
+                    subjects_dir=paths['fs_sub_dir'], 
+                    mode='stat_map', 
+                    verbose=True).savefig(f"{file_paths['stc_grad_plot_fname']}.png")
 
 
 def main():
-    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
-    fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
+    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    freqs = np.arange(1, 60, 0.5)  # range of frequencies for dics
     space = 'volume'  # Space type: 'surface' or 'volume'
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
+    file_paths = construct_paths(subjectID, paths, csd_method='fourier')
+    
+    # Skip subjects with existing DICS results
+    if check_existing_dics(file_paths):
+        return
 
-    for subjectID in good_subjects.index[0:10]:
-        for fr_band in fr_bands:
+    for subjectID in good_subjects.index[0:2]:
+        print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}, {freq}")
+
+        for freq in freqs:
             try:
-                run_dics(subjectID, paths, space=space, fr_band=fr_band)
+                run_dics(subjectID, paths, freq, space=space, csd_method='fourier')
             except Exception as e:
                 print(f"Error processing subject {subjectID}: {e}")
 

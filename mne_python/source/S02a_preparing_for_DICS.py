@@ -16,7 +16,7 @@ import os
 import os.path as op
 import pandas as pd
 import mne
-from mne.time_frequency import csd_multitaper
+from mne.time_frequency import csd_multitaper, csd_fourier
 
 def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
@@ -35,9 +35,26 @@ def setup_paths(platform='mac'):
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
         'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-2sec'),
-        'deriv_folder': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer')
+        'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer')
     }
     return paths
+
+def construct_paths(subjectID, paths, csd_method='fourier'):
+    """Construct file paths for a given subject, space type, and frequency band.
+    csd_method = 'fourier' or 'multitaper' """
+
+    fs_sub = f'sub-CC{subjectID}_T1w'
+    deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
+
+    file_paths = {
+        'fs_sub': fs_sub,
+        'deriv_folder': deriv_folder,
+        'epoched_fname': op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif'),
+        'deriv_epoched_epo_fname': op.join(paths['meg_sensor_dir'], f'{fs_sub[:-4]}_2sec_epod-epo.fif'),
+        f'deriv_csd_{csd_method}_mag_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_csd_{csd_method}_mag'),
+        f'deriv_csd_{csd_method}_grad_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_csd_{csd_method}_grad'),
+    }
+    return file_paths
 
 def load_subjects(good_sub_sheet):
     """Load subject IDs from a CSV file."""
@@ -68,83 +85,105 @@ def epoching_epochs(epoched_fif, duration=2):
                                                       overlap=0.5, 
                                                       preload=True)
     return epoched_epochs
-def compute_csd(epochs, fmin=1, fmax=60, n_fft=500):
-    """ n_fft = 2*info['sfreq'] = n_fft in welch method for sensor level analyses """
-    welch_params = dict(fmin=fmin, fmax=fmax, picks="meg", n_fft=n_fft)
+def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
+    """ n_fft = 2*info['sfreq'] = n_fft in welch method for sensor level analyses 
+    csd_method= 'fourier' or 'multitaper' """
 
-    print(f'Calculating CSD matrices for {fmin} to {fmax}...')
-    csd_fourier = csd_fourier(epochs, 
-                             fmin=fmin, 
-                             fmax=fmax, 
-                             tmin=epochs.tmin, 
-                             tmax=epochs.tmax, 
-                             n_fft=n_fft, 
-                             verbose=False, 
-                             n_jobs=-1)
-    csd_multitaper = csd_multitaper(epochs, 
-                             fmin=fmin, 
-                             fmax=fmax, 
-                             tmin=epochs.tmin, 
-                             tmax=epochs.tmax, 
-                             bandwidth=1, 
-                             low_bias=True, 
-                             verbose=False, 
-                             n_jobs=-1)
-    return csd_fourier, csd_multitaper
+    if csd_method == 'fourier':
+        print(f'Calculating CSD fourier for mags for {fmin} to {fmax}Hz...')
+        csd_output_mag = csd_fourier(epochs, 
+                                fmin=fmin, 
+                                fmax=fmax, 
+                                tmin=epochs.tmin, 
+                                tmax=epochs.tmax, 
+                                picks="mag",
+                                n_fft=n_fft, 
+                                verbose=False, 
+                                n_jobs=-1)
+        print("Calculatingcsd for grads")
+        csd_output_grad = csd_fourier(epochs, 
+                                fmin=fmin, 
+                                fmax=fmax, 
+                                tmin=epochs.tmin, 
+                                tmax=epochs.tmax, 
+                                picks="grad",
+                                n_fft=n_fft, 
+                                verbose=False, 
+                                n_jobs=-1)
+        print('CSD fourier done!')
 
+    elif csd_method == 'multitaper':
+        print(f'Calculating CSD multitaper for mags for {fmin} to {fmax}Hz...')
+        csd_output_mag = csd_multitaper(epochs, 
+                                fmin=fmin, 
+                                fmax=fmax, 
+                                tmin=epochs.tmin, 
+                                tmax=epochs.tmax, 
+                                picks="mag",
+                                bandwidth=1, 
+                                low_bias=True, 
+                                verbose=False, 
+                                n_jobs=-1)
+        print("Calculatingcsd for grads")
+        csd_output_grad = csd_multitaper(epochs, 
+                                fmin=fmin, 
+                                fmax=fmax, 
+                                tmin=epochs.tmin, 
+                                tmax=epochs.tmax, 
+                                picks="grad",
+                                bandwidth=1, 
+                                low_bias=True, 
+                                verbose=False, 
+                                n_jobs=-1)
+                
+        print('CSD multitaper done!')
 
-def process_subject(subjectID, paths, fr_band):
+    return csd_output_mag, csd_output_grad
+
+def process_subject(subjectID, paths, csd_method='fourier'):
     """
     Process a single subject for a given frequency band.
     Computes and saves the cross-spectral density matrices.
     """
-    print(f"Processing subject {subjectID} for {fr_band} band...")
+    print(f"Processing subject {subjectID} ...")
 
-    # Define file paths
-    fs_sub = f"sub-CC{subjectID}_T1w"
-    epoched_fname = op.join(paths['epoched_dir'], f'sub-CC{subjectID}_ses-rest_task-rest_megtransdef_epo.fif')
-    meg_sensor_dir = paths['meg_sensor_dir']
-    deriv_folder = op.join(paths['deriv_folder'], f'{fs_sub[:-4]}')
-    deriv_epoched_epo_fname = op.join(meg_sensor_dir, f'{fs_sub[:-4]}_2sec_epod-epo.fif')
-    deriv_csd_fourier_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_csd_fourier')
-    deriv_csd_multitaper_fname = op.join(deriv_folder, f'{fs_sub[:-4]}_csd_multitaper')
+    file_paths = construct_paths(subjectID, paths, csd_method='fourier')
 
     # Skip if CSD files already exist
-    if op.exists(deriv_csd_fourier_fname) and op.exists(deriv_csd_multitaper_fname):
+    if op.exists(file_paths[f'deriv_csd_{csd_method}_mag_fname']) and \
+        op.exists(file_paths[f'deriv_csd_{csd_method}_grad_fname']):
         print(f"CSD already exists for subject {subjectID}. Skipping...")
         return
     
-    if not op.exists(meg_sensor_dir):
-        os.makedirs(meg_sensor_dir)
+
+    if not op.exists(paths["meg_sensor_dir"]):
+        os.makedirs(paths["meg_sensor_dir"])
 
     # Epoch the data
-    epoched_epochs = epoching_epochs(epoched_fname)
-    epoched_epochs.save(deriv_epoched_epo_fname, overwrite=True)
+    epoched_epochs = epoching_epochs(file_paths["epoched_fname"])
+    epoched_epochs.save(file_paths["deriv_epoched_epo_fname"], overwrite=True)
 
     # Compute CSDs
-    csd_fourier, csd_multitaper = compute_csd(epoched_epochs)
+    csd_output_mag, csd_output_grad = compute_csd(epoched_epochs, fmin=1, fmax=60, n_fft=500)
 
     # Save CSDs
-    csd_fourier.save(deriv_mag_csd_fname, overwrite=True)
-    csd_multitaper.save(deriv_grad_csd_fname, overwrite=True)
+    csd_output_mag.save(file_paths[f'deriv_csd_{csd_method}_mag_fname'], overwrite=True)
+    csd_output_grad.save(file_paths[f'deriv_csd_{csd_method}_grad_fname'], overwrite=True)
 
-    print(f"Subject {subjectID} processed successfully for {fr_band} band.")
+    print(f"Subject {subjectID} processed successfully.")
 
 def main():
     platform = 'mac'  # Change to 'bluebear' if running on BlueBear
-    fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
-
     # Set up paths and load subjects
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
     # Process each subject and frequency band
-    for subjectID in good_subjects.index[0:10]:
-        for fr_band in fr_bands:
-            try:
-                process_subject(subjectID, paths, fr_band)
-            except Exception as e:
-                print(f"Error processing subject {subjectID} in {fr_band} band: {e}")
+    for subjectID in good_subjects.index[0:2]:
+        try:
+            process_subject(subjectID, paths)
+        except Exception as e:
+            print(f"Error processing subject {subjectID}: {e}")
 
 if __name__ == "__main__":
     main()
