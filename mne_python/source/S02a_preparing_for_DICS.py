@@ -85,6 +85,7 @@ def epoching_epochs(epoched_fif, duration=2):
                                                       overlap=0.5, 
                                                       preload=True)
     return epoched_epochs
+
 def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
     """ n_fft = 2*info['sfreq'] = n_fft in welch method for sensor level analyses 
     csd_method= 'fourier' or 'multitaper' """
@@ -155,7 +156,6 @@ def process_subject(subjectID, paths, csd_method='fourier'):
         print(f"CSD already exists for subject {subjectID}. Skipping...")
         return
     
-
     if not op.exists(paths["meg_sensor_dir"]):
         os.makedirs(paths["meg_sensor_dir"])
 

@@ -85,7 +85,7 @@ def check_existing_dics(file_paths):
     return False
 
 
-def forward_rank_csd(file_paths, space='volume', csd_method='fourier'):
+def read_forward_rank_csd(file_paths, space='volume', csd_method='fourier'):
 
     print('Reading forward model')
     forward = mne.read_forward_solution(file_paths['fwd_vol_fname'] if space == 'volume' else file_paths['fwd_surf_fname'])
@@ -105,8 +105,58 @@ def forward_rank_csd(file_paths, space='volume', csd_method='fourier'):
 
     return forward, mags, grads, rank_mag, rank_grad, csd_mags, csd_grads
 
+def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
+                 forward, file_paths, paths, reg=0.01):
+    """Makes dics and  applys on csd on whole spectrum for
+    plotting."""
+    # Plot and save results
+    print("Plotting results for double-checking...")
+    filters_mag = make_dics(mags.info, 
+                            forward, 
+                            csd_mags.mean(), 
+                            noise_csd=None, 
+                            reg=reg, 
+                            pick_ori='max-power', 
+                            reduce_rank=True, 
+                            real_filter=True, 
+                            rank=rank_mag, 
+                            depth=None, 
+                            inversion='matrix', 
+                            weight_norm="unit-noise-gain")
+    stc_mag,_ = apply_dics_csd(csd_mags.mean(), filters_mag)
+   
+    filters_grad = make_dics(grads.info, 
+                            forward, 
+                            csd_grads.mean(), 
+                            noise_csd=None, 
+                            reg=reg, 
+                            pick_ori='max-power', 
+                            reduce_rank=True, 
+                            real_filter=True, 
+                            rank=rank_grad, 
+                            depth=None, 
+                            inversion='matrix', 
+                            weight_norm="unit-noise-gain")
+    stc_grad,_ = apply_dics_csd(csd_grads.mean(), filters_grad)
+
+    if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
+
+    stc_mag.plot(src=forward["src"], 
+                    subject=file_paths['fs_sub'], 
+                    subjects_dir=paths['fs_sub_dir'], 
+                    mode='stat_map',
+                    verbose=True).savefig(f"{file_paths['stc_mag_plot_fname']}.png")
+
+    stc_grad.plot(src=forward["src"], 
+                    subject=file_paths['fs_sub'], 
+                    subjects_dir=paths['fs_sub_dir'], 
+                    mode='stat_map', 
+                    verbose=True).savefig(f"{file_paths['stc_grad_plot_fname']}.png")
+    
+
 def run_dics(mags, grads, freq, forward, csd_mags, csd_grads, 
-             rank_mag, rank_grad, file_paths, reg = 0.01, csd_method='fourier'):
+             rank_mag, rank_grad, file_paths, reg=0.01, csd_method='fourier'):
     """Run DICS for a given subject for the given freqs (1hz by 1hz)."""
 
     print(f'Create DICS filters on {csd_method} csd and apply with egularisation = {reg} for {freq}Hz')
@@ -150,58 +200,48 @@ def run_dics(mags, grads, freq, forward, csd_mags, csd_grads,
     print(f"DICS results successfully saved for {freq}Hz")
 
 
-def plotting_stc(csd_mags, csd_grads, forward, file_paths, paths):
-    # Plot and save results
-    print("Plotting results for double-checking...")
-    filters_mag = make_dics(mags.info, 
-                            forward, 
-                            csd_mags_freq, 
-                            noise_csd=None, 
-                            reg=reg, 
-                            pick_ori='max-power', 
-                            reduce_rank=True, 
-                            real_filter=True, 
-                            rank=rank_mag, 
-                            depth=None, 
-                            inversion='matrix', 
-                            weight_norm="unit-noise-gain")
-    stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)
-   
-    if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
-        os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
+def process_subject(subjectID, paths, space='volume'):
 
-    stc_mag.plot(src=forward["src"], 
-                    subject=file_paths['fs_sub'], 
-                    subjects_dir=paths['fs_sub_dir'], 
-                    mode='stat_map',
-                    verbose=True).savefig(f"{file_paths['stc_mag_plot_fname']}.png")
+    print(f"Processing subject {subjectID}...")
+    subject_paths = construct_paths(subjectID, paths)
+    file_paths = construct_paths(subjectID, paths, csd_method=csd_method)
 
-    stc_grad.plot(src=forward["src"], 
-                    subject=file_paths['fs_sub'], 
-                    subjects_dir=paths['fs_sub_dir'], 
-                    mode='stat_map', 
-                    verbose=True).savefig(f"{file_paths['stc_grad_plot_fname']}.png")
+    # Skip if forward solution already exists
+    if check_existing_dics(subject_paths):
+        return
 
 
-def main():
-    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
-    freqs = np.arange(1, 60, 0.5)  # range of frequencies for dics
-    space = 'volume'  # Space type: 'surface' or 'volume'
-
-    paths = setup_paths(platform)
-    good_subjects = load_subjects(paths['good_sub_sheet'])
-    file_paths = construct_paths(subjectID, paths, csd_method='fourier')
+    (forward, mags, grads, rank_mag, rank_grad, 
+        csd_mags, csd_grads) = read_forward_rank_csd(file_paths, 
+                                                     space=space, 
+                                                     csd_method=csd_method)
+    plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
+                 forward, file_paths, paths, reg=reg)
+    
+    run_dics(mags, grads, freq, forward, csd_mags, csd_grads, 
+             rank_mag, rank_grad, file_paths, reg=reg, csd_method=csd_method)
     
     # Skip subjects with existing DICS results
     if check_existing_dics(file_paths):
         return
+
+def main():
+    
+    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    freqs = np.arange(1, 60, 0.5)  # range of frequencies for dics
+    space = 'volume'  # Space type: 'surface' or 'volume'
+    csd_method = 'fourier'
+    reg = 0.01
+
+    paths = setup_paths(platform)
+    good_subjects = load_subjects(paths['good_sub_sheet'])
 
     for subjectID in good_subjects.index[0:2]:
         print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}, {freq}")
 
         for freq in freqs:
             try:
-                run_dics(subjectID, paths, freq, space=space, csd_method='fourier')
+                run_dics(subjectID, paths, freq, space=space, csd_method=csd_method)
             except Exception as e:
                 print(f"Error processing subject {subjectID}: {e}")
 
