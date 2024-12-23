@@ -155,7 +155,7 @@ def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
                     verbose=True).savefig(f"{file_paths['stc_grad_plot_fname']}.png")
     
 
-def run_dics(mags, grads, freq, forward, csd_mags, csd_grads, 
+def run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
              rank_mag, rank_grad, file_paths, reg=0.01, csd_method='fourier'):
     """Run DICS for a given subject for the given freqs (1hz by 1hz)."""
 
@@ -199,35 +199,29 @@ def run_dics(mags, grads, freq, forward, csd_mags, csd_grads,
 
     print(f"DICS results successfully saved for {freq}Hz")
 
-
-def process_subject(subjectID, paths, space='volume'):
+def process_subject(subjectID, paths, csd_method='fourier', space='volume', reg=0.01):
 
     print(f"Processing subject {subjectID}...")
-    subject_paths = construct_paths(subjectID, paths)
     file_paths = construct_paths(subjectID, paths, csd_method=csd_method)
 
     # Skip if forward solution already exists
-    if check_existing_dics(subject_paths):
+    if check_existing_dics(file_paths):
         return
-
 
     (forward, mags, grads, rank_mag, rank_grad, 
         csd_mags, csd_grads) = read_forward_rank_csd(file_paths, 
                                                      space=space, 
                                                      csd_method=csd_method)
-    plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
-                 forward, file_paths, paths, reg=reg)
     
-    run_dics(mags, grads, freq, forward, csd_mags, csd_grads, 
-             rank_mag, rank_grad, file_paths, reg=reg, csd_method=csd_method)
+    # plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
+    #              forward, file_paths, paths, reg=reg)
     
-    # Skip subjects with existing DICS results
-    if check_existing_dics(file_paths):
-        return
+    return file_paths, forward, mags, grads, rank_mag, rank_grad, csd_mags, csd_grads
+
 
 def main():
     
-    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
     freqs = np.arange(1, 60, 0.5)  # range of frequencies for dics
     space = 'volume'  # Space type: 'surface' or 'volume'
     csd_method = 'fourier'
@@ -237,13 +231,22 @@ def main():
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
     for subjectID in good_subjects.index[0:2]:
-        print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}, {freq}")
-
-        for freq in freqs:
-            try:
-                run_dics(subjectID, paths, freq, space=space, csd_method=csd_method)
-            except Exception as e:
-                print(f"Error processing subject {subjectID}: {e}")
+        try:
+            print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}")
+            (file_paths, forward, 
+            mags, grads, 
+            rank_mag, rank_grad, 
+            csd_mags, csd_grads) = process_subject(subjectID, 
+                                                    paths, 
+                                                    csd_method=csd_method, 
+                                                    space=space, 
+                                                    reg=reg)
+            for freq in freqs:
+                print(f'Running DICS on {freq}Hz')
+                run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
+                        rank_mag, rank_grad, file_paths, reg=reg, csd_method=csd_method)
+        except Exception as e:
+            print(f"Error processing subject {subjectID}: {e}")
 
 if __name__ == "__main__":
     main()

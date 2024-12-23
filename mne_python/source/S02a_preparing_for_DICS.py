@@ -173,13 +173,13 @@ def process_subject(subjectID, paths, csd_method='fourier'):
     print(f"Subject {subjectID} processed successfully.")
 
 def main():
-    platform = 'mac'  # Change to 'bluebear' if running on BlueBear
+    platform = 'bluebear'  # Change to 'bluebear' if running on BlueBear
     # Set up paths and load subjects
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
     # Process each subject and frequency band
-    for subjectID in good_subjects.index[0:2]:
+    for subjectID in good_subjects.index[1:50]:
         try:
             process_subject(subjectID, paths)
         except Exception as e:
