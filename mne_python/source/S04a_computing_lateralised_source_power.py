@@ -81,15 +81,6 @@ def construct_paths(subjectID, paths, sensortype, stc_method, space):
     }
     return file_paths
 
-def check_existing(file_paths):
-    """Checks whether output files already exist for the given subject."""
-    if op.exists(file_paths['grid_positions_csv']) or \
-    op.exists(file_paths['grid_indices_csv']) or \
-    op.exists(file_paths['lateralised_src_power_csv']):
-        print(f"source lateralisation results already exist for {file_paths['fs_sub']}. Skipping...")
-        return True
-    return False
-
 def morph_subject_to_fsaverage(file_paths, src, sensortype, freq):
     """
     Morph subject data to fsaverage space for more 
@@ -317,6 +308,13 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
 
     return lateralised_power_arr
 
+def check_existing(file_paths, freq):
+    """Checks whether output files already exist for the given subject."""
+    if op.exists(f"{file_paths["lateralised_src_power_csv"]}_{freq}.csv"):
+        print(f"source lateralisation results already exist for {file_paths['fs_sub']} in {freq}Hz. Skipping...")
+        return True
+    return False
+
 def plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         forward, file_paths, freq):
@@ -388,14 +386,11 @@ def plot_lateralisation(ordered_right_positions, lateralised_power_arr,
         verbose=True
     ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
 
-def process_subject(subjectID, paths, sensortype, space, fr_band):
+def process_subject(subjectID, paths, sensortype, space, stc_method):
     """Processes a single subject for a specific frequency band.
     sensortyep= 'grad' or 'mag' 
     space= 'vol or 'surf' """
-    file_paths = construct_paths(subjectID, paths, sensortype, space, fr_band)
-
-    if check_existing(file_paths):
-        return
+    file_paths = construct_paths(subjectID, paths, sensortype, stc_method, space)
 
     # Read data - add mags
     forward = mne.read_forward_solution(file_paths[f'fwd_{space}'])
@@ -421,7 +416,7 @@ def process_subject(subjectID, paths, sensortype, space, fr_band):
     plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         forward, file_paths)
-    print(f"Processed subject {subjectID}, freq_band {fr_band}.")
+    print(f"Processed subject {subjectID}, freq_band {freq}.")
 
 
 # ============================================
@@ -432,18 +427,24 @@ def main():
 
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    fr_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']  # Frequency bands to process
+    freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
     for subjectID in good_subjects.index:
-        for sensortype in sensortypes:
-            for fr_band in fr_bands:
-                process_subject(subjectID, paths, sensortype, space, fr_band)
+        try:
+            for sensortype in sensortypes:
 
-    print("Processing complete for all subjects and frequency bands.")
+                for freq in freqs:
+                    check_existing(file_paths, freq)
+
+                    process_subject(subjectID, paths, sensortype, space, freq)
+
+            print("Processing complete for all subjects and frequency bands.")
+        except Exception as e:
+            print(f"Error processing subject {subjectID}: {e}")
 
 if __name__ == "__main__":
     main()
