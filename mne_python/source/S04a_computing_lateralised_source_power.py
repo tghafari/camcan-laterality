@@ -23,10 +23,6 @@ import mne
 from mne.datasets import fetch_fsaverage
 from mpl_toolkits.mplot3d import Axes3D
 
-# ============================================
-# Functions
-# ============================================
-
 def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
     if platform == 'bluebear':
@@ -43,7 +39,7 @@ def setup_paths(platform='mac'):
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'fs_sub_dir': op.join(rds_dir, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
         'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer'),
-        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-1to8sec'),
+        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-2sec'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
     }
     return paths
@@ -53,7 +49,7 @@ def load_subjects(good_sub_sheet):
     good_subjects = pd.read_csv(good_sub_sheet)
     return good_subjects.index.tolist()
 
-def construct_paths(subjectID, paths, sensortype, space, fr_band):
+def construct_paths(subjectID, paths, sensortype, stc_method, space):
     """
     Construct required file paths for a given subject and frequency band.
 
@@ -62,7 +58,6 @@ def construct_paths(subjectID, paths, sensortype, space, fr_band):
     - paths (dict): Dictionary of data paths.
     - sensortype (str): 'grad' or 'mag'.
     - space (str): 'vol' or 'surf'.
-    - fr_band (str): Frequency band.
 
     Returns:
     - dict: File paths for the subject and frequency band.
@@ -74,15 +69,15 @@ def construct_paths(subjectID, paths, sensortype, space, fr_band):
     file_paths = {
         'fs_sub': fs_sub,
         'deriv_folder': deriv_folder,
-        f'{sensortype}_stc': op.join(deriv_folder, f'{fs_sub[:-4]}_{sensortype}_stc_multitaper_{fr_band}-vl.stc'),
-        f'fsmorph_{sensortype}_stc_fname': op.join(deriv_folder, f'{fs_sub[:-4]}_fsmorph_{sensortype}_stc_{fr_band}-vl.stc'),
         f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
-        'grid_positions_csv': op.join(deriv_folder, 'grid_positions.csv'),
-        'grid_indices_csv': op.join(deriv_folder, 'grid_indices.csv'),
-        'lateralised_src_power_csv': op.join(deriv_folder, 'lateralised_src_power.csv'),
-        'lateralised_grid_figname': op.join(deriv_folder, 'lateralised_grid.png'),
-        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, f'stc_VolEst_lateral_power_{sensortype}_{fr_band}.png'),
-        'stc_fsmorphd_lateral_power_figname': op.join(deriv_folder, f'stc_morphd_lateral_power_{sensortype}_{fr_band}.png'),
+        f'{sensortype}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{stc_method}_{sensortype}'),
+        f'fsmorph_{sensortype}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{stc_method}_{sensortype}'),
+        'grid_positions_csv': op.join(deriv_folder, 'grid_perHz', 'grid_positions'),
+        'grid_indices_csv': op.join(deriv_folder, 'grid_perHz', 'grid_indices'),
+        'lateralised_src_power_csv': op.join(deriv_folder, 'lat_perHz', 'lateralised_src_power'),
+        'lateralised_grid_figname': op.join(deriv_folder, 'plot', 'lateralised_grid'),
+        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'plot', f'stc_VolEst_lateral_power_{sensortype}'),
+        'stc_fsmorphd_lateral_power_figname': op.join(deriv_folder, 'plot', f'stc_morphd_lateral_power_{sensortype}'),
     }
     return file_paths
 
@@ -95,7 +90,7 @@ def check_existing(file_paths):
         return True
     return False
 
-def morph_subject_to_fsaverage(file_paths, src, sensortype):
+def morph_subject_to_fsaverage(file_paths, src, sensortype, freq):
     """
     Morph subject data to fsaverage space for more 
     reliable comparisons later.
@@ -104,6 +99,8 @@ def morph_subject_to_fsaverage(file_paths, src, sensortype):
     - file_paths (dict): Dictionary of file paths.
     - src: Source space object.
     - sensortype (str): 'grad' or 'mag'.
+    - freq (double): frequency range for which stc was computed. 
+      Default is np.arange(1, 60.5, 0.5)
 
     Returns:
     - mne.SourceEstimate: Morphed source estimate.
@@ -123,22 +120,29 @@ def morph_subject_to_fsaverage(file_paths, src, sensortype):
         zooms='auto',  # just for speed
         verbose=True,
     )
-    stc_fs = morph.apply(file_paths[f'{sensortype}_stc'])
-    stc_fs.save(file_paths[f'fsmorph_{sensortype}_stc_fname'], overwrite=True)
+    stc_fsmorphed = morph.apply(f'{file_paths["{sensortype}_stc"]}_{freq}-vl.stc')
+        
+    # Save morphed results
+    if not op.exists(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz'))
+    stc_fsmorphed.save(f'{file_paths["fsmorph_{sensortype}_stc_fname"]}_{freq}-vl.stc', overwrite=True)  #_{freq}-vl.stc
+
+    if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
     lims = [0.3, 0.45, 0.6]
-    stc_fs.plot(
+    stc_fsmorphed.plot(
         src=src_fs,
         mode="stat_map",
         initial_time=0.085,
         subjects_dir=file_paths["fs_sub_dir"],
         clim=dict(kind="value", pos_lims=lims),
         verbose=True,
-    ).savefig(file_paths['stc_fsmorphd_lateral_power_figname'])
+    ).savefig(f"{file_paths['stc_fsmorphd_lateral_power_figname']}_{freq}.png")
 
-    return stc_fs
+    return stc_fsmorphed
 
-def compute_hemispheric_index(stc_fs, src):
+def compute_hemispheric_index(stc_fsmorphed, src):
     """
     Compute the hemispheric lateralisation index from source estimates.
 
@@ -169,12 +173,12 @@ def compute_hemispheric_index(stc_fs, src):
     for region_idx, indices in enumerate(grid_indices[0]):
         pos = grid_positions[0][indices]  # only select in-use positions in the source model
         if pos[0] < 0:  # x < 0 is left hemisphere
-            left_hemisphere_time_courses.append(stc_fs.data[region_idx, :])
+            left_hemisphere_time_courses.append(stc_fsmorphed.data[region_idx, :])
             left_positions.append(pos)
             left_indices.append(indices)
             left_reg_indices.append(region_idx)
         elif pos[0] > 0:  # x > 0 is right hemisphere
-            right_hemisphere_time_courses.append(stc_fs.data[region_idx, :])
+            right_hemisphere_time_courses.append(stc_fsmorphed.data[region_idx, :])
             right_positions.append(pos)
             right_indices.append(indices)
             right_reg_indices.append(region_idx)
@@ -193,7 +197,7 @@ def order_grid_positions(right_positions, left_positions,
                          right_indices, left_indices, 
                          right_reg_indices, left_reg_indices,
                          right_hemisphere_time_courses, left_hemisphere_time_courses,
-                         file_paths):
+                         file_paths, freq):
     """
     To match the positions in left_positions and right_positions by aligning the 
     x, y, and z coordinates such that each 
@@ -290,15 +294,15 @@ def order_grid_positions(right_positions, left_positions,
         'Left Hemisphere Index': ordered_left_indices
     })
 
-    positions_table.to_csv(file_paths["grid_positions_csv"])
-    indices_table.to_csv(file_paths["grid_indices_csv"])
+    positions_table.to_csv(f"{file_paths["grid_positions_csv"]}_{freq}.csv")
+    indices_table.to_csv(f"{file_paths["grid_indices_csv"]}_{freq}.csv")
 
     return (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
             ordered_right_region_indices, ordered_left_region_indices,
             ordered_right_time_courses, ordered_left_time_courses)
 
-def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_courses, file_paths):
+def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_courses, file_paths, freq):
     # Calculate lateralised source power
     lateralised_power = []
 
@@ -309,13 +313,13 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
     lateralised_power_arr = np.squeeze(np.array(lateralised_power)) 
     lateralised_power_df = pd.DataFrame(lateralised_power_arr, columns=['Lateralised Source Power Index'])
 
-    lateralised_power_df.to_csv(file_paths["lateralised_src_power_csv"])
+    lateralised_power_df.to_csv(f"{file_paths["lateralised_src_power_csv"]}_{freq}.csv")
 
     return lateralised_power_arr
 
 def plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
-                        forward, file_paths):
+                        forward, file_paths, freq):
     """ 
     Plot findings in grid positions and 
     on a VolumeEstimate.
@@ -346,7 +350,7 @@ def plot_lateralisation(ordered_right_positions, lateralised_power_arr,
     ax.set_zlabel('Z')
     plt.title('Lateralised Power on Right Hemisphere Grid Points')
     plt.legend()
-    plt.savefig(file_paths["lateralised_grid_figname"])
+    plt.savefig(f"{file_paths["lateralised_grid_figname"]}_{freq}.png")
     plt.close()
 
     # Create a volume estimate 
@@ -382,7 +386,7 @@ def plot_lateralisation(ordered_right_positions, lateralised_power_arr,
         mode='stat_map',
         colorbar=True,
         verbose=True
-    ).savefig(file_paths['stc_VolEst_lateral_power_figname'])
+    ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
 
 def process_subject(subjectID, paths, sensortype, space, fr_band):
     """Processes a single subject for a specific frequency band.
