@@ -291,6 +291,8 @@ def order_grid_positions(right_positions, left_positions,
         'Left Hemisphere Index': ordered_left_indices
     })
 
+    if not op.exists(op.join(file_paths["deriv_folder"], 'grid_perHz')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'grid_perHz'))
     positions_table.to_csv(f'{file_paths["grid_positions_csv"]}_{sensortype}_{freq}.csv')
     indices_table.to_csv(f'{file_paths["grid_indices_csv"]}_{sensortype}_{freq}.csv')
 
