@@ -81,10 +81,11 @@ def construct_paths(subjectID, paths, sensortype, stc_method, space):
     }
     return file_paths
 
-def morph_subject_to_fsaverage(file_paths, src, sensortype, freq):
+def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, plot=False):
     """
     Morph subject data to fsaverage space for more 
     reliable comparisons later.
+    runs per freq
 
     Parameters:
     - file_paths (dict): Dictionary of file paths.
@@ -92,50 +93,54 @@ def morph_subject_to_fsaverage(file_paths, src, sensortype, freq):
     - sensortype (str): 'grad' or 'mag'.
     - freq (double): frequency range for which stc was computed. 
       Default is np.arange(1, 60.5, 0.5)
+    - plot (boolean): plot or not
 
     Returns:
     - mne.SourceEstimate: Morphed source estimate.
     """
-
-    fetch_fsaverage(file_paths["fs_sub_dir"])  # ensure fsaverage src exists
-    fname_fsaverage_src = op.join(file_paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+    freq = float(freq)  # this is how the files are saved in S02b
+    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
+    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
 
     src_fs = mne.read_source_spaces(fname_fsaverage_src)
     morph = mne.compute_source_morph(
         src,
         subject_from=file_paths["fs_sub"],
         src_to=src_fs,
-        subjects_dir=file_paths["fs_sub_dir"],
+        subjects_dir=paths["fs_sub_dir"],
         niter_sdr=[5, 5, 2],
         niter_affine=[5, 5, 2],
         zooms='auto',  # just for speed
         verbose=True,
     )
-    stc_fsmorphed = morph.apply(f'{file_paths["{sensortype}_stc"]}_{freq}-vl.stc')
+    sub_freq_stc = mne.read_source_estimate(f'{file_paths[f"{sensortype}_stc"]}_[{freq}]-vl.stc')
+    stc_fsmorphed = morph.apply(sub_freq_stc)
         
     # Save morphed results
     if not op.exists(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz'))
-    stc_fsmorphed.save(f'{file_paths["fsmorph_{sensortype}_stc_fname"]}_{freq}-vl.stc', overwrite=True)  #_{freq}-vl.stc
+    stc_fsmorphed.save(f'{file_paths[f"fsmorph_{sensortype}_stc_fname"]}_{freq}-vl.stc', overwrite=True)  #_{freq}-vl.stc
 
-    if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
-        os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
+    if plot:
+        if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
+            os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
-    lims = [0.3, 0.45, 0.6]
-    stc_fsmorphed.plot(
-        src=src_fs,
-        mode="stat_map",
-        initial_time=0.085,
-        subjects_dir=file_paths["fs_sub_dir"],
-        clim=dict(kind="value", pos_lims=lims),
-        verbose=True,
-    ).savefig(f"{file_paths['stc_fsmorphd_lateral_power_figname']}_{freq}.png")
+        lims = [0.3, 0.45, 0.6]
+        stc_fsmorphed.plot(
+            src=src_fs,
+            mode="stat_map",
+            initial_time=0.085,
+            subjects_dir=paths["fs_sub_dir"],
+            clim=dict(kind="value", pos_lims=lims),
+            verbose=True,
+        ).savefig(f"{file_paths['stc_fsmorphd_lateral_power_figname']}_{freq}.png")
 
     return stc_fsmorphed
 
 def compute_hemispheric_index(stc_fsmorphed, src):
     """
     Compute the hemispheric lateralisation index from source estimates.
+    runs per freq
 
     Parameters:
     -----------
@@ -174,9 +179,9 @@ def compute_hemispheric_index(stc_fsmorphed, src):
             right_indices.append(indices)
             right_reg_indices.append(region_idx)
 
-        # Convert lists to numpy arrays for easy manipulation
-        right_positions = np.array(right_positions)
-        left_positions = np.array(left_positions)
+    # Convert lists to numpy arrays for easy manipulation
+    right_positions = np.array(right_positions)
+    left_positions = np.array(left_positions)
 
     return (right_hemisphere_time_courses, left_hemisphere_time_courses,
             right_positions, left_positions,
@@ -188,7 +193,7 @@ def order_grid_positions(right_positions, left_positions,
                          right_indices, left_indices, 
                          right_reg_indices, left_reg_indices,
                          right_hemisphere_time_courses, left_hemisphere_time_courses,
-                         file_paths, freq):
+                         file_paths, freq, sensortype):
     """
     To match the positions in left_positions and right_positions by aligning the 
     x, y, and z coordinates such that each 
@@ -198,6 +203,7 @@ def order_grid_positions(right_positions, left_positions,
     Once we find the correct order, we'll 
     reorder left_positions and right_positions along with 
     their respective left_indices and right_indices.
+    runs per freq per sensortype
     """
     # Minimum euclidian distance accepted from corresponding points
     min_distance_accepted = 0.01 
@@ -285,8 +291,8 @@ def order_grid_positions(right_positions, left_positions,
         'Left Hemisphere Index': ordered_left_indices
     })
 
-    positions_table.to_csv(f"{file_paths["grid_positions_csv"]}_{freq}.csv")
-    indices_table.to_csv(f"{file_paths["grid_indices_csv"]}_{freq}.csv")
+    positions_table.to_csv(f'{file_paths["grid_positions_csv"]}_{sensortype}_{freq}.csv')
+    indices_table.to_csv(f'{file_paths["grid_indices_csv"]}_{sensortype}_{freq}.csv')
 
     return (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
@@ -315,7 +321,7 @@ def check_existing(file_paths, freq):
         return True
     return False
 
-def plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
+def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         forward, file_paths, freq):
     """ 
@@ -380,7 +386,7 @@ def plot_lateralisation(ordered_right_positions, lateralised_power_arr,
     stc_lateral_power.plot(
         src=forward["src"],
         subject=file_paths["fs_sub"],
-        subjects_dir=file_paths["fs_sub_dir"],
+        subjects_dir=paths["fs_sub_dir"],
         mode='stat_map',
         colorbar=True,
         verbose=True
