@@ -39,7 +39,7 @@ def setup_paths(platform='mac'):
     }
     return paths
 
-def construct_paths(subjectID, paths, csd_method='fourier'):
+def construct_paths(subjectID, paths, csd_method='multitaper'):
     """Construct file paths for a given subject, space type, and frequency band.
     csd_method = 'fourier' or 'multitaper' """
 
@@ -86,7 +86,7 @@ def epoching_epochs(epoched_fif, duration=2):
                                                       preload=True)
     return epoched_epochs
 
-def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
+def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='multitaper'):
     """ n_fft = 2*info['sfreq'] = n_fft in welch method for sensor level analyses 
     csd_method= 'fourier' or 'multitaper' """
 
@@ -101,7 +101,7 @@ def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
                                 n_fft=n_fft, 
                                 verbose=False, 
                                 n_jobs=-1)
-        print("Calculatingcsd for grads")
+        print(f"Calculating CSD fourier for grads for {fmin} to {fmax}Hz")
         csd_output_grad = csd_fourier(epochs, 
                                 fmin=fmin, 
                                 fmax=fmax, 
@@ -125,7 +125,7 @@ def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
                                 low_bias=True, 
                                 verbose=False, 
                                 n_jobs=-1)
-        print("Calculatingcsd for grads")
+        print(f"Calculating CSD multitaper for grads for {fmin} to {fmax}Hz...")
         csd_output_grad = csd_multitaper(epochs, 
                                 fmin=fmin, 
                                 fmax=fmax, 
@@ -141,14 +141,14 @@ def compute_csd(epochs, fmin=1, fmax=60, n_fft=500, csd_method='fourier'):
 
     return csd_output_mag, csd_output_grad
 
-def process_subject(subjectID, paths, csd_method='fourier'):
+def process_subject(subjectID, paths, csd_method='multitaper'):
     """
     Process a single subject for a given frequency band.
     Computes and saves the cross-spectral density matrices.
     """
     print(f"Processing subject {subjectID} ...")
 
-    file_paths = construct_paths(subjectID, paths, csd_method='fourier')
+    file_paths = construct_paths(subjectID, paths, csd_method=csd_method)
 
     # Skip if CSD files already exist
     if op.exists(file_paths[f'deriv_csd_{csd_method}_mag_fname']) and \
@@ -164,7 +164,7 @@ def process_subject(subjectID, paths, csd_method='fourier'):
     epoched_epochs.save(file_paths["deriv_epoched_epo_fname"], overwrite=True)
 
     # Compute CSDs
-    csd_output_mag, csd_output_grad = compute_csd(epoched_epochs, fmin=1, fmax=60, n_fft=500)
+    csd_output_mag, csd_output_grad = compute_csd(epoched_epochs, fmin=1, fmax=60, n_fft=500, csd_method=csd_method)
 
     # Save CSDs
     csd_output_mag.save(file_paths[f'deriv_csd_{csd_method}_mag_fname'], overwrite=True)
@@ -174,14 +174,14 @@ def process_subject(subjectID, paths, csd_method='fourier'):
 
 def main():
     platform = 'bluebear'  # Change to 'bluebear' if running on BlueBear
-    # Set up paths and load subjects
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
+    csd_method='multitaper'
 
     # Process each subject and frequency band
     for subjectID in good_subjects.index[1:50]:
         try:
-            process_subject(subjectID, paths)
+            process_subject(subjectID, paths, csd_method=csd_method)
         except Exception as e:
             print(f"Error processing subject {subjectID}: {e}")
 

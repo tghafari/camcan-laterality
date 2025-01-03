@@ -21,7 +21,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mne
 from mne.datasets import fetch_fsaverage
-from mpl_toolkits.mplot3d import Axes3D
+
 
 def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
@@ -45,18 +45,21 @@ def setup_paths(platform='mac'):
     return paths
 
 def load_subjects(good_sub_sheet):
-    """Loads the list of subjects with good preprocessing."""
-    good_subjects = pd.read_csv(good_sub_sheet)
-    return good_subjects.index.tolist()
+    """Load subject IDs from a CSV file."""
+    good_subject_pd = pd.read_csv(good_sub_sheet)
+    good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # Set subject IDs as the index
+    return good_subject_pd
 
-def construct_paths(subjectID, paths, sensortype, stc_method, space):
+def construct_paths(subjectID, paths, sensortype, csd_method, space):
     """
     Construct required file paths for a given subject and frequency band.
+    runs per sensorytype and csd_method
 
     Parameters:
     - subjectID (str): Subject ID.
     - paths (dict): Dictionary of data paths.
     - sensortype (str): 'grad' or 'mag'.
+    - csd_method (str): 'fourier' or 'multitaper'. only works if S02a and b have been run on that method.
     - space (str): 'vol' or 'surf'.
 
     Returns:
@@ -70,22 +73,22 @@ def construct_paths(subjectID, paths, sensortype, stc_method, space):
         'fs_sub': fs_sub,
         'deriv_folder': deriv_folder,
         f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
-        f'{sensortype}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{stc_method}_{sensortype}'),
-        f'fsmorph_{sensortype}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{stc_method}_{sensortype}'),
-        'grid_positions_csv': op.join(deriv_folder, 'grid_perHz', 'grid_positions'),
-        'grid_indices_csv': op.join(deriv_folder, 'grid_perHz', 'grid_indices'),
-        'lateralised_src_power_csv': op.join(deriv_folder, 'lat_perHz', 'lateralised_src_power'),
-        'lateralised_grid_figname': op.join(deriv_folder, 'plot', 'lateralised_grid'),
-        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'plot', f'stc_VolEst_lateral_power_{sensortype}'),
-        'stc_fsmorphd_lateral_power_figname': op.join(deriv_folder, 'plot', f'stc_morphd_lateral_power_{sensortype}'),
+        f'{sensortype}_{csd_method}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{csd_method}_{sensortype}'),
+        f'fsmorph_{sensortype}_{csd_method}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{csd_method}_{sensortype}'),
+        f'grid_positions_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_positions_{sensortype}_{csd_method}'),
+        f'grid_indices_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_indices_{sensortype}_{csd_method}'),
+        f'lateralised_src_power_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'lat_source_perHz', f'lateralised_src_power_{sensortype}_{csd_method}'),
+        f'lateralised_grid_{sensortype}_{csd_method}_figname': op.join(deriv_folder, 'plots', f'lateralised_grid_{sensortype}_{csd_method}'),
+        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'plots', f'stc_VolEst_lateral_power_{sensortype}_{csd_method}'),
+        'stc_fsmorphd_figname': op.join(deriv_folder, 'plots', f'stc_fsmorphd_{sensortype}_{csd_method}'),
     }
     return file_paths
 
-def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, plot=False):
+def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot):
     """
     Morph subject data to fsaverage space for more 
     reliable comparisons later.
-    runs per freq
+    runs per freq per sensortype per csd_method
 
     Parameters:
     - file_paths (dict): Dictionary of file paths.
@@ -113,40 +116,39 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, plot=Fa
         zooms='auto',  # just for speed
         verbose=True,
     )
-    sub_freq_stc = mne.read_source_estimate(f'{file_paths[f"{sensortype}_stc"]}_[{freq}]-vl.stc')
+
+    print(f'Reading {csd_method}_{sensortype}')
+    sub_freq_stc = mne.read_source_estimate(f'{file_paths[f"{sensortype}_{csd_method}_stc"]}_[{freq}]-vl.stc')
     stc_fsmorphed = morph.apply(sub_freq_stc)
         
     # Save morphed results
     if not op.exists(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz'))
-    stc_fsmorphed.save(f'{file_paths[f"fsmorph_{sensortype}_stc_fname"]}_{freq}-vl.stc', overwrite=True)  #_{freq}-vl.stc
+    stc_fsmorphed.save(f'{file_paths[f"fsmorph_{sensortype}_{csd_method}_stc_fname"]}_{freq}-vl.stc', overwrite=True)  
 
     if plot:
         if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
             os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
-        lims = [0.3, 0.45, 0.6]
         stc_fsmorphed.plot(
             src=src_fs,
             mode="stat_map",
-            initial_time=0.085,
             subjects_dir=paths["fs_sub_dir"],
-            clim=dict(kind="value", pos_lims=lims),
             verbose=True,
-        ).savefig(f"{file_paths['stc_fsmorphd_lateral_power_figname']}_{freq}.png")
+        ).savefig(f"{file_paths['stc_fsmorphd_figname']}_{freq}.png")
 
     return stc_fsmorphed
 
 def compute_hemispheric_index(stc_fsmorphed, src):
     """
     Compute the hemispheric lateralisation index from source estimates.
-    runs per freq
+    runs per freq per sensortype per csd_method
 
     Parameters:
     -----------
-    stc_fs : mne.SourceMorph
+    stc_fsmorphed : mne.SourceMorph
         Morphed source estimate from this subject to fsaverage.
-        this is calculated based on sensortype
+        this is calculated based on sensortype and csd_method
     src : instance of mne.VolSourceEstimate
         Original source space from this subject.
         note that this is NOT fs_src.
@@ -193,7 +195,7 @@ def order_grid_positions(right_positions, left_positions,
                          right_indices, left_indices, 
                          right_reg_indices, left_reg_indices,
                          right_hemisphere_time_courses, left_hemisphere_time_courses,
-                         file_paths, freq, sensortype):
+                         file_paths, freq, sensortype, csd_method):
     """
     To match the positions in left_positions and right_positions by aligning the 
     x, y, and z coordinates such that each 
@@ -203,7 +205,7 @@ def order_grid_positions(right_positions, left_positions,
     Once we find the correct order, we'll 
     reorder left_positions and right_positions along with 
     their respective left_indices and right_indices.
-    runs per freq per sensortype
+    runs per freq per sensortype per scd_method
     """
     # Minimum euclidian distance accepted from corresponding points
     min_distance_accepted = 0.01 
@@ -293,15 +295,16 @@ def order_grid_positions(right_positions, left_positions,
 
     if not op.exists(op.join(file_paths["deriv_folder"], 'grid_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'grid_perHz'))
-    positions_table.to_csv(f'{file_paths["grid_positions_csv"]}_{sensortype}_{freq}.csv')
-    indices_table.to_csv(f'{file_paths["grid_indices_csv"]}_{sensortype}_{freq}.csv')
+    positions_table.to_csv(f'{file_paths[f"grid_positions_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
+    indices_table.to_csv(f'{file_paths[f"grid_indices_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
 
     return (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
             ordered_right_region_indices, ordered_left_region_indices,
             ordered_right_time_courses, ordered_left_time_courses)
 
-def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_courses, file_paths, freq):
+def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_courses, file_paths, sensortype, csd_method, freq):
+    """runs per freq, per sensortype, per csd_method"""
     # Calculate lateralised source power
     lateralised_power = []
 
@@ -312,23 +315,20 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
     lateralised_power_arr = np.squeeze(np.array(lateralised_power)) 
     lateralised_power_df = pd.DataFrame(lateralised_power_arr, columns=['Lateralised Source Power Index'])
 
-    lateralised_power_df.to_csv(f"{file_paths["lateralised_src_power_csv"]}_{freq}.csv")
+    if not op.exists(op.join(file_paths["deriv_folder"], 'lat_source_perHz')):
+        os.makedirs(op.join(file_paths["deriv_folder"], 'lat_source_perHz'))
+    lateralised_power_df.to_csv(f"{file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]}_{freq}.csv")
 
     return lateralised_power_arr
 
-def check_existing(file_paths, freq):
-    """Checks whether output files already exist for the given subject."""
-    if op.exists(f"{file_paths["lateralised_src_power_csv"]}_{freq}.csv"):
-        print(f"source lateralisation results already exist for {file_paths['fs_sub']} in {freq}Hz. Skipping...")
-        return True
-    return False
-
 def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
-                        forward, file_paths, freq):
+                        forward, file_paths, 
+                        sensortype, csd_method, freq, plot):
     """ 
     Plot findings in grid positions and 
     on a VolumeEstimate.
+    runs per freq, per sensortype, per csd_method
     """
 
     fig = plt.figure(figsize=(10, 8))
@@ -354,9 +354,9 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    plt.title('Lateralised Power on Right Hemisphere Grid Points')
+    plt.title('Lateralised Power on Right Hemisphere fsmorphed Grid Points')
     plt.legend()
-    plt.savefig(f"{file_paths["lateralised_grid_figname"]}_{freq}.png")
+    plt.savefig(f"{file_paths[f'lateralised_grid_{sensortype}_{csd_method}_figname']}_{freq}.png")
     plt.close()
 
     # Create a volume estimate 
@@ -384,46 +384,61 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
         subject=file_paths["fs_sub"]
     )
 
-    # Step 3: Plot the lateralized power on the brain
-    stc_lateral_power.plot(
-        src=forward["src"],
-        subject=file_paths["fs_sub"],
-        subjects_dir=paths["fs_sub_dir"],
-        mode='stat_map',
-        colorbar=True,
-        verbose=True
-    ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
+    if plot:
+        # Step 3: Plot the lateralized power on the brain
+        stc_lateral_power.plot(
+            src=forward["src"],
+            subject=file_paths["fs_sub"],
+            subjects_dir=paths["fs_sub_dir"],
+            mode='stat_map',
+            colorbar=True,
+            verbose=True
+        ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
 
-def process_subject(subjectID, paths, sensortype, space, stc_method):
+def check_existing(file_paths, sensortype, csd_method, freq):
+    """Checks whether output files already exist for the given subject."""
+    if op.exists(f'{file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]}_{freq}.csv'):
+        print(f"source lateralisation results already exist for {file_paths['fs_sub']} in {freq}Hz. Skipping...")
+        return True
+    return False
+
+def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot):
     """Processes a single subject for a specific frequency band.
     sensortyep= 'grad' or 'mag' 
     space= 'vol or 'surf' """
-    file_paths = construct_paths(subjectID, paths, sensortype, stc_method, space)
 
-    # Read data - add mags
+    if check_existing(file_paths, sensortype, csd_method, freq):
+        return
+    
     forward = mne.read_forward_solution(file_paths[f'fwd_{space}'])
     src = forward['src']
 
-    # Compute lateralisation
-    stc_fs = morph_subject_to_fsaverage(file_paths, src, sensortype)
-    (left_hemisphere_time_courses, right_hemisphere_time_courses,
-            left_positions, right_positions,
-            left_indices, right_indices,
-            left_reg_indices, right_reg_indices) = compute_hemispheric_index(stc_fs, src)
-    (ordered_right_positions, _,
-    _, _, ordered_right_region_indices, _,
-    ordered_right_time_courses, ordered_left_time_courses) = order_grid_positions(right_positions, 
-                                                        left_positions, 
-                                                        right_indices, left_indices, 
-                                                        right_reg_indices, left_reg_indices,
-                                                        right_hemisphere_time_courses, left_hemisphere_time_courses,
-                                                        file_paths)
+    # Morph to fsaverage and compute lateralisation per grid
+    stc_fsmorphed = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot)
+    
+    (right_hemisphere_time_courses, left_hemisphere_time_courses,
+    right_positions, left_positions,
+    right_indices, left_indices,
+    right_reg_indices, left_reg_indices) = compute_hemispheric_index(stc_fsmorphed, src)
+
+    (ordered_right_positions, ordered_left_positions,
+            ordered_right_indices, ordered_left_indices,
+            ordered_right_region_indices, ordered_left_region_indices,
+            ordered_right_time_courses, ordered_left_time_courses) = order_grid_positions(right_positions, left_positions, 
+                                                                                right_indices, left_indices, 
+                                                                                right_reg_indices, left_reg_indices,
+                                                                                right_hemisphere_time_courses, left_hemisphere_time_courses,
+                                                                                file_paths, freq, sensortype, csd_method)
+    
     lateralised_power_arr = calculate_grid_lateralisation(ordered_right_time_courses, 
                                                           ordered_left_time_courses, 
-                                                          file_paths)
-    plot_lateralisation(ordered_right_positions, lateralised_power_arr, 
+                                                          file_paths, sensortype, csd_method, freq)
+
+
+    plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
-                        forward, file_paths)
+                        forward, file_paths, 
+                        sensortype, csd_method, freq, plot)
     print(f"Processed subject {subjectID}, freq_band {freq}.")
 
 
@@ -435,24 +450,24 @@ def main():
 
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
+    freqs = np.arange(2, 6.5, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
-
+    csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
+    plot = True
 
-    for subjectID in good_subjects.index:
-        try:
-            for sensortype in sensortypes:
+    for sensortype in sensortypes:
+        for freq in freqs:
+            for subjectID in good_subjects.index[2:3]:
+                file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
-                for freq in freqs:
-                    check_existing(file_paths, freq)
+                try:
+                    process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot=plot)
+                    print("Processing complete for all subjects and frequency bands.")
 
-                    process_subject(subjectID, paths, sensortype, space, freq)
-
-            print("Processing complete for all subjects and frequency bands.")
-        except Exception as e:
-            print(f"Error processing subject {subjectID}: {e}")
+                except Exception as e:
+                    print(f"Error processing subject {subjectID}: {e}")
 
 if __name__ == "__main__":
     main()

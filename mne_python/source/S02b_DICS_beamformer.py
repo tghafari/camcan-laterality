@@ -20,6 +20,7 @@ import numpy as np
 import os
 import os.path as op
 import pandas as pd
+import matplotlib.pyplot as plt
 import mne
 from mne.beamformer import make_dics, apply_dics_csd
 from mne.time_frequency import read_csd
@@ -53,7 +54,7 @@ def load_subjects(good_sub_sheet):
     return good_subject_pd.set_index('Unnamed: 0')
 
 
-def construct_paths(subjectID, paths, csd_method='fourier'):
+def construct_paths(subjectID, paths, csd_method='multitaper'):
     """Construct file paths for a given subject, space type, and frequency band.
     csd_method = 'fourier' or 'multitaper' """
 
@@ -76,7 +77,7 @@ def construct_paths(subjectID, paths, csd_method='fourier'):
 
     return file_paths
 
-def read_forward_rank_csd(file_paths, space='volume', csd_method='fourier'):
+def read_forward_rank_csd(file_paths, space='volume', csd_method='multitaper'):
 
     print('Reading forward model')
     forward = mne.read_forward_solution(file_paths['fwd_vol_fname'] if space == 'volume' else file_paths['fwd_surf_fname'])
@@ -144,10 +145,9 @@ def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
                     subjects_dir=paths['fs_sub_dir'], 
                     mode='stat_map', 
                     verbose=True).savefig(f"{file_paths['stc_grad_plot_fname']}.png")
-    
 
 def run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
-             rank_mag, rank_grad, file_paths, reg=0.01, csd_method='fourier'):
+             rank_mag, rank_grad, file_paths, reg=0.01, csd_method='multitaper'):
     """Run DICS for a given subject for the given freqs (1hz by 1hz)."""
 
     print(f'Create DICS filters on {csd_method} csd and apply with egularisation = {reg} for {freq}Hz')
@@ -198,7 +198,7 @@ def check_existing_dics(file_paths, freq):
         return True
     return False
 
-def process_subject(subjectID, paths, csd_method='fourier', space='volume', reg=0.01):
+def process_subject(subjectID, paths, plot, csd_method, space='volume', reg=0.01):
 
     print(f"Processing subject {subjectID}...")
     file_paths = construct_paths(subjectID, paths, csd_method=csd_method)
@@ -207,25 +207,26 @@ def process_subject(subjectID, paths, csd_method='fourier', space='volume', reg=
         csd_mags, csd_grads) = read_forward_rank_csd(file_paths, 
                                                      space=space, 
                                                      csd_method=csd_method)
-    
-    # plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
-    #              forward, file_paths, paths, reg=reg)
+    if plot:
+        plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
+                    forward, file_paths, paths, reg=reg)
     
     return file_paths, forward, mags, grads, rank_mag, rank_grad, csd_mags, csd_grads
 
 
 def main():
     
-    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
+    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
     space = 'volume'  # Space type: 'surface' or 'volume'
-    csd_method = 'fourier'
+    csd_method = 'multitaper'
     reg = 0.01
+    plot = True
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subjects.index[2:50]:
+    for subjectID in good_subjects.index[2:10]:
         try:
             print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}")
             (file_paths, forward, 
@@ -233,12 +234,13 @@ def main():
             rank_mag, rank_grad, 
             csd_mags, csd_grads) = process_subject(subjectID, 
                                                     paths, 
+                                                    plot,
                                                     csd_method=csd_method, 
                                                     space=space, 
                                                     reg=reg)
             for freq in freqs:
                 # Skip if forward solution already exists
-                if check_existing_dics(file_paths):
+                if check_existing_dics(file_paths, freq):
                     return
                 print(f'Running DICS on {freq}Hz')
                 run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
