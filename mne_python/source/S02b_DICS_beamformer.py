@@ -217,7 +217,7 @@ def process_subject(subjectID, paths, plot, csd_method, space='volume', reg=0.01
 def main():
     
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
-    freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
+    freqs = np.arange(1, 10.5, 0.5)  # range of frequencies for dics
     space = 'volume'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'
     reg = 0.01
