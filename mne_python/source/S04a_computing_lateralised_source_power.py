@@ -450,7 +450,7 @@ def main():
 
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(2, 6.5, 0.5)  # range of frequencies for dics
+    freqs = np.arange(2, 20.5, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
@@ -459,12 +459,12 @@ def main():
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[2:3]:
+            for subjectID in good_subjects.index[1:7]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
                     process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot=plot)
-                    print("Processing complete for all subjects and frequency bands.")
+                    print(f"Processing complete for subject {subjectID} and frequency {freq}Hz.")
 
                 except Exception as e:
                     print(f"Error processing subject {subjectID}: {e}")
