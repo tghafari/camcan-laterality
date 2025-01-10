@@ -84,7 +84,7 @@ def construct_paths(subjectID, paths, sensortype, csd_method, space):
     }
     return file_paths
 
-def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot):
+def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot, do_plot_3d):
     """
     Morph subject data to fsaverage space for more 
     reliable comparisons later.
@@ -138,27 +138,28 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
             verbose=True,
         ).savefig(f"{file_paths['stc_fsmorphd_figname']}_{freq}.png")
 
-        # # Plotting results in 3D to compare morphed and unmorphed source estimates
-        # kwargs = dict(
-        #     subjects_dir=paths["fs_sub_dir"],
-        #     hemi='both',
-        #     size=(600, 600),
-        #     views='sagittal',
-        #     brain_kwargs=dict(silhouette=True),
-        #     initial_time=0.087,
-        #     verbose=True,
-        # )
+    if do_plot_3d:
+        # Plotting results in 3D to compare morphed and unmorphed source estimates
+        kwargs = dict(
+            subjects_dir=paths["fs_sub_dir"],
+            hemi='both',
+            size=(600, 600),
+            views='sagittal',
+            brain_kwargs=dict(silhouette=True),
+            initial_time=0.087,
+            verbose=True,
+        )
 
-        # stc_fsmorphed.plot_3d(
-        #     src=src_fs,
-        #     **kwargs,
-        # )
+        stc_fsmorphed.plot_3d(
+            src=src_fs,
+            **kwargs,
+        )
 
-        # stc_sub_freq.plot_3d(
-        #     subject=file_paths["fs_sub"],
-        #     src=src,
-        #     **kwargs,
-        # )
+        stc_sub_freq.plot_3d(
+            subject=file_paths["fs_sub"],
+            src=src,
+            **kwargs,
+        )
 
     return stc_fsmorphed, src_fs, stc_sub_freq
 
@@ -347,7 +348,7 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
 def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         src_fs, file_paths, 
-                        sensortype, csd_method, freq, plot):
+                        sensortype, csd_method, freq, plot, do_plot_3d):
     """ 
     Plot findings in grid positions and 
     on a VolumeEstimate.
@@ -418,7 +419,8 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
             colorbar=True,
             verbose=True
             ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
-        
+    
+    if do_plot_3d:
         # Plot in 3d
         kwargs = dict(
             subjects_dir=paths["fs_sub_dir"],
@@ -441,7 +443,7 @@ def check_existing(file_paths, sensortype, csd_method, freq):
         return True
     return False
 
-def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot):
+def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot, do_plot_3d):
     """Processes a single subject for a specific frequency band.
     sensortyep= 'grad' or 'mag' 
     space= 'vol or 'surf' """
@@ -477,7 +479,7 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
     plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         src_fs, file_paths, 
-                        sensortype, csd_method, freq, plot)
+                        sensortype, csd_method, freq, plot, do_plot_3d)
     print(f"Processed subject {subjectID}, freq_band {freq}.")
 
 
@@ -495,6 +497,7 @@ def main():
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
     plot = True
+    do_plot_3d = False
 
     for sensortype in sensortypes:
         for freq in freqs:
@@ -502,7 +505,7 @@ def main():
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
-                    process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot=plot)
+                    process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot=plot, do_plot_3d=do_plot_3d)
                     print(f"Processing complete for subject {subjectID} and frequency {freq}Hz.")
 
                 except Exception as e:
