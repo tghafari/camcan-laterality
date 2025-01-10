@@ -111,15 +111,16 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
         subject_from=file_paths["fs_sub"],
         src_to=src_fs,
         subjects_dir=paths["fs_sub_dir"],
-        niter_sdr=[5, 5, 2],
-        niter_affine=[5, 5, 2],
-        zooms='auto',  # just for speed
+        niter_sdr=[40, 20, 10],
+        niter_affine=[100, 100, 50],
+        zooms='auto',  
         verbose=True,
+        smooth=5,  # doesn't change the results that much
     )
 
     print(f'Reading {csd_method}_{sensortype}')
-    sub_freq_stc = mne.read_source_estimate(f'{file_paths[f"{sensortype}_{csd_method}_stc"]}_[{freq}]-vl.stc')
-    stc_fsmorphed = morph.apply(sub_freq_stc)
+    stc_sub_freq = mne.read_source_estimate(f'{file_paths[f"{sensortype}_{csd_method}_stc"]}_[{freq}]-vl.stc')
+    stc_fsmorphed = morph.apply(stc_sub_freq)
         
     # Save morphed results
     if not op.exists(op.join(file_paths["deriv_folder"], 'stc_morphd_perHz')):
@@ -137,7 +138,29 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
             verbose=True,
         ).savefig(f"{file_paths['stc_fsmorphd_figname']}_{freq}.png")
 
-    return stc_fsmorphed
+        # # Plotting results in 3D to compare morphed and unmorphed source estimates
+        # kwargs = dict(
+        #     subjects_dir=paths["fs_sub_dir"],
+        #     hemi='both',
+        #     size=(600, 600),
+        #     views='sagittal',
+        #     brain_kwargs=dict(silhouette=True),
+        #     initial_time=0.087,
+        #     verbose=True,
+        # )
+
+        # stc_fsmorphed.plot_3d(
+        #     src=src_fs,
+        #     **kwargs,
+        # )
+
+        # stc_sub_freq.plot_3d(
+        #     subject=file_paths["fs_sub"],
+        #     src=src,
+        #     **kwargs,
+        # )
+
+    return stc_fsmorphed, src_fs, stc_sub_freq
 
 def compute_hemispheric_index(stc_fsmorphed, src):
     """
@@ -158,7 +181,7 @@ def compute_hemispheric_index(stc_fsmorphed, src):
     tuple
         Data for left and right hemisphere time courses, positions, and indices.
     """
-    grid_positions = [s['rr'] for s in src]
+    grid_positions = [s['rr'] for s in src]  # this is the same as src[0]['rr] as len(src)=1
     grid_indices = [s['vertno'] for s in src]
 
     # Separate sources into left and right hemisphere based on x-coordinate
@@ -323,7 +346,7 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
 
 def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
-                        forward, file_paths, 
+                        src_fs, file_paths, 
                         sensortype, csd_method, freq, plot):
     """ 
     Plot findings in grid positions and 
@@ -365,7 +388,7 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
 
     # Step 1: Prepare the data
     # Initialize an empty array with zeros for all dipoles in the source space
-    n_dipoles_in_src = sum([len(s['vertno']) for s in forward['src']])  # Total in-use dipoles
+    n_dipoles_in_src = sum([len(s['vertno']) for s in src_fs])  # Total in-use dipoles from fsaverage source - for VolSourceEst this is the same as len(src[0]['vertno'])
     n_times = 1  # Single time point for static data
     lateralised_power_full = np.zeros((n_dipoles_in_src, n_times))
 
@@ -374,26 +397,39 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
         lateralised_power_full[index, 0] = lateralised_power_arr[i]
 
     # Step 2: Create the VolSourceEstimate object
-    vertices = [np.array(forward['src'][0]['vertno'])]
+    vertices = [np.array(src_fs[0]['vertno'])]
 
     stc_lateral_power = mne.VolSourceEstimate(
         data=lateralised_power_full,
         vertices=vertices,
         tmin=0,
         tstep=1,
-        subject=file_paths["fs_sub"]
+        subject='fsaverage'
+        # file_paths["fs_sub"]
     )
 
     if plot:
         # Step 3: Plot the lateralized power on the brain
         stc_lateral_power.plot(
-            src=forward["src"],
-            subject=file_paths["fs_sub"],
+            src=src_fs,
+            subject='fsaverage',
+            # file_paths["fs_sub"],
             subjects_dir=paths["fs_sub_dir"],
             mode='stat_map',
             colorbar=True,
             verbose=True
-        ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
+            ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
+        # Plot in 3d
+                # kwargs = dict(
+        #     subjects_dir=paths["fs_sub_dir"],
+        #     hemi='both',
+        #     size=(600, 600),
+        #     views='sagittal',
+        #     brain_kwargs=dict(silhouette=True),
+        #     initial_time=0.087,
+        #     verbose=True,
+        # )
+        
 
 def check_existing(file_paths, sensortype, csd_method, freq):
     """Checks whether output files already exist for the given subject."""
@@ -407,19 +443,19 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
     sensortyep= 'grad' or 'mag' 
     space= 'vol or 'surf' """
 
-    if check_existing(file_paths, sensortype, csd_method, freq):
-        return
+    # if check_existing(file_paths, sensortype, csd_method, freq):
+    #     return
     
     forward = mne.read_forward_solution(file_paths[f'fwd_{space}'])
     src = forward['src']
 
     # Morph to fsaverage and compute lateralisation per grid
-    stc_fsmorphed = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot)
+    stc_fsmorphed, src_fs, stc_sub_freq = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot)
     
     (right_hemisphere_time_courses, left_hemisphere_time_courses,
     right_positions, left_positions,
     right_indices, left_indices,
-    right_reg_indices, left_reg_indices) = compute_hemispheric_index(stc_fsmorphed, src)
+    right_reg_indices, left_reg_indices) = compute_hemispheric_index(stc_fsmorphed, src_fs)
 
     (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
@@ -437,7 +473,7 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
 
     plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
-                        forward, file_paths, 
+                        src_fs, file_paths, 
                         sensortype, csd_method, freq, plot)
     print(f"Processed subject {subjectID}, freq_band {freq}.")
 
@@ -450,7 +486,7 @@ def main():
 
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(2, 10.5, 0.5)  # range of frequencies for dics
+    freqs = np.arange(6.5, 8.5, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
@@ -459,8 +495,7 @@ def main():
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in ['120469']:
-            # good_subjects.index[1:7]:
+            for subjectID in good_subjects.index[1]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
