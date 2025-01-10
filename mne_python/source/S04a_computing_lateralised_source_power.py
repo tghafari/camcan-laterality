@@ -405,7 +405,6 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
         tmin=0,
         tstep=1,
         subject='fsaverage'
-        # file_paths["fs_sub"]
     )
 
     if plot:
@@ -419,17 +418,21 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
             colorbar=True,
             verbose=True
             ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
-        # Plot in 3d
-                # kwargs = dict(
-        #     subjects_dir=paths["fs_sub_dir"],
-        #     hemi='both',
-        #     size=(600, 600),
-        #     views='sagittal',
-        #     brain_kwargs=dict(silhouette=True),
-        #     initial_time=0.087,
-        #     verbose=True,
-        # )
         
+        # Plot in 3d
+        kwargs = dict(
+            subjects_dir=paths["fs_sub_dir"],
+            hemi='both',
+            size=(600, 600),
+            views='sagittal',
+            brain_kwargs=dict(silhouette=True),
+            initial_time=0.087,
+            verbose=True,
+        )
+        stc_lateral_power.plot_3d(
+            src=src_fs,
+            **kwargs,
+        )
 
 def check_existing(file_paths, sensortype, csd_method, freq):
     """Checks whether output files already exist for the given subject."""
