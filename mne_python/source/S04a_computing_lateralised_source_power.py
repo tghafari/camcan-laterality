@@ -30,7 +30,7 @@ def setup_paths(platform='mac'):
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
         rds_dir = '/Volumes/quinna-camcan'
-        sub2ctx_dir = '/Volumes/jenseno-sub2ctx-1/camcan'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
@@ -455,7 +455,7 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
     src = forward['src']
 
     # Morph to fsaverage and compute lateralisation per grid
-    stc_fsmorphed, src_fs, stc_sub_freq = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot)
+    stc_fsmorphed, src_fs, stc_sub_freq = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot, do_plot_3d=do_plot_3d)
     
     (right_hemisphere_time_courses, left_hemisphere_time_courses,
     right_positions, left_positions,
@@ -497,11 +497,11 @@ def main():
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
     plot = True
-    do_plot_3d = False
+    do_plot_3d = True
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[1]:
+            for subjectID in good_subjects.index[1:3]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:

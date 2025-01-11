@@ -45,6 +45,7 @@ def setup_paths(platform='mac'):
 
     paths = {
         'rds_dir': rds_dir,
+        'sub2ctx_dir': sub2ctx_dir,
         'epoched_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
@@ -182,9 +183,8 @@ def main():
     paths = setup_paths(platform)
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subject_pd.index[1:50]:
+    for subjectID in good_subject_pd.index[1:200]:
         process_subject(subjectID, paths, coreg_type=coreg_type, platform=platform)
-
 
 
 if __name__ == "__main__":
