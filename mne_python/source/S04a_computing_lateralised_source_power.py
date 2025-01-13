@@ -75,6 +75,7 @@ def construct_paths(subjectID, paths, sensortype, csd_method, space):
         f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
         f'{sensortype}_{csd_method}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{csd_method}_{sensortype}'),
         f'fsmorph_{sensortype}_{csd_method}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{csd_method}_{sensortype}'),
+        f'grid_stc_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_stc_{sensortype}_{csd_method}'),
         f'grid_positions_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_positions_{sensortype}_{csd_method}'),
         f'grid_indices_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_indices_{sensortype}_{csd_method}'),
         f'lateralised_src_power_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'lat_source_perHz', f'lateralised_src_power_{sensortype}_{csd_method}'),
@@ -131,7 +132,7 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
         if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
             os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
-        initial_pos=np.array([34, -50, 14]) * 0.001
+        initial_pos=np.array([19, -50, 29]) * 0.001
         stc_fsmorphed.plot(
             src=src_fs,
             mode="stat_map",
@@ -139,14 +140,6 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
             initial_pos=initial_pos,
             verbose=True,
         ).savefig(f"{file_paths['stc_fsmorphd_figname']}_{freq}.png")
-
-        stc_sub_freq.plot(
-            src=src,
-            mode="stat_map",
-            subjects_dir=paths["fs_sub_dir"],
-            initial_pos=initial_pos,
-            verbose=True,
-        ).savefig(f"{file_paths['stc_fsmorphd_figname']}_notmorphed_{freq}.png")
 
     if do_plot_3d:
         # Plotting results in 3D to compare morphed and unmorphed source estimates
@@ -173,7 +166,7 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
 
     return stc_fsmorphed, src_fs, stc_sub_freq
 
-def compute_hemispheric_index(stc_fsmorphed, src):
+def compute_hemispheric_index(stc_fsmorphed, src_fs):
     """
     Compute the hemispheric lateralisation index from source estimates.
     runs per freq per sensortype per csd_method
@@ -192,8 +185,8 @@ def compute_hemispheric_index(stc_fsmorphed, src):
     tuple
         Data for left and right hemisphere time courses, positions, and indices.
     """
-    grid_positions = [s['rr'] for s in src]  # this is the same as src[0]['rr] as len(src)=1
-    grid_indices = [s['vertno'] for s in src]
+    grid_positions = [s['rr'] for s in src_fs]  # this is the same as src_fs[0]['rr] as len(src_fs)=1
+    grid_indices = [s['vertno'] for s in src_fs]
 
     # Separate sources into left and right hemisphere based on x-coordinate
     right_hemisphere_time_courses, left_hemisphere_time_courses = [], []
@@ -309,8 +302,13 @@ def order_grid_positions(right_positions, left_positions,
     ordered_right_time_courses = [right_hemisphere_time_courses[right_indices.index(idx)] for idx in ordered_right_indices]
     ordered_left_time_courses = [left_hemisphere_time_courses[left_indices.index(idx)] for idx in ordered_left_indices]
 
-    # Step 4: Create tables for grid positions, indices, and distances
+    # Step 4: Create tables for source time course, grid positions, indices, and distances
     # Create a DataFrame for positions, including the distance between each corresponding pair
+    time_course_table = pd.DataFrame({
+        'Right Hemisphere Time Course': np.squeeze(np.array(ordered_right_time_courses)),
+        'Left Hemisphere Time Course': np.squeeze(np.array(ordered_left_time_courses))
+    })
+
     positions_table = pd.DataFrame({
         'Right Hemisphere X': [pos[0] for pos in ordered_right_positions],
         'Right Hemisphere Y': [pos[1] for pos in ordered_right_positions],
@@ -329,6 +327,7 @@ def order_grid_positions(right_positions, left_positions,
 
     if not op.exists(op.join(file_paths["deriv_folder"], 'grid_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'grid_perHz'))
+    time_course_table.to_csv(f'{file_paths[f"grid_stc_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
     positions_table.to_csv(f'{file_paths[f"grid_positions_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
     indices_table.to_csv(f'{file_paths[f"grid_indices_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
 
@@ -343,7 +342,8 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
     lateralised_power = []
 
     for right_tc, left_tc  in zip(ordered_right_time_courses, ordered_left_time_courses):
-        lateral_power_index = (right_tc - left_tc) / (right_tc + left_tc)
+        lateral_power_index = (right_tc - left_tc) 
+        # / (right_tc + left_tc)
         lateralised_power.append(lateral_power_index)
 
     lateralised_power_arr = np.squeeze(np.array(lateralised_power)) 
@@ -419,7 +419,7 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
             subject='fsaverage'
         )
 
-        initial_pos=np.array([34, -45, 9]) * 0.001
+        initial_pos=np.array([19, -50, 29]) * 0.001
         # Step 3: Plot the lateralized power on the brain
         stc_lateral_power.plot(
             src=src_fs,
@@ -427,7 +427,7 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
             subjects_dir=paths["fs_sub_dir"],
             mode='stat_map',
             colorbar=True,
-            # initial_pos=initial_pos,
+            initial_pos=initial_pos,
             verbose=True
             ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
     
@@ -512,12 +512,12 @@ def main():
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[1:2]:
+            for subjectID in good_subjects.index[3:4]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
                     process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot=plot, do_plot_3d=do_plot_3d)
-                    print(f"Processing complete for subject {subjectID} and frequency {freq}Hz.")
+                    print(f"Processing complete for subject {subjectID} and frequency {freq}Hz on {sensortype}.")
 
                 except Exception as e:
                     print(f"Error processing subject {subjectID}: {e}")
