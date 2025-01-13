@@ -30,7 +30,7 @@ def setup_paths(platform='mac'):
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
         rds_dir = '/Volumes/quinna-camcan'
-        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
+        sub2ctx_dir = '/Volumes/rdsprojects/j/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
@@ -131,12 +131,22 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
         if not op.exists(op.join(file_paths["deriv_folder"], 'plots')):
             os.makedirs(op.join(file_paths["deriv_folder"], 'plots'))
 
+        initial_pos=np.array([34, -50, 14]) * 0.001
         stc_fsmorphed.plot(
             src=src_fs,
             mode="stat_map",
             subjects_dir=paths["fs_sub_dir"],
+            initial_pos=initial_pos,
             verbose=True,
         ).savefig(f"{file_paths['stc_fsmorphd_figname']}_{freq}.png")
+
+        stc_sub_freq.plot(
+            src=src,
+            mode="stat_map",
+            subjects_dir=paths["fs_sub_dir"],
+            initial_pos=initial_pos,
+            verbose=True,
+        ).savefig(f"{file_paths['stc_fsmorphd_figname']}_notmorphed_{freq}.png")
 
     if do_plot_3d:
         # Plotting results in 3D to compare morphed and unmorphed source estimates
@@ -397,26 +407,27 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
     for i, index in enumerate(ordered_right_region_indices):
         lateralised_power_full[index, 0] = lateralised_power_arr[i]
 
-    # Step 2: Create the VolSourceEstimate object
-    vertices = [np.array(src_fs[0]['vertno'])]
-
-    stc_lateral_power = mne.VolSourceEstimate(
-        data=lateralised_power_full,
-        vertices=vertices,
-        tmin=0,
-        tstep=1,
-        subject='fsaverage'
-    )
-
     if plot:
+        # Step 2: Create the VolSourceEstimate object
+        vertices = [np.array(src_fs[0]['vertno'])]
+
+        stc_lateral_power = mne.VolSourceEstimate(
+            data=lateralised_power_full,
+            vertices=vertices,
+            tmin=0,
+            tstep=1,
+            subject='fsaverage'
+        )
+
+        initial_pos=np.array([34, -45, 9]) * 0.001
         # Step 3: Plot the lateralized power on the brain
         stc_lateral_power.plot(
             src=src_fs,
             subject='fsaverage',
-            # file_paths["fs_sub"],
             subjects_dir=paths["fs_sub_dir"],
             mode='stat_map',
             colorbar=True,
+            # initial_pos=initial_pos,
             verbose=True
             ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
     
@@ -491,17 +502,17 @@ def main():
 
     platform = 'mac'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(6.5, 8.5, 0.5)  # range of frequencies for dics
+    freqs = np.arange(10, 11, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
     plot = True
-    do_plot_3d = True
+    do_plot_3d = False
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[1:3]:
+            for subjectID in good_subjects.index[1:2]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:

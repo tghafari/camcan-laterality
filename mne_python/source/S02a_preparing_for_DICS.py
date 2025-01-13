@@ -179,7 +179,7 @@ def main():
     csd_method='multitaper'
 
     # Process each subject and frequency band
-    for subjectID in good_subjects.index[1:50]:
+    for subjectID in good_subjects.index[1:200]:
         try:
             process_subject(subjectID, paths, csd_method=csd_method)
         except Exception as e:

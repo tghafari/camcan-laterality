@@ -130,14 +130,14 @@ def process_subject(subjectID, fr_band, paths):
     print(f"Finished processing subject {subjectID}, band: {fr_band}")
 
 def main():
-    platform = 'mac'  # Change to 'bluebear' if running on a different platform
+    platform = 'bluebear'  # Change to 'bluebear' if running on a different platform
     paths = setup_paths(platform)
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
     
     # Iterate over all subjects and frequency bands
     freq_bands = ['delta', 'theta', 'alpha', 'beta', 'gamma']
 
-    for subjectID in good_subject_pd.index:
+    for subjectID in good_subject_pd.index[1:200]:
         for fr_band in freq_bands:
             try:
                 process_subject(subjectID, fr_band, paths)

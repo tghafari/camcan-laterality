@@ -216,17 +216,17 @@ def process_subject(subjectID, paths, plot, csd_method, space='volume', reg=0.01
 
 def main():
     
-    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
-    freqs = np.arange(1, 10.5, 0.5)  # range of frequencies for dics
+    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
+    freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
     space = 'volume'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'
     reg = 0.01
-    plot = True
+    plot = False
 
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subjects.index[2:10]:
+    for subjectID in good_subjects.index[1:200]:
         try:
             print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}")
             (file_paths, forward, 
