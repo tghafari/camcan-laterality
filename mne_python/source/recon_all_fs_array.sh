@@ -5,8 +5,7 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks 4
 #SBATCH --mem 32G
-#SBATCH --array=410-600 # Adjust this based on the number of subjects
-
+#SBATCH --array=391-450 # Adjust this based on the number of subjects
 set -e
 
 module purge; 

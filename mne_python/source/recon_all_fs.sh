@@ -20,11 +20,12 @@ export SUBJECTS_DIR=/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/
 export FS_LICENSE=${HOME}/freesurfer_license.txt  # FreeSurfer license path
 
 # Define the subject directory where the input MRI file is located
-subject_id="sub-CC210023"
-subject_dir="/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/${subject_id}/anat"
+subjectID="sub-CC510568"
+subject_dir="/rds/projects/q/quinna-camcan/cc700/mri/pipeline/release004/BIDS_20190411/anat/${subjectID}/anat"
 
 # Define the subject ID and the file name (assumed to be in subject_dir)
-input_file="${subject_dir}/${subject_id}_T1w.nii.gz"
+subject_id="${subjectID}_T1w"
+input_file="${subject_dir}/${subject_id}.nii.gz"
 
 # Check if the file exists
 if [ ! -f "$input_file" ]; then

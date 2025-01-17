@@ -159,7 +159,7 @@ def main():
     # Load subjects with good preprocessing
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subject_pd.index[1:200]:
+    for subjectID in good_subject_pd.index[350:621]:
         try:
             process_subject(subjectID, paths, space=space)
         except Exception as e:
