@@ -40,9 +40,9 @@ def setup_paths(platform='mac'):
         'epoched_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
-        'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-2sec'),
-        'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer')
-    }
+        'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer'),
+        'meg_source_all_subs_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/all_subs')
+        }
     return paths
 
 def load_subjects(good_sub_sheet):
@@ -104,23 +104,17 @@ def create_all_subs_lateralised_grid(good_subjects, paths, freq, all_subs_lat_gr
         # Append the transposed DataFrame to the list
         all_subs_lat_grid_perHz.append(sub_lat_grid_pd_transposed)
 
+    # Check if all shapes are consistent
+    if len(set(shapes)) != 1:
+        raise ValueError(f"Inconsistent shapes detected among subjects' data: {set(shapes)}")
 
+    # Concatenate all transposed DataFrames into a single DataFrame
+    combined_df = pd.concat(all_subs_lat_grid_perHz, axis=0, ignore_index=True)
 
+    # Save the combined DataFrame to a CSV file
+    output_fname = op.join(paths['meg_source_all_subs_dir'], f'all_subs_lat_grid_perHz_{freq}.csv')
+    combined_df.to_csv(output_fname, index=False)    
 
+    return combined_df
 
-
-# Navigate to lat_source_perHz for each subject
-all_subs_lat_grid_perHz = []
-def create_all_subs_lateralised_grid(good_subjects, paths, freq, all_subs_lat_grid_perHz):
-
-    for subjectID in good_subjects.index: 
-        lat_source_perHz_fname = op.join(paths['meg_source_dir'], f'sub-CC{subjectID}', 'lat_soure_perHz')
-        , f'lateralised_src_power_grad_multitaper_{freq}.csv')
-        sub_lat_grid_pd = pd.read_csv(lat_source_perHz_fname)
-
-        all_subs_lat_grid_perHz.append(sub_lat_grid_pd)
-
-
-    
-    return all_subs_lat_grid_perHz
-
+# def calculate_grid_lat_substr_corr():
