@@ -4,7 +4,7 @@ S04a. Calculate Source Lateralisation
 
 This script computes source lateralisation indices 
 using the formula:
-    (right_stc - left_stc) / (right_stc + left_stc)
+    (right_stc - left_stc) 
 
 It runs for all subjects with good preprocessing 
 and all frequency bands.
@@ -358,7 +358,7 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
 def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
                         ordered_right_region_indices,
                         src_fs, file_paths, 
-                        sensortype, csd_method, freq, plot, do_plot_3d):
+                        sensortype, csd_method, freq, do_plot_3d):
     """ 
     Plot findings in grid positions and 
     on a VolumeEstimate.
@@ -407,29 +407,28 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
     for i, index in enumerate(ordered_right_region_indices):
         lateralised_power_full[index, 0] = lateralised_power_arr[i]
 
-    if plot:
-        # Step 2: Create the VolSourceEstimate object
-        vertices = [np.array(src_fs[0]['vertno'])]
+    # Step 2: Create the VolSourceEstimate object
+    vertices = [np.array(src_fs[0]['vertno'])]
 
-        stc_lateral_power = mne.VolSourceEstimate(
-            data=lateralised_power_full,
-            vertices=vertices,
-            tmin=0,
-            tstep=1,
-            subject='fsaverage'
-        )
+    stc_lateral_power = mne.VolSourceEstimate(
+        data=lateralised_power_full,
+        vertices=vertices,
+        tmin=0,
+        tstep=1,
+        subject='fsaverage'
+    )
 
-        initial_pos=np.array([19, -50, 29]) * 0.001
-        # Step 3: Plot the lateralized power on the brain
-        stc_lateral_power.plot(
-            src=src_fs,
-            subject='fsaverage',
-            subjects_dir=paths["fs_sub_dir"],
-            mode='stat_map',
-            colorbar=True,
-            initial_pos=initial_pos,
-            verbose=True
-            ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
+    initial_pos=np.array([19, -50, 29]) * 0.001
+    # Step 3: Plot the lateralized power on the brain
+    stc_lateral_power.plot(
+        src=src_fs,
+        subject='fsaverage',
+        subjects_dir=paths["fs_sub_dir"],
+        mode='stat_map',
+        colorbar=True,
+        initial_pos=initial_pos,
+        verbose=True
+        ).savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{freq}.png")
     
     if do_plot_3d:
         # Plot in 3d
@@ -486,11 +485,11 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
                                                           ordered_left_time_courses, 
                                                           file_paths, sensortype, csd_method, freq)
 
-
-    plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
-                        ordered_right_region_indices,
-                        src_fs, file_paths, 
-                        sensortype, csd_method, freq, plot, do_plot_3d)
+    if plot:
+        plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr, 
+                            ordered_right_region_indices,
+                            src_fs, file_paths, 
+                            sensortype, csd_method, freq, do_plot_3d)
     print(f"Processed subject {subjectID}, freq_band {freq}.")
 
 
@@ -500,14 +499,14 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
 
 def main():
 
-    platform = 'mac'  # Set platform: 'mac' or 'bluebear'
+    platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
     freqs = np.arange(10, 11, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
-    plot = True
+    plot = False
     do_plot_3d = False
 
     for sensortype in sensortypes:
