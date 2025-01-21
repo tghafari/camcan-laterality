@@ -458,8 +458,8 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
     sensortyep= 'grad' or 'mag' 
     space= 'vol or 'surf' """
 
-    # if check_existing(file_paths, sensortype, csd_method, freq):
-    #     return
+    if check_existing(file_paths, sensortype, csd_method, freq):
+        return
     
     forward = mne.read_forward_solution(file_paths[f'fwd_{space}'])
     src = forward['src']

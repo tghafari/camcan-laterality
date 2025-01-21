@@ -183,7 +183,7 @@ def main():
     paths = setup_paths(platform)
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subject_pd.index[350:621]:
+    for subjectID in good_subject_pd.index[1:620]:
         process_subject(subjectID, paths, coreg_type=coreg_type, platform=platform)
 
 

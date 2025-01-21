@@ -226,7 +226,7 @@ def main():
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subjects.index[1:200]:
+    for subjectID in good_subjects.index[250:310]:
         try:
             print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}")
             (file_paths, forward, 
