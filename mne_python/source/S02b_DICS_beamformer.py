@@ -192,8 +192,8 @@ def run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads,
 
 def check_existing_dics(file_paths, freq):
     """Check if DICS results already exist for a subject."""
-    if op.exists(f"{file_paths['mag_stc_fname']}_{freq}") and \
-        op.exists(f"{file_paths['grad_stc_fname']}_{freq}"):
+    if op.exists(f"{file_paths['mag_stc_fname']}_[{freq}]-vl.stc") and \
+        op.exists(f"{file_paths['grad_stc_fname']}_[{freq}]-vl.stc"):
         print(f"DICS results already exist for {file_paths['fs_sub']} in {freq}. Skipping...")
         return True
     return False
@@ -226,7 +226,7 @@ def main():
     paths = setup_paths(platform)
     good_subjects = load_subjects(paths['good_sub_sheet'])
 
-    for subjectID in good_subjects.index[250:310]:
+    for subjectID in good_subjects.index[200:630]:
         try:
             print(f"Running DICS with {csd_method} csd for subject {subjectID}, space: {space}")
             (file_paths, forward, 
@@ -240,11 +240,10 @@ def main():
                                                     reg=reg)
             for freq in freqs:
                 # Skip if forward solution already exists
-                if check_existing_dics(file_paths, freq):
-                    return
-                print(f'Running DICS on {freq}Hz')
-                run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
-                        rank_mag, rank_grad, file_paths, reg=reg, csd_method=csd_method)
+                if not check_existing_dics(file_paths, freq):
+                    print(f'Running DICS on {freq}Hz')
+                    run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
+                            rank_mag, rank_grad, file_paths, reg=reg, csd_method=csd_method)
         except Exception as e:
             print(f"Error processing subject {subjectID}: {e}")
 
