@@ -327,9 +327,13 @@ def order_grid_positions(right_positions, left_positions,
 
     if not op.exists(op.join(file_paths["deriv_folder"], 'grid_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'grid_perHz'))
-    time_course_table.to_csv(f'{file_paths[f"grid_stc_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
-    positions_table.to_csv(f'{file_paths[f"grid_positions_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
-    indices_table.to_csv(f'{file_paths[f"grid_indices_{sensortype}_{csd_method}_csv"]}_{freq}.csv')
+
+    time_course_path = file_paths[f'grid_stc_{sensortype}_{csd_method}_csv'] 
+    time_course_table.to_csv(f'{time_course_path}_{freq}.csv')
+    positions_path = file_paths[f"grid_positions_{sensortype}_{csd_method}_csv"]
+    positions_table.to_csv(f'{positions_path}_{freq}.csv')
+    indices_path = file_paths[f"grid_indices_{sensortype}_{csd_method}_csv"]
+    indices_table.to_csv(f'{indices_path}_{freq}.csv')
 
     return (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
@@ -351,7 +355,8 @@ def calculate_grid_lateralisation(ordered_right_time_courses, ordered_left_time_
 
     if not op.exists(op.join(file_paths["deriv_folder"], 'lat_source_perHz')):
         os.makedirs(op.join(file_paths["deriv_folder"], 'lat_source_perHz'))
-    lateralised_power_df.to_csv(f"{file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]}_{freq}.csv")
+    lateralised_power_path = file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]
+    lateralised_power_df.to_csv(f"{lateralised_power_path}_{freq}.csv")
 
     return lateralised_power_arr
 
@@ -448,7 +453,9 @@ def plot_lateralisation(paths, ordered_right_positions, lateralised_power_arr,
 
 def check_existing(file_paths, sensortype, csd_method, freq):
     """Checks whether output files already exist for the given subject."""
-    if op.exists(f'{file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]}_{freq}.csv'):
+
+    lateralised_power_path = file_paths[f"lateralised_src_power_{sensortype}_{csd_method}_csv"]
+    if op.exists(f'{lateralised_power_path}_{freq}.csv'):
         print(f"source lateralisation results already exist for {file_paths['fs_sub']} in {freq}Hz. Skipping...")
         return True
     return False
@@ -501,7 +508,7 @@ def main():
 
     platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(10, 11, 0.5)  # range of frequencies for dics
+    freqs = np.arange(1, 3, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
@@ -511,7 +518,7 @@ def main():
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[3:4]:
+            for subjectID in good_subjects.index[3:5]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
