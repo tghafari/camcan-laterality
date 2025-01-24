@@ -508,7 +508,7 @@ def main():
 
     platform = 'bluebear'  # Set platform: 'mac' or 'bluebear'
     sensortypes = ['grad', 'mag']
-    freqs = np.arange(1, 3, 0.5)  # range of frequencies for dics
+    freqs = np.arange(1, 60.5, 0.5)  # range of frequencies for dics
     space = 'vol'  # Space type: 'surface' or 'volume'
     csd_method = 'multitaper'  # or 'fourier'
     paths = setup_paths(platform)
@@ -518,7 +518,7 @@ def main():
 
     for sensortype in sensortypes:
         for freq in freqs:
-            for subjectID in good_subjects.index[3:5]:
+            for subjectID in good_subjects.index[220:250]:
                 file_paths = construct_paths(subjectID, paths, sensortype, csd_method, space)
 
                 try:
