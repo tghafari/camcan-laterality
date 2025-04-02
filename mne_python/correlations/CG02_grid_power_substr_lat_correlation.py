@@ -51,7 +51,7 @@ def load_lateralization_volumes(file_path):
     return lat_vols 
 
 def compute_spearman(lat_src_file, lat_vols):
-    """Compute Spearman correlation between MEG data and lateralization volumes."""
+    print('Compute Spearman correlation between MEG data and lateralization volumes.')
     lat_src_data = pd.read_csv(lat_src_file, index_col=0)
     common_subjects = lat_src_data.columns.intersection(lat_vols.index)
     
@@ -80,8 +80,8 @@ def compute_spearman(lat_src_file, lat_vols):
     
     return pd.DataFrame({'Spearman_r': r_values, 'Spearman_pval': p_values})
 
-def process_correlations(platform='bluebear', freqs=np.arange(1.5, 60, 0.5), sensortypes=['grad', 'mag']):
-    """Process all MEG frequency files and compute Spearman correlations."""
+def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
+    print('Process all MEG frequency files and compute Spearman correlations.')
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
     
