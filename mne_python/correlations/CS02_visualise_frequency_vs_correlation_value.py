@@ -1,6 +1,6 @@
 """
 ====================================
-CS02_correlation_frequency_plot_topo:
+CS02_visualise_frequency_vs_correlation_value:
     this script:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
