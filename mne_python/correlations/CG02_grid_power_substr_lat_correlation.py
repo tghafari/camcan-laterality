@@ -77,8 +77,10 @@ def compute_spearman(lat_src_file, lat_vols):
             r_values[grid_idx, struct_idx] = r
             p_values[grid_idx, struct_idx] = p
 
-    
-    return pd.DataFrame({'Spearman_r': r_values, 'Spearman_pval': p_values})
+    spearman_r = pd.DataFrame(r_values, columns=subcortical_structures)
+    spearman_pval = pd.DataFrame(p_values, columns=subcortical_structures)
+
+    return spearman_r, spearman_pval
 
 def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
     print('Process all MEG frequency files and compute Spearman correlations.')
@@ -90,11 +92,17 @@ def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortyp
             lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
                                     f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
             if os.path.exists(lat_src_file):
-                result = compute_spearman(lat_src_file, lat_vols)
-                if result is not None:
+                spearman_r, spearman_pval = compute_spearman(lat_src_file, lat_vols)
+
+                if spearman_r is not None:
                     output_file = os.path.join(paths['output_dir'],
-                                               f'spearman_src_lat_power_vol_{sensor}_{freq}.csv')
-                    result.to_csv(output_file, index=False)
+                                               f'spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
+                    spearman_r.to_csv(output_file, index=False)
+                if spearman_pval is not None:
+                    output_file = os.path.join(paths['output_dir'],
+                                               f'spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
+                    spearman_pval.to_csv(output_file, index=False)
+
                     print(f"Saved: {output_file}")
             else:
                 print(f"Missing MEG data file: {lat_src_file}")
