@@ -82,7 +82,7 @@ def compute_spearman(lat_src_file, lat_vols):
 
     return spearman_r, spearman_pval
 
-def process_correlations(platform='bluebear', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
+def process_correlations(platform='bluebear', freqs=np.arange(5, 60, 0.5), sensortypes=['grad', 'mag']):
     print('Processing all MEG source frequency files and computing Spearman correlations with lateralised volumes.')
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
