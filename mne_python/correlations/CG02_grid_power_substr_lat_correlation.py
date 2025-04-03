@@ -37,9 +37,9 @@ def setup_paths(platform='mac'):
     paths = {
         'meg_source_all_subs_dir': os.path.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/all_subs'),
         'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
-        'output_dir': os.path.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/correlation_results')
+        'output_dir': os.path.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers')
     }
-    os.makedirs(paths['output_dir'], exist_ok=True)
+
     return paths
 
 def load_lateralization_volumes(file_path):
@@ -82,7 +82,7 @@ def compute_spearman(lat_src_file, lat_vols):
 
     return spearman_r, spearman_pval
 
-def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
+def process_correlations(platform='bluebear', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
     print('Processing all MEG source frequency files and computing Spearman correlations with lateralised volumes.')
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
