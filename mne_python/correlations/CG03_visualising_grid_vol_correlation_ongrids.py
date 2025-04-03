@@ -266,7 +266,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
 def main():
     paths = setup_paths(platform='mac')
     # Prompt user for input
-    freq_input = input("Enter frequency (e.g., 5.0): ").strip()
+    freq_input = input("Enter frequency (e.g., 5.0): (make sure input a float number)").strip()
     structure = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
     sensor = input("Enter sensor type (grad or mag): ").strip()
     do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
