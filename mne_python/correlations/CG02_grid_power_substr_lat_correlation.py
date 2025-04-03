@@ -51,7 +51,7 @@ def load_lateralization_volumes(file_path):
     return lat_vols 
 
 def compute_spearman(lat_src_file, lat_vols):
-    print('Compute Spearman correlation between MEG data and lateralization volumes.')
+    print('Computing Spearman correlation between source data and lateralization volumes.')
     lat_src_data = pd.read_csv(lat_src_file, index_col=0)
     common_subjects = lat_src_data.columns.intersection(lat_vols.index)
     
@@ -83,7 +83,7 @@ def compute_spearman(lat_src_file, lat_vols):
     return spearman_r, spearman_pval
 
 def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortypes=['grad', 'mag']):
-    print('Process all MEG frequency files and compute Spearman correlations.')
+    print('Processing all MEG source frequency files and computing Spearman correlations with lateralised volumes.')
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
     
@@ -105,7 +105,7 @@ def process_correlations(platform='mac', freqs=np.arange(1.5, 5, 0.5), sensortyp
 
                     print(f"Saved: {output_file}")
             else:
-                print(f"Missing MEG data file: {lat_src_file}")
+                print(f"Missing source data file: {lat_src_file}")
 
 if __name__ == "__main__":
     process_correlations()
