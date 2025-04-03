@@ -34,21 +34,48 @@ def setup_paths(platform='mac'):
 def compute_hemispheric_index(src_fs):
     """
     Extract right hemisphere grid positions from fsaverage source space.
+    
+    Parameters:
+    -----------
+    src_fs : list of dicts
+        Source space read using mne.read_source_spaces.
+    
+    Returns:
+    --------
+    right_positions : np.ndarray, shape (n_right, 3)
+        3D positions of grid points in the right hemisphere.
+    right_indices : list of int
+        Indices in the full source space corresponding to right hemisphere grid points.
     """
-    grid_positions = [s['rr'] for s in src_fs][0]  # Extract all dipole positions
-    grid_indices = [s['vertno'] for s in src_fs][0]  # Get active dipole indices
+
+    grid_positions = [s['rr'] for s in src_fs]  # Extract all dipole positions. this is the same as src_fs[0]['rr] as len(src_fs)=1
+    grid_indices = [s['vertno'] for s in src_fs] # Get active dipole indices
     
     right_positions, right_indices = [], []
-    for idx in grid_indices:
-        pos = grid_positions[idx]
+    for region_idx, indices in enumerate(grid_indices[0]):
+        pos = grid_positions[0][indices]  # only select in-use positions in the source model
         if pos[0] > 0:  # x > 0 is right hemisphere
             right_positions.append(pos)
-            right_indices.append(idx)
+            right_indices.append(indices)
     
     return np.array(right_positions), right_indices
 
-def plot_correlation(grid_positions, correlation_values, significant_mask, output_path):
-    """Plots correlation values on the right hemisphere grid points."""
+def plot_scatter(grid_positions, correlation_values, significant_mask, output_path, save=False):
+    """
+    Plot a 3D scatter of correlation values on right hemisphere grid points.
+    
+    Parameters:
+    -----------
+    grid_positions : np.ndarray, shape (n_points, 3)
+        XYZ coordinates of right hemisphere grid points.
+    correlation_values : np.ndarray, shape (n_points,)
+        Spearman correlation values for each grid point.
+    significant_mask : np.ndarray, shape (n_points,)
+        Boolean array indicating significant correlations (p < 0.05).
+    output_path : str
+        File path to save the scatter plot.
+    """
+
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
     
@@ -64,7 +91,12 @@ def plot_correlation(grid_positions, correlation_values, significant_mask, outpu
     
     # Highlight significant correlations in black
     sig_positions = grid_positions[significant_mask]
-    ax.scatter(sig_positions[:, 0], sig_positions[:, 1], sig_positions[:, 2], c='k', s=50, label='p<0.05')
+    ax.scatter(sig_positions[:, 0], 
+               sig_positions[:, 1], 
+               sig_positions[:, 2], 
+               c='k', 
+               s=50, 
+               label='p<0.05')
     
     cbar = plt.colorbar(sc, ax=ax, shrink=0.5, aspect=10)
     cbar.set_label('Spearman r')
@@ -72,42 +104,223 @@ def plot_correlation(grid_positions, correlation_values, significant_mask, outpu
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    plt.title('Spearman Correlation on Right Hemisphere Grid')
+    plt.title('Src-Vol Spearman Correlation on Right Hemisphere Grids')
+    plt.legend()
     
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plt.savefig(output_path)
-    plt.close()
+    plt.show()
+    if save:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        plt.savefig(output_path)
+        plt.close()
+
+
+def create_volume_estimate(correlation_values, significant_mask, src_fs, right_indices):
+    """
+    Create a volumetric source estimate using correlation values.
+    
+    Parameters:
+    -----------
+    correlation_values : np.ndarray, shape (n_right,)
+        Correlation values for right hemisphere grid points.
+    significant_mask : np.ndarray, shape (n_right,)
+        Boolean mask for significant correlation values.
+    src_fs : list of dicts
+        Source space read using mne.read_source_spaces.
+    right_indices : list of int
+        Indices (in the full source space) corresponding to right hemisphere.
+    
+    Returns:
+    --------
+    stc : mne.VolSourceEstimate        
+        The volumetric source estimate with correlation data.
+    vol_mask : np.ndarray    
+        Boolean mask of the same shape as stc.data indicating significant regions.
+    """
+    # For fsaverage volume, there's one source space element
+    full_vertno = src_fs[0]['vertno']  # array of vertex numbers (may be non-contiguous)
+    n_dipoles_in_src = len(full_vertno)
+    n_times = 1  # Single time point
+    vol_data = np.zeros((n_dipoles_in_src, n_times))
+    vol_mask = np.zeros((n_dipoles_in_src, n_times), dtype=bool)
+    
+    # For each right hemisphere vertex, find its index within full_vertno
+    """I don't know how the other method in S04 works! spent hours to figure it out!"""
+    for i, vertex in enumerate(right_indices):
+        # Find the position in full_vertno where the vertex is located
+        pos_index = np.where(full_vertno == vertex)[0][0]
+        vol_data[pos_index, 0] = correlation_values[i]
+        vol_mask[pos_index, 0] = significant_mask[i]
+
+    vertices = [full_vertno]
+    stc = mne.VolSourceEstimate(
+        data=vol_data, 
+        vertices=vertices, 
+        tmin=0, 
+        tstep=1, 
+        subject='fsaverage'
+    )
+    return stc, vol_mask
+
+def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, do_plot_3d=True, save=False):
+    """
+    Plot the volumetric source estimate on MRI and in 3D, highlighting significant regions.
+    
+    Parameters:
+    -----------
+    stc : mne.VolSourceEstimate
+        The volumetric source estimate with correlation data.
+    vol_mask : np.ndarray
+        Boolean mask indicating significant regions.
+    paths : dict
+        Dictionary containing file paths.
+    freq : str
+        Frequency (e.g., '5.0').
+    sensor : str
+        Sensor type (e.g., 'grad' or 'mag').
+    structure : str
+        Subcortical structure name.
+    do_plot_3d : bool
+        If True, plot the 3D visualization.
+    """
+    initial_pos = np.array([19, -50, 29]) * 0.001
+
+    # Apply the mask to set non-significant values to NaN or 0 and only show significant clusters
+    stc_data = stc.data.copy()  # Make a copy of the original data
+    stc_data[~vol_mask] = np.mean([np.min(stc_data),np.max(stc_data)]) # Set non-significant regions to 0 (or NaN)
+    
+    # Create a new stc with masked data
+    stc_masked = mne.VolSourceEstimate(stc_data, 
+                                        stc.vertices, 
+                                        stc.tmin, 
+                                        stc.tstep, 
+                                        subject=stc.subject)
+
+    # Plot on MRI using the masked stc
+    fig = stc_masked.plot(
+        src=src_fs,  # use default source
+        subject='fsaverage',
+        subjects_dir=paths['fs_sub_dir'],
+        mode='stat_map',
+        colorbar=True,
+        initial_pos=initial_pos,
+        verbose=True
+    )
+    if save:
+        mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri_sig-only.png')
+        fig.savefig(mri_output)
+
+    # Plot on MRI using stc.plot with a mask highlighting significant regions (white markers)
+    fig2 = stc.plot(
+        src=src_fs,  # use default source
+        subject='fsaverage',
+        subjects_dir=paths['fs_sub_dir'],
+        mode='stat_map',
+        colorbar=True,
+        initial_pos=initial_pos,
+        verbose=True
+    )
+    if save:
+        mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri.png')
+        fig2.savefig(mri_output)
+    
+    if do_plot_3d:
+        kwargs = dict(
+            subjects_dir=paths['fs_sub_dir'],
+            hemi='both',
+            size=(600, 600),
+            views='sagittal',
+            brain_kwargs=dict(silhouette=True),
+            initial_time=0.087,
+            verbose=True,
+        )
+        stc.plot_3d(
+            src=src_fs,
+            **kwargs)
 
 def main():
-    paths = setup_paths()
-
-    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
-    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+    paths = setup_paths(platform='mac')
+    # Prompt user for input
+    freq_input = input("Enter frequency (e.g., 5.0): ").strip()
+    structure = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    sensor = input("Enter sensor type (grad or mag): ").strip()
+    do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
+    do_plot_3d = do_plot_3d_input == 'y'
+    
+    # Build file names for correlation and p-values
+    corr_file = op.join(paths['correlation_dir'], f'spearman-r_src_lat_power_vol_{sensor}_{freq_input}.csv')
+    pval_file = op.join(paths['correlation_dir'], f'spearman-pval_src_lat_power_vol_{sensor}_{freq_input}.csv')
+    
+    if not op.exists(corr_file) or not op.exists(pval_file):
+        print(f"Files not found for frequency {freq_input} and sensor {sensor}.")
+        return
+    
+    df_corr = pd.read_csv(corr_file, index_col=None)
+    df_pval = pd.read_csv(pval_file, index_col=None)
+    
+    if structure not in df_corr.columns:
+        print(f"Structure {structure} not found in correlation file.")
+        return
+    
+    correlation_values = df_corr[structure].values
+    p_values = df_pval[structure].values
+    significant_mask = p_values < 0.05
+    
+    # Read fsaverage source space
+    fname_fsaverage_src = op.join(paths['fs_sub_dir'], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
     src_fs = mne.read_source_spaces(fname_fsaverage_src)
-
-    grid_positions, grid_indices = compute_hemispheric_index(src_fs)
     
-    structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-    frequencies = [f'{freq:.1f}' for freq in np.arange(1.5, 60, 0.5)]
+    # Compute right hemisphere grid positions and indices
+    grid_positions, right_indices = compute_hemispheric_index(src_fs)
     
-    for structure in structures:
-        for freq in frequencies:
-            corr_file = os.path.join(paths['correlation_dir'], f'spearman_src_lat_power_vol_grad_{freq}.csv')
-            pval_file = os.path.join(paths['correlation_dir'], f'spearman_pvals_{freq}.csv')
-            if not os.path.exists(corr_file) or not os.path.exists(pval_file):
-                continue
-            
-            df_corr = pd.read_csv(corr_file, index_col=0)
-            df_pval = pd.read_csv(pval_file, index_col=0)
-            
-            if structure not in df_corr.columns:
-                continue
-            
-            correlation_values = df_corr[structure].values
-            significant_mask = df_pval[structure].values < 0.05  # Identify significant values
-            output_path = os.path.join(paths['output_base'], structure, f'src-correlation_{freq}.png')
-            
-            plot_correlation(grid_positions, correlation_values, significant_mask, output_path)
+    # Plot scatter of correlation values
+    scatter_output = op.join(paths['output_base'], structure, f'src-correlation_{freq_input}.png')
+    os.makedirs(op.dirname(scatter_output), exist_ok=True)
+    plot_scatter(grid_positions, correlation_values, significant_mask, scatter_output)
+    
+    # Create a volume estimate using the correlation data
+    stc, vol_mask = create_volume_estimate(correlation_values, significant_mask, src_fs, right_indices)
+    
+    # Plot volume estimate on MRI and optionally in 3D
+    plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, sensor, structure, do_plot_3d)
 
 if __name__ == "__main__":
     main()
+
+
+
+
+# def main():
+#     paths = setup_paths(platform='mac')
+
+#     fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
+#     fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+#     src_fs = mne.read_source_spaces(fname_fsaverage_src)
+
+#     grid_positions, _ = compute_hemispheric_index(src_fs)
+    
+#     structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+#     sensortypes = ['grad', 'mag']
+#     freqs = np.arange(5, 60, 0.5)
+
+#     for structure in structures:
+#         for sensor in sensortypes:
+#             for freq in freqs:
+#                 corr_file = os.path.join(paths['correlation_dir'], f'spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
+#                 pval_file = os.path.join(paths['correlation_dir'], f'spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
+#                 if not os.path.exists(corr_file) or not os.path.exists(pval_file):
+#                     continue
+                
+#                 df_corr = pd.read_csv(corr_file, index_col=None)
+#                 df_pval = pd.read_csv(pval_file, index_col=None)
+                
+#                 if structure not in df_corr.columns:
+#                     continue
+                
+#                 correlation_values = df_corr[structure].values
+#                 significant_mask = df_pval[structure].values < 0.05  # Identify significant values
+#                 output_path = os.path.join(paths['output_base'], structure, f'src-correlation_{freq}.png')
+                
+#                 plot_correlation(grid_positions, correlation_values, significant_mask, output_path)
+
+# if __name__ == "__main__":
+#     main()
