@@ -140,6 +140,7 @@ def process_correlations(platform='mac', freqs=np.arange(5, 60, 0.5), sensortype
 
             if band_data:
                 # Average across frequencies
+                #TODO: problem with Nans, try to ignore them when averaging
                 avg_band_data = sum(band_data) / len(band_data)
                 avg_band_file = os.path.join(paths['meg_source_all_subs_dir'],
                                              f'all_subs_lateralised_src_power_{sensor}_{band_name}_band_avg.csv')
