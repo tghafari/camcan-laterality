@@ -1,4 +1,5 @@
 """
+==============================================
 CG02_grid_power_substr_lat_correlation
 
 This script calculates Spearman correlation (r and p-value) between
@@ -18,6 +19,7 @@ Output:
 
 written by Tara Ghafari
 tara.ghafari@gmail.com
+==============================================
 """
 
 import os
@@ -82,32 +84,80 @@ def compute_spearman(lat_src_file, lat_vols):
 
     return spearman_r, spearman_pval
 
-def process_correlations(platform='bluebear', freqs=np.arange(5, 60, 0.5), sensortypes=['grad', 'mag']):
+def process_correlations(platform='mac', freqs=np.arange(5, 60, 0.5), sensortypes=['grad', 'mag']):
     """Process all MEG source frequency files and compute Spearman correlations with lateralised volumes."""
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
     
+    # Frequency bands
+    bands = {
+        'Delta': (1.5, 4),
+        'Theta': (4, 8),
+        'Alpha': (8, 12),
+        'Beta': (12, 30)
+    }
+
     for sensor in sensortypes:
         print(f'Processing {sensor}')
-        for freq in freqs:
-            print(f'Processing {freq}')
-            lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
-                                    f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
-            if os.path.exists(lat_src_file):
-                spearman_r, spearman_pval = compute_spearman(lat_src_file, lat_vols)
+
+        # # --- Per-frequency correlation ---
+        # for freq in freqs:
+        #     print(f'Processing {freq}')
+        #     lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
+        #                             f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
+        #     if os.path.exists(lat_src_file):
+        #         spearman_r, spearman_pval = compute_spearman(lat_src_file, lat_vols)
+
+        #         if spearman_r is not None:
+        #             output_file = os.path.join(paths['output_dir'],
+        #                                        f'spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
+        #             spearman_r.to_csv(output_file, index=False)
+        #         if spearman_pval is not None:
+        #             output_file = os.path.join(paths['output_dir'],
+        #                                        f'spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
+        #             spearman_pval.to_csv(output_file, index=False)
+
+        #             print(f"Saved: {output_file}")
+        #     else:
+        #         print(f"Missing source data file: {lat_src_file}")
+
+        # --- Bandwise correlation ---
+        print(f'\n  Computing bandwise correlations for {sensor}')
+        for band_name, (low, high) in bands.items():
+            print(f'    Processing band: {band_name} ({low}-{high} Hz)')
+
+            band_freqs = np.arange(low, high, 0.5)
+            band_data = []
+
+            for freq in band_freqs[1:]:
+                lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
+                                            f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
+                if os.path.exists(lat_src_file):
+                    df = pd.read_csv(lat_src_file, index_col=None)
+                    band_data.append(df)
+                else:
+                    print(f"      Missing file for {freq} Hz")
+
+            if band_data:
+                # Average across frequencies
+                avg_band_data = sum(band_data) / len(band_data)
+                avg_band_file = os.path.join(paths['meg_source_all_subs_dir'],
+                                             f'all_subs_lateralised_src_power_{sensor}_{band_name}_band_avg.csv')
+                avg_band_data.to_csv(avg_band_file)
+                
+                # Now compute Spearman correlation
+                spearman_r, spearman_pval = compute_spearman(avg_band_file, lat_vols)
 
                 if spearman_r is not None:
-                    output_file = os.path.join(paths['output_dir'],
-                                               f'spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
-                    spearman_r.to_csv(output_file, index=False)
+                    spearman_r.to_csv(os.path.join(paths['output_dir'],
+                                                   f'spearman-r_src_lat_power_vol_{sensor}_{band_name}.csv'),
+                                      index=False)
                 if spearman_pval is not None:
-                    output_file = os.path.join(paths['output_dir'],
-                                               f'spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
-                    spearman_pval.to_csv(output_file, index=False)
-
-                    print(f"Saved: {output_file}")
+                    spearman_pval.to_csv(os.path.join(paths['output_dir'],
+                                                      f'spearman-pval_src_lat_power_vol_{sensor}_{band_name}.csv'),
+                                         index=False)
             else:
-                print(f"Missing source data file: {lat_src_file}")
+                print(f"    No data found for band {band_name}")
 
 if __name__ == "__main__":
     process_correlations()

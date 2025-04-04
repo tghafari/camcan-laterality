@@ -187,7 +187,7 @@ def create_volume_estimate(correlation_values, significant_mask, src_fs, right_i
     )
     return stc, vol_mask
 
-def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, do_plot_3d=True, save=False):
+def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, do_plot_3d=True, save=False, volume_masked=False):
     """
     Plot the volumetric source estimate on MRI and in 3D, highlighting significant regions.
     
@@ -210,30 +210,31 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
     """
     initial_pos = np.array([19, -50, 29]) * 0.001
 
-    # Apply the mask to set non-significant values to NaN or 0 and only show significant clusters
-    stc_data = stc.data.copy()  # Make a copy of the original data
-    stc_data[~vol_mask] = np.mean([np.min(stc_data),np.max(stc_data)]) # Set non-significant regions to 0 (or NaN)
-    
-    # Create a new stc with masked data
-    stc_masked = mne.VolSourceEstimate(stc_data, 
-                                        stc.vertices, 
-                                        stc.tmin, 
-                                        stc.tstep, 
-                                        subject=stc.subject)
+    if volume_masked:  # plot significant masks on volume?
+        # Apply the mask to set non-significant values to NaN or 0 and only show significant clusters
+        stc_data = stc.data.copy()  # Make a copy of the original data
+        stc_data[~vol_mask] = np.mean([np.min(stc_data),np.max(stc_data)]) # Set non-significant regions to 0 (or NaN)
+        
+        # Create a new stc with masked data
+        stc_masked = mne.VolSourceEstimate(stc_data, 
+                                            stc.vertices, 
+                                            stc.tmin, 
+                                            stc.tstep, 
+                                            subject=stc.subject)
 
-    # Plot on MRI using the masked stc
-    fig = stc_masked.plot(
-        src=src_fs,  # use default source
-        subject='fsaverage',
-        subjects_dir=paths['fs_sub_dir'],
-        mode='stat_map',
-        colorbar=True,
-        initial_pos=initial_pos,
-        verbose=True
-    )
-    if save:
-        mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri_sig-only.png')
-        fig.savefig(mri_output)
+        # Plot on MRI using the masked stc
+        fig = stc_masked.plot(
+            src=src_fs,  # use default source
+            subject='fsaverage',
+            subjects_dir=paths['fs_sub_dir'],
+            mode='stat_map',
+            colorbar=True,
+            initial_pos=initial_pos,
+            verbose=True
+        )
+        if save:
+            mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri_sig-only.png')
+            fig.savefig(mri_output)
 
     # Plot on MRI using stc.plot with a mask highlighting significant regions (white markers)
     fig2 = stc.plot(
@@ -266,13 +267,12 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
 def main():
     paths = setup_paths(platform='mac')
     # Prompt user for input
-    freq_input = input("Enter frequency (e.g., 5.0): (make sure input a float number)").strip()
+    freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
     structure = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
     sensor = input("Enter sensor type (grad or mag): ").strip()
     do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
     do_plot_3d = do_plot_3d_input == 'y'
-    
-    # Build file names for correlation and p-values
+
     corr_file = op.join(paths['correlation_dir'], f'spearman-r_src_lat_power_vol_{sensor}_{freq_input}.csv')
     pval_file = op.join(paths['correlation_dir'], f'spearman-pval_src_lat_power_vol_{sensor}_{freq_input}.csv')
     
