@@ -54,14 +54,13 @@ def load_lateralization_volumes(file_path):
 
 def compute_spearman(lat_src_file, lat_vols):
     """Compute Spearman correlation between source data and lateralization volumes."""
-    lat_src_data = pd.read_csv(lat_src_file, index_col=0)
+    lat_src_data = pd.read_csv(lat_src_file, index_col=None)
     common_subjects = lat_src_data.columns.intersection(lat_vols.index)
     
     if len(common_subjects) == 0:
         print(f"No overlapping subjects found for {lat_src_file}")
         return None
     
-    lat_src_data = lat_src_data.reset_index(drop=True)  # Ensure the DataFrame index is reset so we don't retain old subject indices
     lat_src_data = lat_src_data[common_subjects].T  # Align subjects
     lat_vols = lat_vols.loc[common_subjects]  # Align subjects
         
@@ -76,6 +75,8 @@ def compute_spearman(lat_src_file, lat_vols):
     for grid_idx in range(lat_src_data.shape[1]):  # Iterate over 7011 grid indices
         for struct_idx, structure in enumerate(subcortical_structures):  # Iterate over subcortical structures
             r, p = spearmanr(lat_src_data.iloc[:, grid_idx], lat_vols[structure])
+            if p == np.nan or r == np.nan:
+                print(f'{grid_idx} in {structure} is NaN')
             r_values[grid_idx, struct_idx] = r
             p_values[grid_idx, struct_idx] = p
 
@@ -84,7 +85,7 @@ def compute_spearman(lat_src_file, lat_vols):
 
     return spearman_r, spearman_pval
 
-def process_correlations(platform='bluebear', sensortypes=['grad', 'mag'], spec=False):
+def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False):
     """Process all MEG source frequency files and compute Spearman correlations with lateralised volumes."""
     paths = setup_paths(platform)
     lat_vols = load_lateralization_volumes(paths['lateralization_volumes'])
@@ -95,7 +96,7 @@ def process_correlations(platform='bluebear', sensortypes=['grad', 'mag'], spec=
         if spec:
             freqs=np.arange(1.5, 60, 0.5)
             # --- Per-frequency correlation ---
-            for freq in freqs:
+            for freq in freqs[2]:
                 print(f'Processing spectrum at {freq}')
                 lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
                                         f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
@@ -130,19 +131,24 @@ def process_correlations(platform='bluebear', sensortypes=['grad', 'mag'], spec=
                 band_freqs = np.arange(low, high, 0.5)
                 band_data = []
 
-                for freq in band_freqs[1:]:
+                for freq in band_freqs:
                     lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
                                                 f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
                     if os.path.exists(lat_src_file):
-                        df = pd.read_csv(lat_src_file, index_col=None)
+                        df = pd.read_csv(lat_src_file, index_col=None)                  
                         band_data.append(df)
                     else:
                         print(f"      Missing file for {freq} Hz")
 
                 if band_data:
-                    # Average across frequencies
-                    #TODO: problem with Nans, try to ignore them when averaging
-                    avg_band_data = sum(band_data) / len(band_data)
+                    data_array = np.stack([df.values for df in band_data], axis=2)
+
+                    # Compute mean across the frequency axis (axis=2), ignoring NaNs
+                    avg_array = np.nanmean(data_array, axis=2)
+
+                    # Reconstruct the DataFrame with same subjects and columns
+                    avg_band_data = pd.DataFrame(avg_array, columns=band_data[0].columns, index=band_data[0].index)
+
                     avg_band_file = os.path.join(paths['meg_source_all_subs_dir'],
                                                 f'all_subs_lateralised_src_power_{sensor}_{band_name}_band_avg.csv')
                     avg_band_data.to_csv(avg_band_file)

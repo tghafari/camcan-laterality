@@ -69,9 +69,11 @@ def process_meg_data(platform='bluebear', freqs=np.arange(1.5, 11, 0.5), sensort
                 file_path = os.path.join(paths['meg_source_dir'], f'sub-CC{subj}', 'lat_source_perHz',
                                          f'lateralised_src_power_{sensor}_multitaper_{freq}.csv')
                 if os.path.exists(file_path):
-                    print(f'Reading {subj}')
+                    # print(f'Reading {subj}')
                     data = pd.read_csv(file_path, header=None)  # Read CSV without headers
                     data = data[1]  # only keep the lateralised source power
+                    if data.isnull().values.any():
+                        print(f'{subj} has a NaN')
                     data[0] = str(subj)  # Add subject code as column header
                     all_data.append(data)
                 else:
@@ -81,7 +83,7 @@ def process_meg_data(platform='bluebear', freqs=np.arange(1.5, 11, 0.5), sensort
                     
             # Combine all subjects' data into one DataFrame
             combined_df = pd.concat(all_data, axis=1)
-            
+            print(f'{sum(sum(combined_df.isnull().values))}')
             # Define output filename
             output_file = os.path.join(paths['meg_source_all_subs_dir'],
                                        f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
