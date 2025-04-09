@@ -236,7 +236,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
             mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri_sig-only.png')
             fig.savefig(mri_output)
 
-    # Plot on MRI using stc.plot with a mask highlighting significant regions (white markers)
+    # Plot on MRI without significant masks
     fig2 = stc.plot(
         src=src_fs,  # use default source
         subject='fsaverage',
