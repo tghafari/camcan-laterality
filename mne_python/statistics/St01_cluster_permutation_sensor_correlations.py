@@ -2,28 +2,11 @@
 ========================================================
 St01_cluster_permutation_sensor_correlations
 
-Script for analyzing and visualizing the correlation 
-between lateralized MEG source power and subcortical volumes.
-
-This script performs the following steps:
-    1. Reads user input for frequency, sensor type, and subcortical structure.
-    2. Loads Spearman correlation results and significance values.
-    3. Computes right hemisphere grid positions from the fsaverage source space.
-    4. Plots a 3D scatter plot of correlation values with significant points highlighted.
-    5. Creates a volumetric source estimate (stc) based on correlation values.
-    6. Visualizes the source estimate on MRI and optionally in 3D.
-
-Functions:
-- setup_paths: Defines file paths based on platform.
-- compute_hemispheric_index: Extracts right hemisphere grid positions.
-- plot_scatter: Plots 3D scatter of correlation values.
-- create_volume_estimate: Creates a volumetric source estimate.
-- plot_volume_estimate: Plots source estimate on MRI and in 3D.
-- main: Orchestrates the entire workflow.
+this code 
 
 Author: Tara Ghafari
 tara.ghafari@gmail.com
-Date: 03/04/2025
+Date: 16/05/2025
 ============================================================
 """
 
