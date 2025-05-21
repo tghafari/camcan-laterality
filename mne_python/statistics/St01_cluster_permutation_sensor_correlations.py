@@ -35,11 +35,11 @@ def setup_paths(platform='mac'):
     if platform == 'bluebear':
         quinna_dir = '/rds/projects/q/quinna-camcan/'
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
-        output_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
+        jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
         quinna_dir = '/Volumes/quinna-camcan/'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
-        output_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
+        jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
@@ -47,10 +47,10 @@ def setup_paths(platform='mac'):
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'output_dir': op.join(sub2ctx_dir,'derivatives/correlations/bands_signif_correlations_subtraction_nooutlier-psd'),
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
+        'sensor_layout' : op.join(quinna_dir, 'dataman/data_information/sensors_layout_names.csv')
     }
 
     return paths
-
 
 def organise_csvs():
     """this def will organise csv files into one csv per significant substr-band, 
@@ -96,8 +96,30 @@ def organise_csvs():
 
             print(f"Saved alpha correlation values to: {output_csv_path}")
 
+def read_info(paths, ch_type='mag'):
+    """This function inputs the type of channel you want to test significancy for,
+    and reads the info object from a sample MEG file for adjacency information"""
 
-def run_cluster_test_for_correlations(paths, substrs_bands, info):
+    # read one meg file for the info
+    meg_fname =  (paths['sample_meg_file'])
+    raw = mne.io.read_raw_fif(meg_fname)
+    sensor_layout = pd.read_csv(paths['sensor_layout'])
+    right_sensors = sensor_layout['right_sensors'].dropna().tolist()  
+
+    if ch_type == 'mag':
+        right_mags = [ch for ch in right_sensors if ch.endswith('1')]
+        magraw = raw.copy().pick('mag').pick(right_mags)
+        info_mag = magraw.info
+        return info_mag
+    
+    elif ch_type == 'grad':
+        right_grads = [ch for ch in right_sensors if not ch.endswith('1')]
+        gradraw = raw.copy().pick('grad').pick(right_grads)
+        info_grad = gradraw.info
+        return info_grad
+
+
+def run_cluster_test_for_correlations(paths, substrs_bands, info, ch_type):
     """
     Run a one-sample cluster permutation test on sensor correlation values for each subcortical structure and band.
 
@@ -109,8 +131,11 @@ def run_cluster_test_for_correlations(paths, substrs_bands, info):
         List of dictionaries mapping subcortical structures to oscillatory bands.
     info : mne.Info
         MNE Info object with sensor locations (must match sensor count in CSV).
+    ch_type : 'mag' or 'grad'
+        the type of channels you are testing significancy for. Should correspond to the info
     """
-    adjacency, ch_names = find_ch_adjacency(info, ch_type='mag')
+
+    adjacency, ch_names = find_ch_adjacency(info, ch_type=ch_type)
 
     for item in substrs_bands:
         for substr, band in item.items():
@@ -147,11 +172,9 @@ def run_cluster_test_for_correlations(paths, substrs_bands, info):
 
 def main():
     paths = setup_paths(platform='mac')
-    # read one meg file for the info
-    meg_fname =  (paths['sample_meg_file'])
-    raw = mne.io.read_raw_fif(meg_fname)
-    magraw = raw.copy().pick('mag')
-    info = magraw.info
+
+
+
     # Prompt user for input
     freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
     structure = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
