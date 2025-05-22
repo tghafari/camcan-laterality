@@ -25,8 +25,8 @@ import matplotlib.pyplot as plt
 
 import mne
 from mne.channels import find_ch_adjacency
-from mne.stats import permutation_cluster_1samp_test
-from scipy.stats import ttest_1samp
+from mne.stats import permutation_cluster_1samp_test, permutation_cluster_test
+from scipy.stats import ttest_1samp, spearmanr
 
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -44,6 +44,8 @@ def setup_paths(platform='mac'):
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
     paths = {
+        'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),  # directory of laterlised band power
+        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # directory of lateralised volume of substrs
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir,'derivatives/correlations/bands_signif_correlations_subtraction_nooutlier-psd'),
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
@@ -96,6 +98,117 @@ def organise_csvs():
 
             print(f"Saved alpha correlation values to: {output_csv_path}")
 
+
+
+def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
+    """Merge the dataframes containing spectrum lateralization values and 
+    subcortical structure lateralization values together."""
+
+    # Navigate to the sensor_pair folder
+    spec_lat_index_fname = op.join(spectra_dir, f'{left_sensor}_{right_sensor}.csv')
+
+    # Load lateralization index for each pair
+    spectrum_pair_lat_df = pd.read_csv(spec_lat_index_fname)
+    spectrum_pair_lat_df = spectrum_pair_lat_df.rename(columns={'Unnamed: 0':'subject_ID'})
+    
+    # Merge and match the subject_ID column and remove nans
+    working_df = spectrum_pair_lat_df.merge(substr_lat_df, on=['subject_ID'])
+    working_df = working_df.dropna()
+
+    # Get the freqs of spectrum from spec_pair_lat
+    freqs = spectrum_pair_lat_df.columns.values[1:]  # remove subject_ID column
+    freqs = [float(freq) for freq in freqs]  # convert strings to floats
+    return working_df, freqs
+
+def calculate_band_power(working_df, freqs, band):
+    """Calculate the average power within a specified frequency band."""
+    # Round frequencies to one decimal place to match the column names in working_df
+    freqs_rounded = [round(f, 1) for f in freqs]
+
+    # Select frequencies that fall within the band range
+    band_freqs = [f for f in freqs_rounded if band[0] <= f <= band[1]]
+    
+    # Ensure the selected frequencies are actually in the DataFrame columns
+    band_freqs = [str(f) for f in band_freqs if str(f) in working_df.columns]
+
+    # Check if there are any valid frequencies selected
+    if len(band_freqs) == 0:
+        raise ValueError(f"No frequencies found in the range {band[0]}-{band[1]} Hz in the data.")
+    
+    # Calculate the average power across the selected frequencies
+    band_power = working_df[band_freqs].mean(axis=1)
+    
+    return band_power
+
+# Define sensors and band limits
+sensor_pairs = [('MEG0111', 'MEG0121'), ('MEG0211', 'MEG0221'), ...]  # Add all right-side pairs
+bands = {
+    'Delta': (1, 4),
+    'Theta': (4, 8),
+    'Alpha': (8, 13),
+    'Beta': (13, 30)
+}
+
+# Load subcortical LV CSV
+substr_lat_df = pd.read_csv(paths['LV_csv'])  # shape: (subjects, 7)
+
+# Create container for each band's power across sensor pairs
+band_li_dict = {band: [] for band in bands}
+subject_ids = None
+
+# Loop through sensor pairs
+for left_sensor, right_sensor in sensor_pairs:
+    working_df, freqs = working_df_maker(paths['spectra_dir'], left_sensor, right_sensor, substr_lat_df)
+
+    # Save subject IDs
+    if subject_ids is None:
+        subject_ids = working_df['subject_ID']
+
+    # Compute band power and store
+    for band_name, band_range in bands.items():
+        band_power = calculate_band_power(working_df, freqs, band_range)
+        band_li_dict[band_name].append(band_power.values)
+
+# Concatenate all sensor pairs for each band: subjects x sensor_pairs
+for band_name, band_matrix in band_li_dict.items():
+    band_li = np.stack(band_matrix, axis=1)
+    df_out = pd.DataFrame(band_li, columns=[f'{i}' for i in range(band_li.shape[1])])
+    df_out.insert(0, 'subject_ID', subject_ids.values)
+    
+    out_path = op.join(paths['LI_dir'], f'{band_name}_lateralised_power_allsens_subtraction_nonoise.csv')
+    df_out.to_csv(out_path, index=False)
+
+# --- Raw Spearman correlations ---
+# Load LV again (aligned with saved subject_IDs)
+lv_df = substr_lat_df.set_index('subject_ID').loc[subject_ids].reset_index()
+
+# For each (band, substructure) pair
+band_substr_map = {
+    'Alpha': 'Thal',
+    'Beta': 'Puta',
+    'Delta': 'Hipp'
+}
+
+for band, substr in band_substr_map.items():
+    band_csv = op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv')
+    band_df = pd.read_csv(band_csv)
+    lv_vals = lv_df[substr].values
+
+    rval_list = []
+    for ch in band_df.columns[1:]:  # skip subject_ID
+        li_vals = band_df[ch].values
+        rval, _ = spearmanr(lv_vals, li_vals)
+        rval_list.append(rval)
+
+    # Save correlation values
+    out_df = pd.DataFrame({
+        'sensor_pair': band_df.columns[1:],
+        f'{band.lower()}_rval': rval_list
+    })
+    out_df.to_csv(op.join(paths['LI_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False)
+
+# You can now call `run_cluster_test_for_correlations(...)` to run the permutation tests.
+
 def read_info(paths, ch_type='mag'):
     """This function inputs the type of channel you want to test significancy for,
     and reads the info object from a sample MEG file for adjacency information"""
@@ -115,7 +228,6 @@ def read_info(paths, ch_type='mag'):
         raise ValueError("ch_type must be 'mag' or 'grad'")
     
     return raw.info
-
 
 def find_custom_adjacency(info, ch_type):
     """
@@ -143,6 +255,92 @@ def find_custom_adjacency(info, ch_type):
     ch_names = [ch for ch in full_ch_names if ch in info['ch_names']]
 
     return adjacency, ch_names
+
+def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
+    """
+    Runs cluster-based permutation tests on correlations between subcortical LVs
+    and MEG power lateralization indices for specific bands.
+
+    Parameters:
+    ------------
+    paths : dict
+        Dictionary containing keys: 'LI_dir', 'LV_csv', 'sensor_layout', 'sample_meg_file', 'signif_correlation_dir'
+    ch_type : str
+        'mag' or 'grad'
+    """
+
+    substrs_bands = [{'Thal': 'Alpha'}, {'Puta': 'Beta'}, {'Hipp': 'Delta'}]
+
+    # Load subcortical LVs
+    lv_df = pd.read_csv(paths['LV_csv'])  # shape: (n_subjects, 7)
+
+    # Get sensor info and adjacency
+    info = read_info(paths, ch_type=ch_type)
+    adjacency, ch_names = find_custom_adjacency(info, ch_type=ch_type)
+
+    for item in substrs_bands:
+        for substr, band in item.items():
+
+            # Load LI data
+            li_fname = os.path.join(paths['LI_dir'], f"{band}_lateralised_power_allsens_subtraction_nonoise.csv")
+            li_df = pd.read_csv(li_fname)
+
+            # Filter sensor columns by sensor type (mag or grad)
+            if ch_type == 'mag':
+                selected_cols = [col for col in li_df.columns if col.endswith('1')]
+            else:  # grad
+                selected_cols = [col for col in li_df.columns if not col.endswith('1')]
+
+            li_filtered = li_df[selected_cols].to_numpy()
+            lv_vector = lv_df[substr].to_numpy()  # (n_subjects,)
+
+            # Sanity check
+            assert li_filtered.shape[0] == lv_vector.shape[0], f"Subject mismatch for {substr}-{band}"
+
+            n_subjects, n_sensors = li_filtered.shape
+
+            # --- Compute observed correlations ---
+            r_obs = np.array([
+                spearmanr(lv_vector, li_filtered[:, ch])[0]
+                for ch in range(n_sensors)
+            ])
+
+            z_obs = np.arctanh(r_obs)  # Fisher transform
+
+            # --- Permutation Testing ---
+            n_permutations = 1000
+            z_null = np.zeros((n_permutations, n_sensors))
+            rng = np.random.RandomState(42)
+
+            for i in range(n_permutations):
+                shuffled_lv = rng.permutation(lv_vector)
+                z_null[i] = [
+                    np.arctanh(spearmanr(shuffled_lv, li_filtered[:, ch])[0])
+                    for ch in range(n_sensors)
+                ]
+
+            # --- Run cluster permutation test ---
+            T_obs, clusters, p_values, _ = permutation_cluster_test(
+                [z_obs] + [z_null[i] for i in range(n_permutations)],
+                n_permutations=n_permutations,
+                threshold=None,
+                tail=0,
+                adjacency=adjacency,
+                out_type='mask',
+                verbose=True
+            )
+
+            # --- Save results ---
+            sig_clusters = np.where(p_values < 0.05)[0]
+            out_txt = os.path.join(paths['signif_correlation_dir'], f"{substr}_{band}_{ch_type}_significant_clusters.txt")
+
+            with open(out_txt, 'w') as f:
+                for i in sig_clusters:
+                    cluster_sensors = np.array(selected_cols)[clusters[i]]
+                    f.write(f"Cluster {i + 1} (p = {p_values[i]:.3f}):\n")
+                    f.write(", ".join(cluster_sensors) + "\n\n")
+
+            print(f"Finished {substr}-{band} ({ch_type}): {len(sig_clusters)} significant clusters")
 
 
 
