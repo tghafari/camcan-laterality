@@ -175,11 +175,11 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
         for substr, band in pair.items():
             li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
             selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
-            li_data = li_df[selected_cols].to_numpy()
+            li_data = li_df[selected_cols].to_numpy()  #
             lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
             
             # Step 1: Observed z-transformed correlations
-            r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(li_data.shape[1])])
+            r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(li_data.shape[1])])  
             z_obs = np.arctanh(r_obs)  # Fisher transform (Fisher's transformation = 0.5 * ln((1 + r) / (1 - r)) , Standard Error = 1 / sqrt(n - 3), z = (z - 0) / (Standard Error))
             # The arctanh function, is a statistical transformation often used in conjunction with Fisher information to address the issue of non-normality in correlation coefficients
             
@@ -197,7 +197,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
             # Run cluster permutation test
             T_obs, clusters, p_vals, _ = permutation_cluster_test(
                 X,
-                n_permutations=1000,
+                n_permutations=10,
                 tail=0,
                 threshold=None,
                 adjacency=adjacency,
