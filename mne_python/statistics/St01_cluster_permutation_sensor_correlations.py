@@ -93,14 +93,12 @@ def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     freqs = [float(f) for f in spectrum_df.columns[1:]]
     return merged_df, freqs
 
-
 def calculate_band_power(working_df, freqs, band):
     """Computes average power for a given frequency band."""
     band_freqs = [str(round(f, 1)) for f in freqs if band[0] <= f <= band[1] and str(round(f, 1)) in working_df.columns]
     if not band_freqs:
         raise ValueError(f"No frequencies found for band {band}.")
     return working_df[band_freqs].mean(axis=1)
-
 
 def extract_all_band_power(paths):
     """Extracts band power values from sensor pairs and saves them per band."""
@@ -128,7 +126,6 @@ def extract_all_band_power(paths):
         df_out.insert(0, 'subject_ID', subject_ids.values)
         df_out.to_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'), index=False)
 
-
 def save_spearman_correlations(paths):
     """Computes Spearman r-values between MEG band power and subcortical LVs."""
     band_substr_map = {'Alpha': 'Thal', 'Beta': 'Puta', 'Delta': 'Hipp'}
@@ -142,7 +139,6 @@ def save_spearman_correlations(paths):
         pd.DataFrame({'sensor_pair': band_df.columns[1:], f'{band.lower()}_rval': rval_list}).to_csv(
             op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False
         )
-
 
 def read_info(paths, ch_type='mag'):
     """Reads sensor info from a MEG file for adjacency computation."""
@@ -159,15 +155,13 @@ def read_info(paths, ch_type='mag'):
 
     return raw.info
 
-
 def find_custom_adjacency(info, ch_type):
-    """Returns adjacency matrix for selected sensor type and layout."""
+    """Returns sparse adjacency matrix for selected sensor type."""
     full_adj, full_names = find_ch_adjacency(info, ch_type=ch_type)
     mask = [name in info['ch_names'] for name in full_names]
-    adjacency, ch_names = full_adj[mask][:, mask], [name for name in full_names if name in info['ch_names']]
-    adjacency_sparse = sparse.csr_matrix(adjacency)
+    adjacency = full_adj[mask][:, mask]
 
-    return adjacency_sparse, ch_names
+    return sparse.csr_matrix(adjacency), [name for name in full_names if name in info['ch_names']]
 
 def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
     """Runs cluster-based permutation tests for correlations between LI and LVs."""
@@ -180,7 +174,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
     for pair in substrs_bands:
         for substr, band in pair.items():
             li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
-            selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if not c.endswith('1')]
+            selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
             li_data = li_df[selected_cols].to_numpy()
             lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
             
@@ -188,49 +182,19 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
             r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(li_data.shape[1])])
             z_obs = np.arctanh(r_obs)  # Fisher transform (Fisher's transformation = 0.5 * ln((1 + r) / (1 - r)) , Standard Error = 1 / sqrt(n - 3), z = (z - 0) / (Standard Error))
             # The arctanh function, is a statistical transformation often used in conjunction with Fisher information to address the issue of non-normality in correlation coefficients
-
-            # Run cluster-based permutation test again with corrected adjacency format
-            T_obs, clusters, cluster_p_values, H0 = permutation_cluster_1samp_test(
-                z_data, 
-                threshold=None, 
-                adjacency=adjacency, 
-                n_permutations=1000, 
-                tail=0, 
-                out_type='mask', 
-                n_jobs=1, 
-                seed=42
-            )
-
-            # Plot the observed T-values and significant cluster mask
-            significant_mask = np.zeros_like(T_obs, dtype=bool)
-            for cl, p in zip(clusters, cluster_p_values):
-                if p < 0.05:
-                    significant_mask[cl] = True
-
-            plt.figure(figsize=(10, 4))
-            plt.plot(T_obs, label="T-values")
-            plt.plot(significant_mask * T_obs, 'ro', label="Significant cluster")
-            plt.title("Cluster-based Permutation Test")
-            plt.xlabel("Sensor Index")
-            plt.ylabel("T-statistic")
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-
-
-            # Step 2: Generate permutation-based null distribution
+            
+            # Prepare data for cluster test: 1 sample (obs) + 1000 perms
             rng = np.random.RandomState(42)
             z_null = np.array([
-                np.arctanh([spearmanr(rng.permutation(lv_vals), li_data[:, i])[0]
-                             for i in range(li_data.shape[1])])
+                np.arctanh([spearmanr(rng.permutation(lv_vals), li_data[:, i])[0] for i in range(li_data.shape[1])])
                 for _ in range(1000)
             ])
-
-            z_data = np.vstack([z_obs] + list(z_null))  # shape: (n_samples, n_sensors)
+            z_data = np.vstack([z_obs] + list(z_null))
             assert z_data.shape[1] == adjacency.shape[0], "Mismatch between tests and adjacency size"
 
-            X = [z_data[i, :][np.newaxis, :] for i in range(z_data.shape[0])]  # shape (1, 51) each
+            X = [z_data[i, :][np.newaxis, :] for i in range(z_data.shape[0])]
 
+            # Run cluster permutation test
             T_obs, clusters, p_vals, _ = permutation_cluster_test(
                 X,
                 n_permutations=1000,
@@ -241,16 +205,31 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
                 verbose=True
             )
 
+            # Save and plot significant clusters
             sig_idx = np.where(p_vals < 0.05)[0]
             out_txt = op.join(paths['signif_correlation_dir'], f'{substr}_{band}_{ch_type}_significant_clusters.txt')
-
             with open(out_txt, 'w') as f:
                 for i in sig_idx:
                     sig_sensors = np.array(selected_cols)[clusters[i]]
                     f.write(f"Cluster {i+1} (p={p_vals[i]:.3f}):\n")
                     f.write(", ".join(sig_sensors) + "\n\n")
-
             print(f"Completed {substr}-{band} ({ch_type}): {len(sig_idx)} significant clusters")
+
+            # Plotting
+            significant_mask = np.zeros_like(T_obs, dtype=bool)
+            for cl, p in zip(clusters, p_vals):
+                if p < 0.05:
+                    significant_mask[cl] = True
+
+            plt.figure(figsize=(10, 4))
+            plt.plot(T_obs, label="T-values")
+            plt.plot(significant_mask * T_obs, 'ro', label="Significant cluster")
+            plt.title(f"Cluster Test: {substr}-{band} ({ch_type})")
+            plt.xlabel("Sensor Index")
+            plt.ylabel("T-statistic")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
 
 
 def main():
