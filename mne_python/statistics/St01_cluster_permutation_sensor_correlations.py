@@ -197,7 +197,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
             # Run cluster permutation test
             T_obs, clusters, p_vals, _ = permutation_cluster_test(
                 X,
-                n_permutations=10,
+                n_permutations=1000,
                 tail=0,
                 threshold=None,
                 adjacency=adjacency,
