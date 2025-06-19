@@ -234,11 +234,13 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
                 center = pts.mean(axis=0)
                 ax.text(center[0], center[1], str(cid), color='black', fontsize=12)
 
-            # Save figure
-            out_dir = paths['significant_cluster_perm_dir']
-            os.makedirs(out_dir, exist_ok=True)
-            fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
-            plt.close(fig)
+            plt.show()
+            
+            # # Save figure
+            # out_dir = paths['significant_cluster_perm_dir']
+            # os.makedirs(out_dir, exist_ok=True)
+            # fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
+            # plt.close(fig)
 
 
 def main():
