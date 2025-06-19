@@ -1,0 +1,252 @@
+"""
+Unified script for computing lateralized MEG-sensor correlations with subcortical volumes,
+performing cluster-based permutation testing on sensor-level correlations,
+and visualizing significant clusters via topographic maps.
+
+Steps:
+1. **Setup file paths** based on platform ('mac' or 'bluebear').
+
+## These two steps only need to be run once ##
+2. **Extract lateralized power** per frequency band (Delta, Theta, Alpha, Beta) for each sensor pair.
+3. **Compute Spearman correlations** between band power and subcortical volume lateralization for specified mappings.
+########
+
+4. **Read MEG sensor info** and build a custom adjacency for the selected channel type (mag or grad).
+5. **For each band-structure combination**:
+   a. Load lateralized power data for sensors.
+   b. Compute observed Spearman correlations across subjects.
+   c. Build a null distribution by shuffling subject labels and computing Fisher z-transformed correlations.
+   d. Compute non-parametric p-values for each sensor.
+   e. Identify significant sensors (p < 0.05).
+   f. Cluster significant sensors using the adjacency matrix (connected components).
+   g. Visualize results: topographic map of correlation values, mask significant sensors, and annotate clusters.
+
+Requirements:
+- `li_data`: lateralized index data per sensor (subjects × sensors).
+- `lv_vals`: lateralized volume values per subject.
+- `info`: MNE Info object with selected channels.
+- `adjacency`: sparse adjacency matrix for sensor neighborhoods.
+
+Written by: Tara Ghafari
+tara.ghafari@gmail.com
+"""
+
+import os
+import os.path as op
+import numpy as np
+import pandas as pd
+import mne
+from scipy.stats import spearmanr
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
+import matplotlib.pyplot as plt
+
+from mne.channels import find_ch_adjacency
+from scipy import sparse
+from mne.channels import find_layout
+
+
+def setup_paths(platform='mac'):
+    """Set up and return file paths based on the system platform."""
+    if platform == 'bluebear':
+        quinna_dir = '/rds/projects/q/quinna-camcan/'
+        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
+        jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
+    elif platform == 'mac':
+        quinna_dir = '/Volumes/quinna-camcan/'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
+        jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
+    else:
+        raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
+
+    paths = {
+        'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),
+        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
+        'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
+        'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_signif_correlations_subtraction_nooutlier-psd'),
+        'significant_cluster_perm_dir' : op.join(jenseno_dir, '/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd-clusterpermutation'),
+        'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
+        'sensor_layout': op.join(quinna_dir, 'dataman/data_information/sensors_layout_names.csv'),
+        'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+    }
+    return paths
+
+
+def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
+    """Combines spectra and volume lateralization data for one sensor pair."""
+    pair_file = op.join(spectra_dir, f'{left_sensor}_{right_sensor}.csv')
+    spectrum_df = pd.read_csv(pair_file).rename(columns={'Unnamed: 0': 'subject_ID'})
+    merged_df = spectrum_df.merge(substr_lat_df, on='subject_ID').dropna()
+    freqs = [float(f) for f in spectrum_df.columns[1:]]
+    return merged_df, freqs
+
+
+def calculate_band_power(working_df, freqs, band):
+    """Computes average power for a given frequency band from the DataFrame."""
+    band_freqs = [str(round(f, 1)) for f in freqs if band[0] <= f <= band[1] and str(round(f, 1)) in working_df.columns]
+    if not band_freqs:
+        raise ValueError(f"No frequencies found for band {band}.")
+    return working_df[band_freqs].mean(axis=1)
+
+
+def extract_all_band_power(paths):
+    """Extracts band power values from sensor pairs and saves them per band."""
+    sensor_pairs = pd.read_csv(paths['sensor_layout'])[['left_sensors', 'right_sensors']].dropna()
+    substr_lat_df = pd.read_csv(paths['LV_csv'])
+    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 13), 'Beta': (13, 30)}
+
+    band_li_dict = {band: [] for band in bands}
+    label_dict = {band: [] for band in bands}
+    subject_ids = None
+
+    for _, row in sensor_pairs.iterrows():
+        left_sensor, right_sensor = row['left_sensors'], row['right_sensors']
+        working_df, freqs = working_df_maker(paths['spectra_dir'], left_sensor, right_sensor, substr_lat_df)
+        if subject_ids is None:
+            subject_ids = working_df['subject_ID']
+        for band, frange in bands.items():
+            band_power = calculate_band_power(working_df, freqs, frange)
+            band_li_dict[band].append(band_power.values)
+            label_dict[band].append(f'{left_sensor}_{right_sensor}')
+
+    for band, data in band_li_dict.items():
+        matrix = np.stack(data, axis=1)
+        df_out = pd.DataFrame(matrix, columns=label_dict[band])
+        df_out.insert(0, 'subject_ID', subject_ids.values)
+        df_out.to_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'), index=False)
+
+
+def save_spearman_correlations(paths):
+    """Computes Spearman r-values between MEG band power and subcortical LVs and saves CSVs."""
+    # Example mapping; modify as needed
+    band_substr_map = {'Alpha': 'Thal', 'Beta': 'Puta', 'Delta': 'Hipp'}
+    lv_df = pd.read_csv(paths['LV_csv'])
+
+    for band, substr in band_substr_map.items():
+        band_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
+        lv_vals = lv_df.set_index('subject_ID').loc[band_df['subject_ID']][substr].values
+
+        rval_list = [spearmanr(band_df[col], lv_vals)[0] for col in band_df.columns[1:]]
+        out_df = pd.DataFrame({'sensor_pair': band_df.columns[1:], f'{band.lower()}_rval': rval_list})
+        out_df.to_csv(op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False)
+
+
+def read_info(paths, ch_type='mag'):
+    """Reads sensor info from a MEG file for adjacency computation."""
+    raw = mne.io.read_raw_fif(paths['sample_meg_file'], verbose='ERROR')
+    layout = pd.read_csv(paths['sensor_layout'])
+    right_sensors = layout['right_sensors'].dropna().tolist()
+
+    if ch_type == 'mag':
+        channels = [ch for ch in right_sensors if ch.endswith('1')]
+        raw.pick('mag').pick(channels)
+    else:
+        channels = [ch for ch in right_sensors if not ch.endswith('1')]
+        raw.pick('grad').pick(channels)
+
+    return raw.info
+
+def find_custom_adjacency(info, ch_type):
+    """Returns sparse adjacency matrix and channel names for selected sensor type."""
+    full_adj, full_names = find_ch_adjacency(info, ch_type=ch_type)
+    mask = [name in info['ch_names'] for name in full_names]
+    adjacency = full_adj[mask][:, mask]
+    return sparse.csr_matrix(adjacency), [name for name in full_names if name in info['ch_names']]
+
+
+def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
+    """Performs cluster-based permutation test on Spearman correlations between sensor lateralized power and subcortical volumes."""
+    lv_df = pd.read_csv(paths['LV_csv'])
+    # Example mapping; modify as needed:
+    substrs_bands = [{'Thal': 'Alpha'}, {'Puta': 'Beta'}, {'Hipp': 'Delta'}]
+
+    info = read_info(paths, ch_type=ch_type)
+    adjacency, ch_names = find_custom_adjacency(info, ch_type)
+
+    for pair in substrs_bands:
+        for substr, band in pair.items():
+            # Load lateralized power data for this band
+            li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
+            # Select columns matching channels in info, ensuring order matches info['ch_names']
+            selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
+            li_data = li_df[selected_cols].to_numpy()
+            lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
+
+            # 1. Compute observed Spearman correlations and Fisher z-transform
+            n_sensors = li_data.shape[1]
+            r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(n_sensors)])
+            z_obs = np.arctanh(r_obs)
+
+            # 2. Build null distribution by shuffling
+            rng = np.random.RandomState(42)
+            z_null = np.zeros((n_permutations, n_sensors))
+            for p in range(n_permutations):
+                lv_shuff = rng.permutation(lv_vals)
+                r_null = [spearmanr(lv_shuff, li_data[:, i])[0] for i in range(n_sensors)]
+                z_null[p, :] = np.arctanh(r_null)
+
+            # 3. Compute non-parametric p-values (two-tailed)
+            p_vals = np.mean(np.abs(z_null) >= np.abs(z_obs), axis=0)
+            significant_mask = p_vals < 0.05
+            print(f"{substr}-{band} ({ch_type}): {significant_mask.sum()} significant sensors")
+
+            # 4. Cluster significant sensors using adjacency
+            sig_idx = np.where(significant_mask)[0]
+            if sig_idx.size > 0:
+                sub_adj = adjacency[np.ix_(sig_idx, sig_idx)]
+                n_comp, labels = connected_components(csr_matrix(sub_adj), directed=False, return_labels=True)
+                clusters = {i: sig_idx[labels == i] for i in range(n_comp)}
+                print(f"Found {len(clusters)} cluster(s) for {substr}-{band} ({ch_type}):")
+                for cid, nodes in clusters.items():
+                    print(f"  Cluster {cid}: indices {nodes}")
+            else:
+                print(f"No significant sensors to cluster for {substr}-{band} ({ch_type}).")
+                clusters = {}
+
+            # 5. Visualize topomap with significant mask and cluster labels
+            fig, ax = plt.subplots()
+            mask = significant_mask
+            mask_params = dict(
+                marker='o', markerfacecolor='w', markeredgecolor='k',
+                linewidth=1, markersize=10
+            )
+
+            layout = find_layout(info)  # layout includes all right-side sensors
+            all_names = layout.names     # sensor names in layout order
+            all_pos = layout.pos        # 2D coordinates
+
+            # Create index mapping from your channel names to layout entries
+            # ch_names should be list of your selected 51 sensor names in the same order as li_data columns
+            indices = [all_names.index(ch) for ch in ch_names]
+
+            pos = np.array(all_pos)[indices]  # shape (51, 2)
+
+            # Plot topomap
+            im, cn = mne.viz.plot_topomap(
+                r_obs, pos, mask=mask, mask_params=mask_params,
+                cmap='RdBu_r', show=False, axes=ax
+            )
+            ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
+
+            # Annotate clusters
+            for cid, idxs in clusters.items():
+                pts = pos[idxs]
+                center = pts.mean(axis=0)
+                ax.text(center[0], center[1], str(cid), color='black', fontsize=12)
+
+            # Save figure
+            out_dir = paths['significant_cluster_perm_dir']
+            os.makedirs(out_dir, exist_ok=True)
+            fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
+            plt.close(fig)
+
+
+def main():
+    platform = 'mac'  # or 'bluebear'
+    paths = setup_paths(platform)
+    # Step 3: Run cluster permutation tests and visualize
+    run_cluster_test_from_raw_corr(paths, ch_type='mag')
+    run_cluster_test_from_raw_corr(paths, ch_type='grad')
+
+if __name__ == "__main__":
+    main()

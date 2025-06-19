@@ -4,8 +4,12 @@ St01_cluster_permutation_sensor_correlations
 
 This script performs the following:
 
-1. Organizes significant Spearman correlation (r) values between lateralized MEG band power and lateralized subcortical volumes into a unified CSV per band-structure pair.
-2. Calculates cluster-based permutation tests for significance across MEG sensor pairs.
+1. Organizes significant Spearman correlation (r)
+     values between lateralized MEG band power and 
+     lateralized subcortical volumes into a unified 
+     CSV per band-structure pair.
+2. Calculates cluster-based permutation tests for 
+      significance across MEG sensor pairs.
 
 Author: Tara Ghafari
 Email: tara.ghafari@gmail.com
@@ -49,7 +53,6 @@ def setup_paths(platform='mac'):
         'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
     }
     return paths
-
 
 def organise_csvs():
     """Organizes correlation r-values per structure-band into separate CSV files.
@@ -194,50 +197,12 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag'):
 
             X = [z_data[i, :][np.newaxis, :] for i in range(z_data.shape[0])]
 
-            # Run cluster permutation test
-            T_obs, clusters, p_vals, _ = permutation_cluster_test(
-                X,
-                n_permutations=1000,
-                tail=0,
-                threshold=None,
-                adjacency=adjacency,
-                out_type='mask',
-                verbose=True
-            )
-
-            # Save and plot significant clusters
-            sig_idx = np.where(p_vals < 0.05)[0]
-            out_txt = op.join(paths['signif_correlation_dir'], f'{substr}_{band}_{ch_type}_significant_clusters.txt')
-            with open(out_txt, 'w') as f:
-                for i in sig_idx:
-                    sig_sensors = np.array(selected_cols)[clusters[i]]
-                    f.write(f"Cluster {i+1} (p={p_vals[i]:.3f}):\n")
-                    f.write(", ".join(sig_sensors) + "\n\n")
-            print(f"Completed {substr}-{band} ({ch_type}): {len(sig_idx)} significant clusters")
-
-            # Plotting
-            significant_mask = np.zeros_like(T_obs, dtype=bool)
-            for cl, p in zip(clusters, p_vals):
-                if p < 0.05:
-                    significant_mask[cl] = True
-
-            plt.figure(figsize=(10, 4))
-            plt.plot(T_obs, label="T-values")
-            plt.plot(significant_mask * T_obs, 'ro', label="Significant cluster")
-            plt.title(f"Cluster Test: {substr}-{band} ({ch_type})")
-            plt.xlabel("Sensor Index")
-            plt.ylabel("T-statistic")
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-
 
 def main():
     paths = setup_paths()
     extract_all_band_power(paths)
     save_spearman_correlations(paths)
-    run_cluster_test_from_raw_corr(paths, ch_type='mag')
-    run_cluster_test_from_raw_corr(paths, ch_type='grad')
+
 
 
 if __name__ == '__main__':
