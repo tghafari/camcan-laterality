@@ -212,8 +212,8 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             )
 
             layout = find_layout(info)  # layout includes all right-side sensors
-            all_names = layout.names     # sensor names in layout order
-            all_pos = layout.pos        # 2D coordinates
+            all_names = layout.names  # sensor names in layout order
+            all_pos = layout.pos  # 2D coordinates
 
             # Create index mapping from your channel names to layout entries
             # ch_names should be list of your selected 51 sensor names in the same order as li_data columns
@@ -236,7 +236,6 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 
             # Save figure
             out_dir = paths['significant_cluster_perm_dir']
-            os.makedirs(out_dir, exist_ok=True)
             fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
             plt.close(fig)
 
