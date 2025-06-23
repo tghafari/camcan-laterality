@@ -63,7 +63,7 @@ def setup_paths(platform='mac'):
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),
         'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
-        'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_signif_correlations_subtraction_nooutlier-psd'),
+        'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'),
         'significant_cluster_perm_dir' : op.join(jenseno_dir, '/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd-clusterpermutation'),
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/sensors_layout_names.csv'),
@@ -131,7 +131,7 @@ def save_spearman_correlations(paths):
         out_df.to_csv(op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False)
 
 
-def read_info(paths, ch_type='mag'):
+def read_raw_info(paths, ch_type='mag'):
     """Reads sensor info from a MEG file for adjacency computation."""
     raw = mne.io.read_raw_fif(paths['sample_meg_file'], verbose='ERROR')
     layout = pd.read_csv(paths['sensor_layout'])
@@ -144,7 +144,7 @@ def read_info(paths, ch_type='mag'):
         channels = [ch for ch in right_sensors if not ch.endswith('1')]
         raw.pick('grad').pick(channels)
 
-    return raw.info
+    return raw, raw.info
 
 def find_custom_adjacency(info, ch_type):
     """Returns sparse adjacency matrix and channel names for selected sensor type."""
@@ -160,7 +160,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
     # Example mapping; modify as needed:
     substrs_bands = [{'Thal': 'Alpha'}, {'Puta': 'Beta'}, {'Hipp': 'Delta'}]
 
-    info = read_info(paths, ch_type=ch_type)
+    raw, info = read_raw_info(paths, ch_type=ch_type)
     adjacency, ch_names = find_custom_adjacency(info, ch_type)
 
     for pair in substrs_bands:
@@ -169,13 +169,15 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
             # Select columns matching channels in info, ensuring order matches info['ch_names']
             selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
-            li_data = li_df[selected_cols].to_numpy()
+            # li_data = li_df[selected_cols].to_numpy()
+            li_data = li_df['MEG0112_MEG1422'].to_numpy()  #temp
             lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
 
             # 1. Compute observed Spearman correlations and Fisher z-transform
             n_sensors = li_data.shape[1]
+            p_obs = spearmanr(lv_vals, li_data)  #temp
             r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(n_sensors)])
-            z_obs = np.arctanh(r_obs)
+            z_obs = np.arctanh(r_obs)  # Fisher z-transform to acquire z-scores
 
             # 2. Build null distribution by shuffling
             rng = np.random.RandomState(42)
@@ -187,7 +189,8 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 
             # 3. Compute non-parametric p-values (two-tailed)
             p_vals = np.mean(np.abs(z_null) >= np.abs(z_obs), axis=0)
-            significant_mask = p_vals < 0.05
+            # significant_mask = p_vals < 0.05
+            significant_mask = z_obs < 0.05  #temp
             print(f"{substr}-{band} ({ch_type}): {significant_mask.sum()} significant sensors")
 
             # 4. Cluster significant sensors using adjacency
@@ -205,42 +208,20 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 
             # 5. Visualize topomap with significant mask and cluster labels
             fig, ax = plt.subplots()
+
+            # Define the significant clusters
             mask = significant_mask
             mask_params = dict(
                 marker='o', markerfacecolor='w', markeredgecolor='k',
                 linewidth=1, markersize=10
-            )
-
-            layout = find_layout(info)  # layout includes all right-side sensors
-            all_names = layout.names  # sensor names in layout order
-            indices = [all_names.index(ch) for ch in ch_names]
-
-            # Create a mask for selecting only your channel names
-            sel_mask = [name in ch_names for name in layout.names]
-            # Filter the layout to only right-side sensors
-            layout.pick(picks=indices)
-            pos = layout.pos  # now matches len(ch_names)
-
-            # all_pos = layout.pos  # 2D coordinates
-
-            # Create index mapping from your channel names to layout entries
-            # ch_names should be list of your selected 51 sensor names in the same order as li_data columns
-
-            # pos = np.array(all_pos)[indices]  # shape (51, 2)
+            ) 
 
             # Plot topomap
             im, cn = mne.viz.plot_topomap(
-                r_obs, pos, mask=mask, mask_params=mask_params,
+                r_obs, info, mask=mask, mask_params=mask_params,
                 cmap='RdBu_r', show=False, axes=ax
-            )
+            )   # fix the contours to look like the sensor plot
             ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
-
-            # Annotate clusters
-            for cid, idxs in clusters.items():
-                pts = pos[idxs]
-                center = pts.mean(axis=0)
-                ax.text(center[0], center[1], str(cid), color='black', fontsize=12)
-
             plt.show()
 
             # # Save figure
@@ -248,7 +229,6 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             # os.makedirs(out_dir, exist_ok=True)
             # fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
             # plt.close(fig)
-plotting is wrong shows all the sensors.
 
 def main():
     platform = 'mac'  # or 'bluebear'
