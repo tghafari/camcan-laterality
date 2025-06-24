@@ -243,19 +243,13 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
                 r_obs, info, mask=mask, mask_params=mask_params,
                 vlim=(min(r_obs), max(r_obs)), contours=0, image_interp='nearest', 
                 cmap='RdBu_r', show=False, axes=ax
-            )   # fix the contours to look like the sensor plot
+            )  
             cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
             cbar.ax.tick_params(labelsize=10)
             cbar.set_label('Correlation Values', fontsize=14)
             ax.set_xlim(0, )  # remove the left half of topoplot
             ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
             plt.show()
-
-            # # Save figure
-            # out_dir = paths['significant_cluster_perm_dir']
-            # os.makedirs(out_dir, exist_ok=True)
-            # fig.savefig(op.join(out_dir, f'{substr}_{band}_{ch_type}_cluster_topomap.png'))
-            # plt.close(fig)
 
 def main():
     platform = 'mac'  # or 'bluebear'
