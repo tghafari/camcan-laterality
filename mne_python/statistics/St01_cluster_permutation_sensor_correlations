@@ -212,7 +212,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             # 3. Compute non-parametric p-values (two-tailed)
             p_vals = np.mean(np.abs(z_null) >= np.abs(z_obs), axis=0)
             significant_mask = p_vals < 0.05
-            # significant_mask = spearman_p < 0.05  # temp
+            # significant_mask = spearman_p < 0.05  # if you want to plot without cluster permutation tests
             print(f"{substr}-{band} ({ch_type}): {significant_mask.sum()} significant sensors")
 
             # 4. Cluster significant sensors using adjacency
