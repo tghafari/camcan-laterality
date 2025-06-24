@@ -76,9 +76,9 @@ def working_df_maker(spectra_dir, left_sensor, right_sensor, substr_lat_df):
     """Combines spectra and volume lateralization data for one sensor pair."""
     pair_file = op.join(spectra_dir, f'{left_sensor}_{right_sensor}.csv')
     spectrum_df = pd.read_csv(pair_file).rename(columns={'Unnamed: 0': 'subject_ID'})
-    merged_df = spectrum_df.merge(substr_lat_df, on='subject_ID').dropna()
+    working_df = spectrum_df.merge(substr_lat_df, on='subject_ID').dropna()
     freqs = [float(f) for f in spectrum_df.columns[1:]]
-    return merged_df, freqs
+    return working_df, freqs
 
 
 def calculate_band_power(working_df, freqs, band):
@@ -93,7 +93,7 @@ def extract_all_band_power(paths):
     """Extracts band power values from sensor pairs and saves them per band."""
     sensor_pairs = pd.read_csv(paths['sensor_layout'])[['left_sensors', 'right_sensors']].dropna()
     substr_lat_df = pd.read_csv(paths['LV_csv'])
-    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 13), 'Beta': (13, 30)}
+    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 12), 'Beta': (12, 30)}
 
     band_li_dict = {band: [] for band in bands}
     label_dict = {band: [] for band in bands}
@@ -179,6 +179,17 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(n_sensors)])
             z_obs = np.arctanh(r_obs)  # Fisher z-transform to acquire z-scores
 
+            # Compute r and p values
+            r_obs = np.zeros(n_sensors)
+            spearman_p = np.zeros(n_sensors)
+            for i in range(n_sensors):
+                r, p = spearmanr(lv_vals, li_data[:, i])
+                r_obs[i] = r
+                spearman_p[i] = p
+
+            # Fisher z-transform
+            z_obs = np.arctanh(r_obs)
+
             # 2. Build null distribution by shuffling
             rng = np.random.RandomState(42)
             z_null = np.zeros((n_permutations, n_sensors))
@@ -190,7 +201,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             # 3. Compute non-parametric p-values (two-tailed)
             p_vals = np.mean(np.abs(z_null) >= np.abs(z_obs), axis=0)
             # significant_mask = p_vals < 0.05
-            significant_mask = z_obs < 0.05  #temp
+            significant_mask = spearman_p < 0.05  # temp
             print(f"{substr}-{band} ({ch_type}): {significant_mask.sum()} significant sensors")
 
             # 4. Cluster significant sensors using adjacency
@@ -219,8 +230,13 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             # Plot topomap
             im, cn = mne.viz.plot_topomap(
                 r_obs, info, mask=mask, mask_params=mask_params,
+                vlim=(min(r_obs), max(r_obs)), contours=0, image_interp='nearest', 
                 cmap='RdBu_r', show=False, axes=ax
             )   # fix the contours to look like the sensor plot
+            cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
+            cbar.ax.tick_params(labelsize=10)
+            cbar.set_label('Correlation Values', fontsize=14)
+            ax.set_xlim(0, )  # remove the left half of topoplot
             ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
             plt.show()
 
@@ -233,6 +249,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 def main():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
+    
     # Step 3: Run cluster permutation tests and visualize
     run_cluster_test_from_raw_corr(paths, ch_type='mag')
     run_cluster_test_from_raw_corr(paths, ch_type='grad')
