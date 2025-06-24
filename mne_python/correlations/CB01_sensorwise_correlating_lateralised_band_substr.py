@@ -84,7 +84,7 @@ info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
 spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')  #psd outliers removed
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
-substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
+substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')  # later we used lateralization_volumes_nooutliers where outliers where smaller than 10% centile.
 lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_nooutliers.csv')  # vol and psd outliers removed
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
@@ -98,7 +98,7 @@ sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 bands = {
     'Delta': (1, 4),
     'Theta': (4, 8),
-    'Alpha': (8, 14),
+    'Alpha': (8, 14),  # different than CB04 plotting script
     'Beta': (14, 40)
 }
 

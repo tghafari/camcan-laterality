@@ -138,8 +138,8 @@ substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 bands = {
     'Delta': (1, 4),
     'Theta': (4, 8),
-    'Alpha': (8, 12),
-    'Beta': (12, 30)
+    'Alpha': (8, 14),
+    'Beta': (14, 30)  # ranges ar enot used here, just a reminder of what has been used in calculating correlations
 }
 
 # Initialize a dictionary to store correlation values for each sensor pair and dfs for all bands

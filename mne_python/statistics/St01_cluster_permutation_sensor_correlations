@@ -6,7 +6,7 @@ and visualizing significant clusters via topographic maps.
 Steps:
 1. **Setup file paths** based on platform ('mac' or 'bluebear').
 
-## These two steps only need to be run once ##
+## Steps 2 and 3 only need to be run once ##
 2. **Extract lateralized power** per frequency band (Delta, Theta, Alpha, Beta) for each sensor pair.
 3. **Compute Spearman correlations** between band power and subcortical volume lateralization for specified mappings.
 ########
@@ -61,7 +61,7 @@ def setup_paths(platform='mac'):
 
     paths = {
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),
-        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
+        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # outliers are smaller than 10th percentile
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'),
         'significant_cluster_perm_dir' : op.join(jenseno_dir, '/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd-clusterpermutation'),
@@ -93,7 +93,7 @@ def extract_all_band_power(paths):
     """Extracts band power values from sensor pairs and saves them per band."""
     sensor_pairs = pd.read_csv(paths['sensor_layout'])[['left_sensors', 'right_sensors']].dropna()
     substr_lat_df = pd.read_csv(paths['LV_csv'])
-    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 12), 'Beta': (12, 30)}
+    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 14), 'Beta': (14, 40)}
 
     band_li_dict = {band: [] for band in bands}
     label_dict = {band: [] for band in bands}
@@ -124,10 +124,22 @@ def save_spearman_correlations(paths):
 
     for band, substr in band_substr_map.items():
         band_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
-        lv_vals = lv_df.set_index('subject_ID').loc[band_df['subject_ID']][substr].values
+        merged = band_df.merge(lv_df[['subject_ID', substr]], on='subject_ID', how='inner')
+        lv_vals = merged[substr].values
 
-        rval_list = [spearmanr(band_df[col], lv_vals)[0] for col in band_df.columns[1:]]
-        out_df = pd.DataFrame({'sensor_pair': band_df.columns[1:], f'{band.lower()}_rval': rval_list})
+        rval_list = []
+        pval_list = []
+
+        for col in band_df.columns[1:]:  # Skip subject_ID
+            r, p = spearmanr(merged[col], lv_vals)
+            rval_list.append(r)
+            pval_list.append(p)
+
+        out_df = pd.DataFrame({
+            'sensor_pair': band_df.columns[1:],
+            f'{band.lower()}_rval': rval_list,
+            f'{band.lower()}_pval': pval_list
+        })
         out_df.to_csv(op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False)
 
 
@@ -159,33 +171,37 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
     lv_df = pd.read_csv(paths['LV_csv'])
     # Example mapping; modify as needed:
     substrs_bands = [{'Thal': 'Alpha'}, {'Puta': 'Beta'}, {'Hipp': 'Delta'}]
-
     raw, info = read_raw_info(paths, ch_type=ch_type)
     adjacency, ch_names = find_custom_adjacency(info, ch_type)
 
     for pair in substrs_bands:
         for substr, band in pair.items():
-            # Load lateralized power data for this band
+            # Load precomputed r and p values
+            corr_df = pd.read_csv(op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'))
+            # Filter sensor pairs based on magnetometer or gradiometer channel suffix
+            if ch_type == 'mag':
+                sensor_mask = corr_df['sensor_pair'].str.endswith('1')
+            elif ch_type == 'grad':
+                sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
+            else:
+                raise ValueError(f"Unsupported ch_type: {ch_type}")
+
+            # Apply the mask to select rows
+            filtered_df = corr_df[sensor_mask]
+            r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
+            spearman_p = filtered_df[f'{band.lower()}_pval'].to_numpy()
+            # Fisher z-transform (from r to z)
+            z_obs = np.arctanh(r_obs)
+
+            # 2. Build null distribution by shuffling
+            # Load lateralized power data for this band to calculate shuffled correlations
             li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
             # Select columns matching channels in info, ensuring order matches info['ch_names']
             selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
             li_data = li_df[selected_cols].to_numpy()
+            n_sensors = li_data.shape[1]
             # li_data = li_df['MEG0112_MEG1422'].to_numpy()  #temp
             lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
-
-            # 1. Compute observed Spearman correlations and Fisher z-transform
-            n_sensors = li_data.shape[1]
-            r_obs = np.zeros(n_sensors)
-            spearman_p = np.zeros(n_sensors)
-            for i in range(n_sensors):
-                r, p = spearmanr(lv_vals, li_data[:, i][0])
-                r_obs[i] = r
-                spearman_p[i] = p
-
-            # Fisher z-transform to acquire z-scores for permutation comparisons
-            z_obs = np.arctanh(r_obs)
-
-            # 2. Build null distribution by shuffling
             rng = np.random.RandomState(42)
             z_null = np.zeros((n_permutations, n_sensors))
             for p in range(n_permutations):
@@ -195,8 +211,8 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 
             # 3. Compute non-parametric p-values (two-tailed)
             p_vals = np.mean(np.abs(z_null) >= np.abs(z_obs), axis=0)
-            # significant_mask = p_vals < 0.05
-            significant_mask = spearman_p < 0.05  # temp
+            significant_mask = p_vals < 0.05
+            # significant_mask = spearman_p < 0.05  # temp
             print(f"{substr}-{band} ({ch_type}): {significant_mask.sum()} significant sensors")
 
             # 4. Cluster significant sensors using adjacency
@@ -244,8 +260,8 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
 def main():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
-    
-    # Step 3: Run cluster permutation tests and visualize
+    extract_all_band_power(paths)
+    save_spearman_correlations(paths)
     run_cluster_test_from_raw_corr(paths, ch_type='mag')
     run_cluster_test_from_raw_corr(paths, ch_type='grad')
 
