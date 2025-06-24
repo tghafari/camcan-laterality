@@ -169,25 +169,20 @@ def run_cluster_test_from_raw_corr(paths, ch_type='mag', n_permutations=1000):
             li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
             # Select columns matching channels in info, ensuring order matches info['ch_names']
             selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
-            # li_data = li_df[selected_cols].to_numpy()
-            li_data = li_df['MEG0112_MEG1422'].to_numpy()  #temp
+            li_data = li_df[selected_cols].to_numpy()
+            # li_data = li_df['MEG0112_MEG1422'].to_numpy()  #temp
             lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
 
             # 1. Compute observed Spearman correlations and Fisher z-transform
             n_sensors = li_data.shape[1]
-            p_obs = spearmanr(lv_vals, li_data)  #temp
-            r_obs = np.array([spearmanr(lv_vals, li_data[:, i])[0] for i in range(n_sensors)])
-            z_obs = np.arctanh(r_obs)  # Fisher z-transform to acquire z-scores
-
-            # Compute r and p values
             r_obs = np.zeros(n_sensors)
             spearman_p = np.zeros(n_sensors)
             for i in range(n_sensors):
-                r, p = spearmanr(lv_vals, li_data[:, i])
+                r, p = spearmanr(lv_vals, li_data[:, i][0])
                 r_obs[i] = r
                 spearman_p[i] = p
 
-            # Fisher z-transform
+            # Fisher z-transform to acquire z-scores for permutation comparisons
             z_obs = np.arctanh(r_obs)
 
             # 2. Build null distribution by shuffling
