@@ -62,6 +62,7 @@ def setup_paths(platform='mac'):
     paths = {
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),
         'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # outliers are smaller than 10th percentile
+        'sub_list': op.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'),
         'significant_cluster_perm_dir' : op.join(jenseno_dir, '/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd-clusterpermutation'),
@@ -117,15 +118,21 @@ def extract_all_band_power(paths):
 
 
 def save_spearman_correlations(paths):
-    """Computes Spearman r-values between MEG band power and subcortical LVs and saves CSVs."""
-    # Example mapping; modify as needed
+    """Computes Spearman r-values between MEG band power and subcortical LVs and saves:
+    1. CSVs with correlation and p-values per sensor pair,
+    2. CSV of matched subject_IDs used in the analysis.
+    """
+        
     band_substr_map = {'Alpha': 'Thal', 'Beta': 'Puta', 'Delta': 'Hipp'}
     lv_df = pd.read_csv(paths['LV_csv'])
+    used_subjects = set()
 
     for band, substr in band_substr_map.items():
         band_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
         merged = band_df.merge(lv_df[['subject_ID', substr]], on='subject_ID', how='inner')
         lv_vals = merged[substr].values
+        used_subjects.update(merged['subject_ID'].tolist())
+
 
         rval_list = []
         pval_list = []
@@ -141,7 +148,10 @@ def save_spearman_correlations(paths):
             f'{band.lower()}_pval': pval_list
         })
         out_df.to_csv(op.join(paths['signif_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'), index=False)
-
+    
+    # Save subject IDs used in the merged data (intersection of LI and LV with no NaNs)
+    subject_df = pd.DataFrame(sorted(used_subjects), columns=['subject_ID'])
+    subject_df.to_csv(paths['sub_list'], index=False)
 
 def read_raw_info(paths, ch_type='mag'):
     """Reads sensor info from a MEG file for adjacency computation."""

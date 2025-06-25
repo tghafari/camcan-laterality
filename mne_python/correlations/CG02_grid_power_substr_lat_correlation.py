@@ -30,13 +30,17 @@ from scipy.stats import spearmanr
 def setup_paths(platform='mac'):
     """Set up file paths for the given platform."""
     if platform == 'bluebear':
+        quinna_dir = '/rds/projects/q/quinna-camcan/'
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
+        quinna_dir = '/Volumes/quinna-camcan/'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
     paths = {
+        'sub_list': os.path.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
+        'len_subs': os.path.join(quinna_dir, 'dataman/data_information/source_subs'),
         'meg_source_all_subs_dir': os.path.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/all_subs'),
         'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
         'output_dir': os.path.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers')
@@ -52,17 +56,29 @@ def load_lateralization_volumes(file_path):
 
     return lat_vols 
 
-def compute_spearman(lat_src_file, lat_vols):
+def compute_spearman(paths, lat_src_file, lat_vols, sensor, freq):
     """Compute Spearman correlation between source data and lateralization volumes."""
+    final_sub_list = pd.read_csv(paths['sub_list'])['subject_ID'].astype(str).tolist()
     lat_src_data = pd.read_csv(lat_src_file, index_col=None)
-    common_subjects = lat_src_data.columns.intersection(lat_vols.index)
-    
-    if len(common_subjects) == 0:
+    lat_src_data.columns = lat_src_data.columns.astype(str)  # Ensure consistent dtype
+
+    # Get valid common subjects across all three: final list, source data, and volume data
+    valid_subjects = (
+        set(lat_src_data.columns)
+        .intersection(lat_vols.index)
+        .intersection(final_sub_list)
+    )
+
+    if len(valid_subjects) == 0:
         print(f"No overlapping subjects found for {lat_src_file}")
         return None
-    
-    lat_src_data = lat_src_data[common_subjects].T  # Align subjects
-    lat_vols = lat_vols.loc[common_subjects]  # Align subjects
+
+    valid_subjects = sorted(valid_subjects)  # ensure consistent ordering
+    out_filename = os.path.join(paths['len_subs'], f"{sensor}_{freq}.csv")
+    pd.DataFrame({'n_subjects': [len(valid_subjects)]}).to_csv(out_filename, index=False)
+
+    lat_src_data = lat_src_data[valid_subjects].T  # shape: subjects × grid indices
+    lat_vols = lat_vols.loc[valid_subjects]
         
     # Define subcortical structures
     subcortical_structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
@@ -96,12 +112,12 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
         if spec:
             freqs=np.arange(1.5, 60, 0.5)
             # --- Per-frequency correlation ---
-            for freq in freqs[2]:
+            for freq in freqs:
                 print(f'Processing spectrum at {freq}')
                 lat_src_file = os.path.join(paths['meg_source_all_subs_dir'],
                                         f'all_subs_lateralised_src_power_{sensor}_{freq}.csv')
                 if os.path.exists(lat_src_file):
-                    spearman_r, spearman_pval = compute_spearman(lat_src_file, lat_vols)
+                    spearman_r, spearman_pval = compute_spearman(paths, lat_src_file, lat_vols, sensor, freq)
 
                     if spearman_r is not None:
                         output_file = os.path.join(paths['output_dir'],
@@ -121,8 +137,8 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
             bands = {
                 'Delta': (1.5, 4),
                 'Theta': (4, 8),
-                'Alpha': (8, 12),  #change to 8,14 and 14,40 like all the others
-                'Beta': (12, 30)}
+                'Alpha': (8, 14),  #change to 8,14 and 14,40 like all the others
+                'Beta': (14, 40)}
             
             print(f'\n  Computing bandwise correlations for {sensor}')
             for band_name, (low, high) in bands.items():
@@ -154,7 +170,7 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
                     avg_band_data.to_csv(avg_band_file)
                     
                     # Now compute Spearman correlation
-                    spearman_r, spearman_pval = compute_spearman(avg_band_file, lat_vols)
+                    spearman_r, spearman_pval = compute_spearman(paths, avg_band_file, lat_vols, sensor, freq)
 
                     if spearman_r is not None:
                         spearman_r.to_csv(os.path.join(paths['output_dir'],
