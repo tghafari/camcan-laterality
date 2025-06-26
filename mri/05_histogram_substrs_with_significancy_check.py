@@ -27,22 +27,26 @@ platform = 'mac'  # 'bluebear' or 'mac'?
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
 
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
-final_sub_list_path = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed')  # list of subjects after removing size below 10th percentile and lateralised power nonoise_subtraction_abs_thresh
+final_sub_list_path = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and lateralised power nonoise_subtraction_abs_thresh
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
-lat_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes.csv')
-lat_sheet_fname_nooutlier = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes_nooutliers.csv')
-lat_sheet_fname_final_subs = op.join(rds_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')
-substr_vol_sheet_fname = op.join(rds_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
+lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')
+lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_nooutliers.csv')
+lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')
+substr_vol_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
 output_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/volume-plots')
+
+old_outliers = False  # this ensures we use the final list of subjects rather than old outlier removal
 
 # Define colormap and structures
 colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#ADD8E6']
@@ -138,9 +142,8 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
 
         # Save lateralisation index df without outliers
         substr_lat_df.to_csv(lat_sheet_fname_nooutlier)
-    else:
-        # this is with psd_vol new outliers
-        
+    else:  # this is with psd_vol new outliers
+                
         # Load FINAL subject list
         final_sub_df = pd.read_csv(final_sub_list_path)  # Should contain column 'subject_ID'
         final_sub_df['subject_ID'] = final_sub_df['subject_ID'].astype(str)
@@ -192,7 +195,7 @@ def plot_volume_histograms(structures, substr_vol_df, colormap):
         # Fit and plot a normal density function
         mu_L, std_L = stats.norm.fit(volume_L)
         pdf_L = stats.norm.pdf(x_L, mu_L, std_L)
-        ax_L.plot(x_L, pdf_L * max(y_L) / max(pdf_L), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
+        ax_L.plot(x_L, pdf_L * max(y_L) / max(pdf_L), 'k-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
 
         if idx == 6:
             ax_L.set_xlabel('Volume', fontsize=12, fontname='Calibri') 
@@ -211,13 +214,74 @@ def plot_volume_histograms(structures, substr_vol_df, colormap):
         # Fit a normal distribution and plot the PDF
         mu_R, std_R = stats.norm.fit(volume_R)
         pdf_R = stats.norm.pdf(x_R, mu_R, std_R)
-        ax_R.plot(x_R, pdf_R * max(y_R) / max(pdf_R), 'r-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
+        ax_R.plot(x_R, pdf_R * max(y_R) / max(pdf_R), 'k-', label='Normal Fit', linewidth=0.5)  # Scaled for comparison
 
         if idx == 6:
             ax_R.set_xlabel('Volume', fontsize=12, fontname='Calibri')
     
     plt.tight_layout()
-    plt.savefig(op.join(output_plot_dir, 'substr-histograms-nooutliers.png'), dpi=300)
+    plt.savefig(op.join(output_plot_dir, 'substr-histograms-final_subs.png'), dpi=3000)
+
+# Checking the normality of the distributions
+def test_normality(structures, lateralization_volume):
+    # Perform the normality test analytically and graphically:
+    """ p > 0.05 is normal distribution""" 
+
+    n_structures = len(structures)
+    n_cols = 4
+    n_rows = int(np.ceil(n_structures / n_cols))
+
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
+    axs = axs.flatten()
+
+    p_values_shapiro = []
+
+    for idx, structure in enumerate(structures):
+        ax = axs[idx]
+
+        # Extract and clean data
+        valid_lateralization_volume = lateralization_volume[:, idx].copy()
+        clean_data = valid_lateralization_volume[~np.isnan(valid_lateralization_volume)]
+
+        # Shapiro-Wilk test
+        stat, p_shapiro = shapiro(clean_data)
+        p_values_shapiro.append(p_shapiro)
+
+        # Q-Q plot
+        stats.probplot(clean_data, dist="norm", plot=ax)
+        ax.set_xlabel('Theoretical Quantiles', fontsize=10, fontname='Calibri')
+        ax.set_ylabel('Ordered Values', fontsize=10, fontname='Calibri')
+        ax.set_title(structure, fontsize=12, fontname='Calibri')
+
+
+        # Annotate p-value
+        ax.text(0.05, 0.95,
+                f'Shapiro p = {p_shapiro:.3f}',
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.6))
+
+        # Add large NORMAL / NOT NORMAL label
+        label = 'NORMAL' if p_shapiro > 0.05 else 'NOT NORMAL'
+        color = 'green' if label == 'NORMAL' else 'red'
+        ax.text(0.5, 0.5,
+                label,
+                transform=ax.transAxes,
+                fontsize=20,
+                color=color,
+                alpha=0.4,
+                ha='center', va='center',
+                fontweight='bold')
+
+    # Remove empty axes
+    for i in range(len(structures), len(axs)):
+        fig.delaxes(axs[i])
+
+    plt.tight_layout()
+    # plt.show()
+
+    return p_values_shapiro
 
 # Function to filter subjects and plot lateralization histograms
 def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
@@ -239,27 +303,30 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
     # Extract lateralization volumes
     lateralization_volume = substr_lat_df.iloc[:,1:8].to_numpy()
 
-    # Preallocation
-    p_values = []
-    p_values_shapiro =[]
-
     # null hypothesis (H0) mean value
     throw_out_outliers = False
     null_hypothesis_mean = 0.0
-    t_stats = []
-    t_p_vals = []
+    p_vals = []  # is used for both wilcox and ttest
 
     # wilcoxon p-vals
     null_hypothesis_median = 0.0
-    wilcox_p_vals = []
 
+    # Perform the normality test analytically and graphically:
+    """ p > 0.05 is normal distribution""" 
+    p_values_shapiro = test_normality(structures, lateralization_volume)
+        
     # Plotting histograms
-    fig, axs = plt.subplots(2, 4)
+    n_structures = len(structures)
+    n_cols = 4
+    n_rows = int(np.ceil(n_structures / n_cols))
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
+    axs = axs.flatten()
     fig.set_figheight(6)
     fig.set_figwidth(10)
 
     for idx, structure in enumerate(structures):
-        ax = axs[idx // 4, idx % 4]
+        # ax = axs[idx // 4, idx % 4]
+        ax = axs[idx]
         ax.set_title(structure, fontsize=12, fontname='Calibri')
         ax.set_xlabel('Lateralisation Volume', fontsize=12, fontname='Calibri')
         ax.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
@@ -267,7 +334,7 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
         
         valid_lateralization_volume = lateralization_volume[:, idx]
         lateralization_volume_hist = np.histogram(valid_lateralization_volume, bins=10, density=False)
-        
+
         # Throw out the outliers
         if throw_out_outliers:
                 mean_lateralization_volume = np.nanmean(valid_lateralization_volume)
@@ -275,21 +342,16 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
                 threshold = mean_lateralization_volume - (2.5 * std_lateralization_volume)
                 valid_lateralization_volume[:][valid_lateralization_volume[:] <= threshold] = np.nan
         
-        # Perform the ranksum test
-        k2, p = stats.normaltest(valid_lateralization_volume, nan_policy='omit')
-        p_values.append(p)
-        stat, shapiro_p = shapiro(valid_lateralization_volume)
-        p_values_shapiro.append(shapiro_p)
-        
-        # 1 sample t-test for left/right lateralisation
-        t_statistic, t_p_value = stats.ttest_1samp(valid_lateralization_volume, null_hypothesis_mean)
-        t_stats.append(t_statistic)
-        t_p_vals.append(t_p_value)
-        
-        # one sample wilcoxon signed rank (for non normal distributions)
-        _, wilcox_p = stats.wilcoxon(valid_lateralization_volume - null_hypothesis_median,
-                                        zero_method='wilcox', correction=False)
-        wilcox_p_vals.append(wilcox_p)
+        if p_values_shapiro[idx] > 0.05:
+            # 1 sample t-test for left/right lateralisation (for normal distributions)
+            _, t_p_value = stats.ttest_1samp(valid_lateralization_volume, null_hypothesis_mean)
+            p_vals.append(t_p_value)
+
+        elif p_values_shapiro[idx] < 0.05:
+            # one sample wilcoxon signed rank (for non normal distributions)
+            _, wilcox_p = stats.wilcoxon(valid_lateralization_volume - null_hypothesis_median,
+                                            zero_method='wilcox', correction=False)
+            p_vals.append(wilcox_p)
 
         # Plot histogram with colors
         x = lateralization_volume_hist[1]
@@ -299,30 +361,33 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
         # Fit and plot a normal density function
         mu, std = stats.norm.fit(valid_lateralization_volume)
         pdf = stats.norm.pdf(x, mu, std)
-        ax.plot(x, pdf, 'r-', label='Normal Fit', linewidth=0.5)        
-        
-        txt = r'$ranksum_p = {:.2f}$'.format(p)
-        ax.text(min(ax.get_xlim()) + 0.2 * max(ax.get_xlim()), max(ax.get_ylim()) - 40, txt,
-                fontsize=10, fontname='Calibri')
-        txt = r'$1samp_p = {:.2f}$'.format(t_p_value)
-        ax.text(min(ax.get_xlim()) + 0.2 * max(ax.get_xlim()), max(ax.get_ylim()) - 50, txt,
-                fontsize=10, fontname='Calibri')
-        txt = r'$wilcox_p = {:.2f}$'.format(wilcox_p)
-        ax.text(min(ax.get_xlim()) + 0.2 * max(ax.get_xlim()), max(ax.get_ylim()) - 60, txt,
-                fontsize=10, fontname='Calibri')
+        ax.plot(x, pdf, 'k-', label='Normal Fit', linewidth=0.5)       
 
+        # Annotate p-value
+        ax.text(0.05, 0.95,
+                f'p-value = {p_vals[idx]:.3f}',
+                transform=ax.transAxes,
+                fontsize=9,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.6)) 
+        
         ax.tick_params(axis='both', which='both', length=0)
         ax.set_axisbelow(True)
-        
+    
+    # Remove empty axes
+    for i in range(len(structures), len(axs)):
+        fig.delaxes(axs[i])
+
     plt.tight_layout()
-    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-nooutliers-nonormalcurve.png'), dpi=300)
+    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-final_subs-nonormalcurve.png'), dpi=3000)
 
 (substr_vol_df, substr_lat_df, 
    outlier_subjectID_vol_df) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, 
                                                               outlier_subjectID_psd_csv,lat_sheet_fname, 
-                                                              q1=0.01, q2=1)
+                                                              final_sub_list_path, q1=0.01, q2=1, old_outliers=old_outliers)
 # Save outlier dataframe
-outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
+if old_outliers:
+    outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
 
 # plot_volume_histograms(structures, substr_vol_df, colormap)
 plot_lateralisation_volumes(substr_lat_df, structures, colormap)
