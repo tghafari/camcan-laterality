@@ -170,7 +170,7 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
                     avg_band_data.to_csv(avg_band_file)
                     
                     # Now compute Spearman correlation
-                    spearman_r, spearman_pval = compute_spearman(paths, avg_band_file, lat_vols, sensor, freq)
+                    spearman_r, spearman_pval = compute_spearman(paths, avg_band_file, lat_vols, sensor, band_name)
 
                     if spearman_r is not None:
                         spearman_r.to_csv(os.path.join(paths['output_dir'],
