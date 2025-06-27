@@ -18,6 +18,7 @@ Output:
   (each containing Spearman r and p-values for all grid indices).
 
 written by Tara Ghafari
+last updated 27/06/2025
 tara.ghafari@gmail.com
 ==============================================
 """
@@ -135,7 +136,7 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
         # --- Bandwise correlation ---
         if not spec:
             bands = {
-                'Delta': (1, 4),
+                'Delta': (1.5, 4),  # this only differs from other (1, 4) because there's no source for 1Hz.
                 'Theta': (4, 8),
                 'Alpha': (8, 14),  
                 'Beta': (14, 40)}
