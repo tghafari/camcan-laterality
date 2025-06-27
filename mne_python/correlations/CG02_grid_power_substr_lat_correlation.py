@@ -135,9 +135,9 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
         # --- Bandwise correlation ---
         if not spec:
             bands = {
-                'Delta': (1.5, 4),
+                'Delta': (1, 4),
                 'Theta': (4, 8),
-                'Alpha': (8, 14),  #change to 8,14 and 14,40 like all the others
+                'Alpha': (8, 14),  
                 'Beta': (14, 40)}
             
             print(f'\n  Computing bandwise correlations for {sensor}')
