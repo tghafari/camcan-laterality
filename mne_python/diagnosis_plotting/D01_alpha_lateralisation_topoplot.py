@@ -32,8 +32,8 @@ import matplotlib.pyplot as plt
 freq_bands = {
     "Delta": (1, 4),
     "Theta": (4, 8),
-    "Alpha": (8, 14),
-    "Beta": (14, 40)
+    "Alpha": (8, 12),
+    "Beta": (12, 30)
 }
        
 platform = 'mac'
@@ -41,16 +41,20 @@ platform = 'mac'
 if platform == 'bluebear':
     rds_dir = '/rds/projects/q/quinna-camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
+
 elif platform == 'mac':
     rds_dir = '/Volumes/quinna-camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
+    sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
+
 
 # Define directories 
-deriv_dir = op.join(rds_dir, 'derivatives/meg/sensor') 
-lat_dir = op.join(deriv_dir, 'lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+deriv_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor') 
+lat_dir = op.join(deriv_dir, 'lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise')
 
-# Load the first file to extract the number of subjects
-sample_file = op.join(lat_dir, sorted(os.listdir(lat_dir))[10])
+# Load a sample file to extract the number of subjects
+sample_file = op.join(lat_dir, sorted(os.listdir(lat_dir))[250])
 subject_ids = pd.read_csv(sample_file)['Unnamed: 0']
 
 # Initialize empty DataFrames for each frequency band with sensor names as columns
@@ -158,8 +162,8 @@ def plot_alpha(subject_id, band_tables, meg_fpath, channel_index_grad, channel_i
     axes[0].set_title(f"{band} Lateralised Power (Grads) - Subject {subject_id}")
 
     # Add colorbars below each subplot
-    fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', label=f'{band} Lateralised Power')
-    fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', label=f'{band}Laterliased Power')
+    fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', label='Alpha Lateralised Power')
+    fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', label='Alpha Laterliased Power')
 
 
     # Adjust layout and display the plot

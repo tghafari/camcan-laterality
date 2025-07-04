@@ -187,6 +187,8 @@ def read_raw_info(paths, ch_type):
         raw_mag = raw.copy().pick('mag').pick(channels_mag)
         channels = [ch for ch in right_sensors if not ch.endswith('1')]
         raw.pick('grad').pick(channels)
+        # bear in mind that plotting grads requires a mag info to plot positive and negative values
+        # it also requires grad info for adjacency info
         
         return raw, raw.info, raw_mag.info
 
@@ -210,7 +212,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
     
     # this line receives three outputs if 'grad' and two if 'mag'. 
     # info_mag for plotting is in rest tuple and later called
-    raw, info, *mag_info = read_raw_info(paths, ch_type)  
+    raw, info, *other = read_raw_info(paths, ch_type)  
     adjacency, _ = find_custom_adjacency(info, ch_type)
 
     for substr, band in product(substrs, bands):
@@ -299,7 +301,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
             r_obs = (r_obs[::2] + r_obs[1::2]) / 2  
             mask = mask[::2]
             del info  # refresh info for plotting only in grad
-            info = mag_info[0]  # this is from read_raw_info when running with ch_type='grad'
+            info = other[0]  # this is from read_raw_info when running with ch_type='grad'
 
         # Plot topomap
         im, cn = mne.viz.plot_topomap(
