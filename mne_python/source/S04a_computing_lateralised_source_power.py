@@ -74,7 +74,7 @@ def construct_paths(subjectID, paths, sensortype, csd_method, space):
         'deriv_folder': deriv_folder,
         f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
         f'{sensortype}_{csd_method}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{csd_method}_{sensortype}'),
-        f'fsmorph_{sensortype}_{csd_method}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{csd_method}_{sensortype}'),
+        f'fsmorph_{sensortype}_{csd_method}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{csd_method}_{sensortype}'),  # this is what we use to plot power in source after morphing
         f'grid_stc_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_stc_{sensortype}_{csd_method}'),  # this is the final grid power file before lateralisation after morphing
         f'grid_positions_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_positions_{sensortype}_{csd_method}'),
         f'grid_indices_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_indices_{sensortype}_{csd_method}'),

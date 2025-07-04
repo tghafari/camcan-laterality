@@ -52,6 +52,7 @@ import pandas as pd
 import mne
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+from mne.datasets import fetch_fsaverage
 
 #===========================================
 # P01_plotting_sensor_srource_power_lat_corr
@@ -64,19 +65,26 @@ from scipy.stats import spearmanr
 # 6) Source-lat vs volume-lat correlation Volume Estimate
 #===========================================
 
-def setup_paths(platform='mac'):
+def setup_paths(sensortype, subjectID, platform='mac'):
+
     if platform == 'bluebear':
         sub2ctx = '/rds/projects/j/jenseno-sub2ctx/camcan'
         quinna = '/rds/projects/q/quinna-camcan'
     else:
         sub2ctx = '/Volumes/jenseno-sub2ctx/camcan'
         quinna = '/Volumes/quinna-camcan'
+    
+    fs_sub = f'sub-CC{subjectID}_T1w'
+    deriv_folder = op.join(op.join(sub2ctx, 'derivatives/meg/source/freesurfer'), fs_sub[:-4])
+    
     paths = {
         'sample_meg_file': op.join(quinna, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'epoched_dir': op.join(sub2ctx, 'derivatives/meg/sensor/epoched-7min50'),
         'sensor_layout': op.join(quinna, 'dataman/data_information/sensors_layout_names.csv'),
         'LI_dir': op.join(sub2ctx, 'derivatives/meg/sensor/lateralized_index/bands'),
-        'source_grid_dir': op.join(sub2ctx, 'derivatives/meg/source/freesurfer'),
+        'meg_source_dir': op.join(sub2ctx, 'derivatives/meg/source/freesurfer'),
+        f'fsmorph_{sensortype}_multitaper_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_multitaper_{sensortype}'),  # this is what we use to plot power in source after morphing
+        'fs_sub_dir': op.join(quinna, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
         'all_subs_lat_src': op.join(sub2ctx, 'derivatives/meg/source/freesurfer/all_subs'),
         'corr_sensor_dir': op.join(sub2ctx, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nooutlier-psd'),
         'corr_source_dir': op.join(sub2ctx, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers'),
@@ -193,13 +201,73 @@ def plot_sensor_lat_power(subject_id, band, paths):
 
 
 def plot_source_band_power(subject_id, band, paths):
-    """Plot source-space band power (VolSourceEstimate)"""
-    band_dir = op.join(paths['source_grid_dir'], f'sub-{subject_id}', 'grid_perHz')
-    # collect stc files for freqs in band, average data
-    # Placeholder: simulate an stc with zeros
-    stc = mne.VolSourceEstimate(np.zeros((1000,1)), vertices=[np.arange(1000)], tmin=0, tstep=1, subject='fsaverage')
-    brain = stc.plot(subjects_dir=None, hemi='both', initial_time=0, cmap='hot')
-    brain.show()
+    """Plot source-space band power (VolSourceEstimate) by averaging per-Hz STC files in the band."""
+    # Define bands
+    bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 14), 'Beta': (14, 40)}
+    if band not in bands:
+        raise ValueError(f"Unknown band {band}")
+    fmin, fmax = bands[band]
+
+    # Directory containing per-Hz STC files for this subject
+    stc_dir = op.join(paths['source_grid_dir'], f'sub-CC{subject_id}', 'stc_morphd_perHz')
+    if not op.isdir(stc_dir):
+        raise FileNotFoundError(f"STC directory not found: {stc_dir}")
+
+    # Gather STC files within freq range
+    stc_grad_files = []
+    stc_mag_files = []
+    for fname in os.listdir(stc_dir):
+        if fname.endswith('.stc') and '_' in fname:
+            # extract frequency from filename, e.g. '_4.0-vl.stc'
+            parts = fname[:-7].split('_')
+            try:
+                freq = float(parts[-1])
+                if fmin <= freq < fmax:
+                    if 'mag' in fname:
+                        stc_mag_files.append(op.join(stc_dir, fname))
+                    elif 'grad' in fname:
+                        stc_grad_files.append(op.join(stc_dir, fname))
+            except ValueError:
+                continue
+    if not stc_grad_files or not stc_mag_files:
+        raise FileNotFoundError(f"No STC files found in {stc_dir} for band {band}")
+
+    # Prepare for plotting on fs
+    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
+    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+
+    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+    initial_pos=np.array([19, -50, 29]) * 0.001
+
+    # Read all STCs and average data
+    # Grads
+    stc_grads = [mne.read_source_estimate(fpath) for fpath in sorted(stc_grad_files)]
+    data_stack_grads = np.stack([stc.data[:, 0] for stc in stc_grads], axis=1)
+    mean_data_grads = data_stack_grads.mean(axis=1)
+    stc_grads_band = stc_grads[0]
+    stc_grads_band.data = mean_data_grads[:, np.newaxis] # data should have 2 dimensions
+    # Mags
+    stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
+    data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
+    mean_data_mags = data_stack_mags.mean(axis=1)
+    stc_mags_band = stc_grads[0]
+    stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
+
+    # Plot
+    stc_grads_band.plot(
+        src=src_fs,
+        mode="stat_map",
+        subjects_dir=paths["fs_sub_dir"],
+        initial_pos=initial_pos,
+        verbose=True,
+    )
+    stc_mags_band.plot(
+        src=src_fs,
+        mode="stat_map",
+        subjects_dir=paths["fs_sub_dir"],
+        initial_pos=initial_pos,
+        verbose=True,
+    )
 
 
 def plot_source_lat_power(band, paths):
@@ -208,7 +276,7 @@ def plot_source_lat_power(band, paths):
     data = pd.read_csv(csv, index_col=0).mean(axis=1).values
     # Placeholder stc
     stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
-    brain = stc.plot(subjects_dir=None, hemi='both', initial_time=0, cmap='RdBu_r')
+    brain = stc.plot(subjects_dir=None,  initial_time=0, cmap='RdBu_r')
     brain.show()
 
 
