@@ -83,7 +83,6 @@ def setup_paths(sensortype, subjectID, platform='mac'):
         'sensor_layout': op.join(quinna, 'dataman/data_information/sensors_layout_names.csv'),
         'LI_dir': op.join(sub2ctx, 'derivatives/meg/sensor/lateralized_index/bands'),
         'meg_source_dir': op.join(sub2ctx, 'derivatives/meg/source/freesurfer'),
-        f'fsmorph_{sensortype}_multitaper_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_multitaper_{sensortype}'),  # this is what we use to plot power in source after morphing
         'fs_sub_dir': op.join(quinna, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
         'all_subs_lat_src': op.join(sub2ctx, 'derivatives/meg/source/freesurfer/all_subs'),
         'corr_sensor_dir': op.join(sub2ctx, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nooutlier-psd'),
@@ -209,7 +208,7 @@ def plot_source_band_power(subject_id, band, paths):
     fmin, fmax = bands[band]
 
     # Directory containing per-Hz STC files for this subject
-    stc_dir = op.join(paths['source_grid_dir'], f'sub-CC{subject_id}', 'stc_morphd_perHz')
+    stc_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_perHz')
     if not op.isdir(stc_dir):
         raise FileNotFoundError(f"STC directory not found: {stc_dir}")
 
@@ -246,12 +245,17 @@ def plot_source_band_power(subject_id, band, paths):
     mean_data_grads = data_stack_grads.mean(axis=1)
     stc_grads_band = stc_grads[0]
     stc_grads_band.data = mean_data_grads[:, np.newaxis] # data should have 2 dimensions
+    stc_morphd_band_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_band')
+    if not op.exists(stc_morphd_band_dir):
+        os.makedirs(stc_morphd_band_dir)
+    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC120469_fsmorph_stc_multitaper_grad_{band}'))
     # Mags
     stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
     data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
     mean_data_mags = data_stack_mags.mean(axis=1)
     stc_mags_band = stc_grads[0]
     stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
+    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC120469_fsmorph_stc_multitaper_mag_{band}'))
 
     # Plot
     stc_grads_band.plot(
