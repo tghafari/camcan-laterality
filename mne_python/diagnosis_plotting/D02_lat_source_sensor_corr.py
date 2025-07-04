@@ -274,10 +274,10 @@ def plot_source_band_power(subject_id, band, paths):
     )
 
 
-def plot_source_lat_power(band, paths):
+def plot_source_lat_power(sensor_type, band, paths, subject_id):
     """Plot source lateralised band power Volume Estimate"""
-    csv = op.join(paths['all_subs_lat_src'], f'all_subs_lateralised_src_power_grad_{band}_band_avg.csv')
-    data = pd.read_csv(csv, index_col=0).mean(axis=1).values
+    all_subs_lat_src_power = pd.read_csv(op.join(paths['all_subs_lat_src'], f'all_subs_lateralised_src_power_{sensor_type}_{band}_band_avg.csv'), index_col=0)
+    data = all_subs_lat_src_power[f'{subject_id}']
     # Placeholder stc
     stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
     brain = stc.plot(subjects_dir=None,  initial_time=0, cmap='RdBu_r')
