@@ -61,7 +61,7 @@ def setup_paths(platform='mac'):
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
     paths = {
-        'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index'),
+        'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/bands'),
         'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # outliers are smaller than 10th percentile
         'sub_list': op.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),

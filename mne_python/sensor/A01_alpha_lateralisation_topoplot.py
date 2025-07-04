@@ -32,8 +32,8 @@ import matplotlib.pyplot as plt
 freq_bands = {
     "Delta": (1, 4),
     "Theta": (4, 8),
-    "Alpha": (8, 12),
-    "Beta": (12, 30)
+    "Alpha": (8, 14),
+    "Beta": (14, 40)
 }
        
 platform = 'mac'
@@ -47,7 +47,7 @@ elif platform == 'mac':
 
 # Define directories 
 deriv_dir = op.join(rds_dir, 'derivatives/meg/sensor') 
-lat_dir = op.join(deriv_dir, 'lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise')
+lat_dir = op.join(deriv_dir, 'lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
 
 # Load the first file to extract the number of subjects
 sample_file = op.join(lat_dir, sorted(os.listdir(lat_dir))[10])
@@ -158,8 +158,8 @@ def plot_alpha(subject_id, band_tables, meg_fpath, channel_index_grad, channel_i
     axes[0].set_title(f"{band} Lateralised Power (Grads) - Subject {subject_id}")
 
     # Add colorbars below each subplot
-    fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', label='Alpha Lateralised Power')
-    fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', label='Alpha Laterliased Power')
+    fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', label=f'{band} Lateralised Power')
+    fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', label=f'{band}Laterliased Power')
 
 
     # Adjust layout and display the plot
