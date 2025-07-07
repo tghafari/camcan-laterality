@@ -2,6 +2,8 @@
 
 """
 ====================================
+###### NOTE: Consider using St01 to plot sensor substr correlations than this script.#####
+    
 CS04_visualising_correlations_topoplots:
     this script:
     the goal is to create topo plots using 

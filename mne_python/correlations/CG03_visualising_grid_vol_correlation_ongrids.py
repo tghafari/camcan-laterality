@@ -265,7 +265,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
             src=src_fs,
             **kwargs)
 
-def main():
+def visualising_grid_vol_correlation():
     paths = setup_paths(platform='mac')
     # Prompt user for input
     freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
@@ -311,4 +311,4 @@ def main():
     plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, sensor, structure, do_plot_3d)
 
 if __name__ == "__main__":
-    main()
+    visualising_grid_vol_correlation()

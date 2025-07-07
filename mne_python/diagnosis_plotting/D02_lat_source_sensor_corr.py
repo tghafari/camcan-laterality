@@ -55,16 +55,19 @@ import mne
 from mne.datasets import fetch_fsaverage
 
 # Add custom function path
-source_path = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/programming/camcan-laterality/mne_python/source'
-if source_path not in sys.path:
-    sys.path.append(source_path)
+main_dir = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/programming/camcan-laterality/mne_python'
+if main_dir not in sys.path:
+    sys.path.append(main_dir)
 
-from S04a_computing_lateralised_source_power import (
+from source.S04a_computing_lateralised_source_power import (
     compute_hemispheric_index,
     order_grid_positions,
     calculate_grid_lateralisation,
     plot_lateralisation
 )
+import correlations.CG03_visualising_grid_vol_correlation_ongrids
+
+
 
 # -----------------------------------------
 # Path setup
@@ -283,24 +286,24 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     stc_morphd_band_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_band')
     if not op.exists(stc_morphd_band_dir):
         os.makedirs(stc_morphd_band_dir)
-    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'))
+    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'), overwrite=True)
     
+    stc_grads_band.plot(
+    src=src_fs,
+    mode="stat_map",
+    subjects_dir=paths["fs_sub_dir"],
+    initial_pos=initial_pos,
+    verbose=True,
+    )
+
     # Mags
     stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
     data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
     mean_data_mags = data_stack_mags.mean(axis=1)
     stc_mags_band = stc_grads[0]
     stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
-    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'))
+    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'), overwrite=True)
 
-    # Plot
-    stc_grads_band.plot(
-        src=src_fs,
-        mode="stat_map",
-        subjects_dir=paths["fs_sub_dir"],
-        initial_pos=initial_pos,
-        verbose=True,
-    )
     stc_mags_band.plot(
         src=src_fs,
         mode="stat_map",
@@ -312,30 +315,28 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     return stc_grads_band, stc_mags_band
 
 
-def plot_source_lat_power(subject_id, band, paths, src_fs, file_paths, stc_band, sensortype,
-                          csd_method, do_plot_3d=False):
+def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
+                          csd_method, space, do_plot_3d=False):
     """
     Plot source lateralised band power on a Volume Estimate.
     
     Parameters:
-    - subject_id: int or str, subject number (e.g. 110069)
     - band: str, one of ['Delta', 'Theta', 'Alpha', 'Beta']
     - paths: dict, general path dictionary
     - src_fs: mne.SourceSpaces, fsaverage volumetric source space
-    - file_paths: dict, specific path dictionary from construct_paths()
     - stc_band: mne.SourceEstimate, band-averaged morphed STC object
     - sensortype: str, 'grad' or 'mag'
     - csd_method: str, default 'multitaper'
     - do_plot_3d: bool, whether to also show a 3D interactive plot
     """
 
+    file_paths = construct_paths(subject_id, paths, sensortype, csd_method, space)
+
     # --- Compute lateralised source power
     right_tc, left_tc, right_pos, left_pos, right_idx, left_idx, right_reg_idx, left_reg_idx = \
         compute_hemispheric_index(stc_band, src_fs)
 
-    (ord_right_pos, ord_left_pos,
-     ord_right_idx, ord_left_idx,
-     ord_right_reg_idx, ord_left_reg_idx,
+    (_, _, _, _, ord_right_reg_idx, _,
      ord_right_tc, ord_left_tc) = order_grid_positions(
         right_pos, left_pos,
         right_idx, left_idx,
@@ -402,13 +403,57 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, file_paths, stc_band,
             **kwargs,
         )
 
-def plot_sensor_vol_corr(substr, band, paths):
+def plot_sensor_vol_corr(substr, band, paths, ch_type):
     """Plot sensor lat-power vs volume-lat correlation topomap"""
-    df = pd.read_csv(op.join(paths['corr_sensor_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'))
-    raw = mne.io.read_raw_fif(paths['sample_meg_file'], verbose=False)
-    # assume df['rval'] matches raw.ch_names
-    data = df[f'{band.lower()}_rval'].values
-    mne.viz.plot_topomap(data, raw.info)
+    corr_df = pd.read_csv(op.join(paths['corr_sensor_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'))
+    raw, info, *other = read_raw_info(paths, ch_type)  
+    # Filter sensor pairs based on magnetometer or gradiometer channel suffix
+    if ch_type == 'mag':
+        sensor_mask = corr_df['sensor_pair'].str.endswith('1')
+    elif ch_type == 'grad':
+        sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
+    else:
+        raise ValueError(f"Unsupported ch_type: {ch_type}")
+
+    filtered_df = corr_df[sensor_mask]
+    if filtered_df.empty:
+        print(f"No matching sensors for {ch_type} in {substr}-{band}")
+
+    # Apply the mask to select rows
+    r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
+    spearman_p = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
+    significant_mask_spearman = spearman_p < 0.05  # if you want to plot without cluster permutation tests
+    print(f"{substr}-{band} ({ch_type}): {significant_mask_spearman.sum()} significant sensors")
+
+    # 5. Visualize topomap with significant mask and cluster labels
+    fig, ax = plt.subplots()
+
+    # Define the significant clusters
+    mask = significant_mask_spearman
+    mask_params = dict(
+        marker='o', markerfacecolor='w', markeredgecolor='k',
+        linewidth=1, markersize=10
+    ) 
+
+    # Prepare the data for visualisation
+    """combines planar gradiometer to use mag info (to plot positive and negative values)"""
+    if ch_type == 'grad':
+        r_obs = (r_obs[::2] + r_obs[1::2]) / 2  
+        mask = mask[::2]
+        del info  # refresh info for plotting only in grad
+        info = other[0]  # this is from read_raw_info when running with ch_type='grad'
+
+    # Plot topomap
+    im, cn = mne.viz.plot_topomap(
+        r_obs, info, mask=mask, mask_params=mask_params,
+        vlim=(min(r_obs), max(r_obs)), contours=0, image_interp='nearest', 
+        cmap='RdBu_r', show=False, axes=ax
+    )  
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
+    cbar.ax.tick_params(labelsize=10)
+    cbar.set_label('Correlation Values', fontsize=14)
+    ax.set_xlim(0, )  # remove the left half of topoplot
+    ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
     plt.show()
 
 
@@ -423,7 +468,7 @@ def plot_source_vol_corr(substr, band, paths):
 
 def main():
     paths = setup_paths('mac')
-    subject_id = '110182'
+    subject_id = '120469'
     band = 'Alpha'
     substr = 'Thal'
     sensor_type = 'mag'
@@ -439,7 +484,7 @@ def main():
 
     src_fs = mne.read_source_spaces(fname_fsaverage_src)
 
-    plot_source_band_power(subject_id, band, paths, src_fs)
+    stc_grads_band, stc_mags_band = plot_source_band_power(subject_id, band, paths, src_fs)
     plot_source_lat_power(subject_id, band, paths, src_fs)
 
     # 5 & 6: correlations
