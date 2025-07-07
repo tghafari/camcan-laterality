@@ -1,6 +1,6 @@
 """
 ====================================
-P01_plotting_sensor_srource_power_lat_corr
+D02_lat_source_sensor_corr
 
 This code is run to double check all the 
 steps we took before by plotting:
@@ -44,28 +44,33 @@ steps we took before by plotting:
 ====================================
 """
 
-
 import os
+import sys
 import os.path as op
 import numpy as np
 import pandas as pd
-import mne
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+import mne
 from mne.datasets import fetch_fsaverage
 
-#===========================================
-# P01_plotting_sensor_srource_power_lat_corr
-#===========================================
+# Add custom function path
+source_path = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/programming/camcan-laterality/mne_python/source'
+if source_path not in sys.path:
+    sys.path.append(source_path)
 
-# 2) Sensor lateralised band power
-# 3) Source band power
-# 4) Source lateralised band power
-# 5) Sensor-lat vs volume-lat correlation topomap
-# 6) Source-lat vs volume-lat correlation Volume Estimate
-#===========================================
+from S04a_computing_lateralised_source_power import (
+    compute_hemispheric_index,
+    order_grid_positions,
+    calculate_grid_lateralisation,
+    plot_lateralisation
+)
 
-def setup_paths(sensortype, subjectID, platform='mac'):
+# -----------------------------------------
+# Path setup
+# -----------------------------------------
+
+def setup_paths(platform='mac'):
 
     if platform == 'bluebear':
         sub2ctx = '/rds/projects/j/jenseno-sub2ctx/camcan'
@@ -73,9 +78,6 @@ def setup_paths(sensortype, subjectID, platform='mac'):
     else:
         sub2ctx = '/Volumes/jenseno-sub2ctx/camcan'
         quinna = '/Volumes/quinna-camcan'
-    
-    fs_sub = f'sub-CC{subjectID}_T1w'
-    deriv_folder = op.join(op.join(sub2ctx, 'derivatives/meg/source/freesurfer'), fs_sub[:-4])
     
     paths = {
         'sample_meg_file': op.join(quinna, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
@@ -89,6 +91,44 @@ def setup_paths(sensortype, subjectID, platform='mac'):
         'corr_source_dir': op.join(sub2ctx, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers'),
     }
     return paths
+
+
+def construct_paths(subject_id, paths, sensortype, csd_method, space):
+    """
+    Construct required file paths for a given subject and frequency band.
+    runs per sensorytype and csd_method
+
+    Parameters:
+    - subject_id (str): Subject ID.
+    - paths (dict): Dictionary of data paths.
+    - sensortype (str): 'grad' or 'mag'.
+    - csd_method (str): 'fourier' or 'multitaper'. only works if S02a and b have been run on that method.
+    - space (str): 'vol' or 'surf'.
+
+    Returns:
+    - dict: File paths for the subject and frequency band.
+    """
+
+    fs_sub = f'sub-CC{subject_id}_T1w'
+    deriv_folder = op.join(paths['meg_source_dir'], fs_sub[:-4])
+
+    file_paths = {
+        'fs_sub': fs_sub,
+        'deriv_folder': deriv_folder,
+        f'fwd_{space}': op.join(deriv_folder, f'{fs_sub[:-4]}_fwd-{space}.fif'),
+        f'{sensortype}_{csd_method}_stc': op.join(deriv_folder,'stc_perHz', f'{fs_sub[:-4]}_stc_{csd_method}_{sensortype}'),
+        f'fsmorph_{sensortype}_{csd_method}_stc_fname': op.join(deriv_folder, 'stc_morphd_perHz', f'{fs_sub[:-4]}_fsmorph_stc_{csd_method}_{sensortype}'),  # this is what we use to plot power in source after morphing
+        f'grid_stc_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_stc_{sensortype}_{csd_method}'),  # this is the final grid power file before lateralisation after morphing
+        f'grid_positions_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_positions_{sensortype}_{csd_method}'),
+        f'grid_indices_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'grid_perHz', f'grid_indices_{sensortype}_{csd_method}'),
+        f'lateralised_src_power_{sensortype}_{csd_method}_csv': op.join(deriv_folder, 'lat_source_perHz', f'lateralised_src_power_{sensortype}_{csd_method}'),
+        f'lateralised_grid_{sensortype}_{csd_method}_figname': op.join(deriv_folder, 'plots', f'lateralised_grid_{sensortype}_{csd_method}'),
+        'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'plots', f'stc_VolEst_lateral_power_{sensortype}_{csd_method}'),
+        'stc_fsmorphd_figname': op.join(deriv_folder, 'plots', f'stc_fsmorphd_{sensortype}_{csd_method}'),
+    }
+    return file_paths
+
+
 
 # 1) Sensor band power
 def plot_sensor_power(subject_id, band, paths):
@@ -198,8 +238,7 @@ def plot_sensor_lat_power(subject_id, band, paths):
     fig.suptitle(f'Subject {subject_id}', fontsize=20) # or plt.suptitle('Main title')
     plt.show()
 
-
-def plot_source_band_power(subject_id, band, paths):
+def plot_source_band_power(subject_id, band, paths, src_fs):
     """Plot source-space band power (VolSourceEstimate) by averaging per-Hz STC files in the band."""
     # Define bands
     bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 14), 'Beta': (14, 40)}
@@ -232,10 +271,6 @@ def plot_source_band_power(subject_id, band, paths):
         raise FileNotFoundError(f"No STC files found in {stc_dir} for band {band}")
 
     # Prepare for plotting on fs
-    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
-    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
-
-    src_fs = mne.read_source_spaces(fname_fsaverage_src)
     initial_pos=np.array([19, -50, 29]) * 0.001
 
     # Read all STCs and average data
@@ -248,14 +283,15 @@ def plot_source_band_power(subject_id, band, paths):
     stc_morphd_band_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_band')
     if not op.exists(stc_morphd_band_dir):
         os.makedirs(stc_morphd_band_dir)
-    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC120469_fsmorph_stc_multitaper_grad_{band}'))
+    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'))
+    
     # Mags
     stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
     data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
     mean_data_mags = data_stack_mags.mean(axis=1)
     stc_mags_band = stc_grads[0]
     stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
-    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC120469_fsmorph_stc_multitaper_mag_{band}'))
+    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'))
 
     # Plot
     stc_grads_band.plot(
@@ -272,17 +308,99 @@ def plot_source_band_power(subject_id, band, paths):
         initial_pos=initial_pos,
         verbose=True,
     )
+    
+    return stc_grads_band, stc_mags_band
 
 
-def plot_source_lat_power(sensor_type, band, paths, subject_id):
-    """Plot source lateralised band power Volume Estimate"""
-    all_subs_lat_src_power = pd.read_csv(op.join(paths['all_subs_lat_src'], f'all_subs_lateralised_src_power_{sensor_type}_{band}_band_avg.csv'), index_col=0)
-    data = all_subs_lat_src_power[f'{subject_id}']
-    # Placeholder stc
-    stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
-    brain = stc.plot(subjects_dir=None,  initial_time=0, cmap='RdBu_r')
-    brain.show()
+def plot_source_lat_power(subject_id, band, paths, src_fs, file_paths, stc_band, sensortype,
+                          csd_method, do_plot_3d=False):
+    """
+    Plot source lateralised band power on a Volume Estimate.
+    
+    Parameters:
+    - subject_id: int or str, subject number (e.g. 110069)
+    - band: str, one of ['Delta', 'Theta', 'Alpha', 'Beta']
+    - paths: dict, general path dictionary
+    - src_fs: mne.SourceSpaces, fsaverage volumetric source space
+    - file_paths: dict, specific path dictionary from construct_paths()
+    - stc_band: mne.SourceEstimate, band-averaged morphed STC object
+    - sensortype: str, 'grad' or 'mag'
+    - csd_method: str, default 'multitaper'
+    - do_plot_3d: bool, whether to also show a 3D interactive plot
+    """
 
+    # --- Compute lateralised source power
+    right_tc, left_tc, right_pos, left_pos, right_idx, left_idx, right_reg_idx, left_reg_idx = \
+        compute_hemispheric_index(stc_band, src_fs)
+
+    (ord_right_pos, ord_left_pos,
+     ord_right_idx, ord_left_idx,
+     ord_right_reg_idx, ord_left_reg_idx,
+     ord_right_tc, ord_left_tc) = order_grid_positions(
+        right_pos, left_pos,
+        right_idx, left_idx,
+        right_reg_idx, left_reg_idx,
+        right_tc, left_tc,
+        file_paths, band, sensortype, csd_method
+    )
+
+    # Compute lateralisation index (R - L) at each ordered right grid location
+    lateralised_power_arr = calculate_grid_lateralisation(
+        ord_right_tc,
+        ord_left_tc,
+        file_paths, sensortype, csd_method, band
+    )
+    
+    # Step 1: Build VolSourceEstimate object
+    """Create an mne.VolSourceEstimate object for lateralised_power_arr, 
+    ensuring the data structure is correctly formatted"""
+    # Initialize an empty array with zeros for all dipoles in the source space
+    n_dipoles = sum(len(s['vertno']) for s in src_fs)
+    lateralised_data = np.zeros((n_dipoles, 1))  # One timepoint
+    # Fill the right side of the vol estimate with lateralised powers (left side is all zero)
+    for i, idx in enumerate(ord_right_reg_idx):
+        lateralised_data[idx, 0] = lateralised_power_arr[i]
+
+    # Step 2: Create the VolSourceEstimate object
+    vertices = [np.array(src_fs[0]['vertno'])]
+    
+    stc_lat = mne.VolSourceEstimate(
+        data=lateralised_data,
+        vertices=vertices,
+        tmin=0,
+        tstep=1,
+        subject='fsaverage'
+    )
+
+    # Step 3: Plot the lateralized power on the brain
+    initial_pos=np.array([19, -50, 29]) * 0.001
+    brain = stc_lat.plot(
+        src=src_fs,
+        subject='fsaverage',
+        subjects_dir=paths["fs_sub_dir"],
+        mode='stat_map',
+        colorbar=True,
+        initial_pos=initial_pos,
+        verbose=True
+    )
+    brain.savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{sensortype}_{band}.png")
+
+    # --- Optional interactive 3D plot
+    if do_plot_3d:
+        # Plot in 3d
+        kwargs = dict(
+            subjects_dir=paths["fs_sub_dir"],
+            hemi='both',
+            size=(600, 600),
+            views='sagittal',
+            brain_kwargs=dict(silhouette=True),
+            initial_time=0.087,
+            verbose=True,
+        )
+        stc_lat.plot_3d(
+            src=src_fs,
+            **kwargs,
+        )
 
 def plot_sensor_vol_corr(substr, band, paths):
     """Plot sensor lat-power vs volume-lat correlation topomap"""
@@ -308,14 +426,21 @@ def main():
     subject_id = '110182'
     band = 'Alpha'
     substr = 'Thal'
+    sensor_type = 'mag'
 
     # 1 & 2: sensor power
     plot_sensor_power(subject_id, band, paths)
     plot_sensor_lat_power(subject_id, band, paths)
 
     # 3 & 4: source power
-    plot_source_band_power(subject_id, band, paths)
-    plot_source_lat_power(band, paths)
+    # Read forward model for volume plots
+    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
+    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+
+    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+
+    plot_source_band_power(subject_id, band, paths, src_fs)
+    plot_source_lat_power(subject_id, band, paths, src_fs)
 
     # 5 & 6: correlations
     plot_sensor_vol_corr(substr, band, paths)

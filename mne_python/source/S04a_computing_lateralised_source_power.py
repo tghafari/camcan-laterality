@@ -195,7 +195,7 @@ def compute_hemispheric_index(stc_fsmorphed, src_fs):
     right_reg_indices, left_reg_indices = [], []
     
 
-    for region_idx, indices in enumerate(grid_indices[0]):
+    for region_idx, indices in enumerate(grid_indices[0]):  # region_idx is the index inside of that region
         pos = grid_positions[0][indices]  # only select in-use positions in the source model
         if pos[0] < 0:  # x < 0 is left hemisphere
             left_hemisphere_time_courses.append(stc_fsmorphed.data[region_idx, :])
