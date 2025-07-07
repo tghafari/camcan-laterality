@@ -462,7 +462,7 @@ def check_existing(file_paths, sensortype, csd_method, freq):
 
 def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_method, freq, plot, do_plot_3d):
     """Processes a single subject for a specific frequency band.
-    sensortyep= 'grad' or 'mag' 
+    sensortype= 'grad' or 'mag' 
     space= 'vol or 'surf' """
 
     if check_existing(file_paths, sensortype, csd_method, freq):

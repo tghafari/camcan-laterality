@@ -63,9 +63,8 @@ from source.S04a_computing_lateralised_source_power import (
     compute_hemispheric_index,
     order_grid_positions,
     calculate_grid_lateralisation,
-    plot_lateralisation
 )
-import correlations.CG03_visualising_grid_vol_correlation_ongrids
+import correlations.CG03_visualising_grid_vol_correlation_ongrids as cg
 
 
 
@@ -204,7 +203,7 @@ def read_raw_info(paths, ch_type):
 def plot_sensor_lat_power(subject_id, band, paths):
     """Plot lateralised band power topomap for mags and grads"""
     df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
-    row = df[df['subject_ID']==subject_id]
+    row = df[df['subject_ID']==int(subject_id)]
     
     # Determine magnetometer and gradiometer columns
     sensor_cols = row.columns.drop('subject_ID')
@@ -273,9 +272,6 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     if not stc_grad_files or not stc_mag_files:
         raise FileNotFoundError(f"No STC files found in {stc_dir} for band {band}")
 
-    # Prepare for plotting on fs
-    initial_pos=np.array([19, -50, 29]) * 0.001
-
     # Read all STCs and average data
     # Grads
     stc_grads = [mne.read_source_estimate(fpath) for fpath in sorted(stc_grad_files)]
@@ -287,6 +283,9 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     if not op.exists(stc_morphd_band_dir):
         os.makedirs(stc_morphd_band_dir)
     stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'), overwrite=True)
+    
+    # Prepare for plotting on fs
+    initial_pos=np.array([19, -50, 29]) * 0.001
     
     stc_grads_band.plot(
     src=src_fs,
@@ -300,7 +299,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
     data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
     mean_data_mags = data_stack_mags.mean(axis=1)
-    stc_mags_band = stc_grads[0]
+    stc_mags_band = stc_mags[0]
     stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
     stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'), overwrite=True)
 
@@ -333,6 +332,7 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
     file_paths = construct_paths(subject_id, paths, sensortype, csd_method, space)
 
     # --- Compute lateralised source power
+    #TODO: figure out why mags and grads produce the same time courses
     right_tc, left_tc, right_pos, left_pos, right_idx, left_idx, right_reg_idx, left_reg_idx = \
         compute_hemispheric_index(stc_band, src_fs)
 
@@ -403,27 +403,27 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
             **kwargs,
         )
 
-def plot_sensor_vol_corr(substr, band, paths, ch_type):
+def plot_sensor_vol_corr(substr, band, paths, sensortype):
     """Plot sensor lat-power vs volume-lat correlation topomap"""
     corr_df = pd.read_csv(op.join(paths['corr_sensor_dir'], f'{substr}_allpairs_{band}_spearmanr.csv'))
-    raw, info, *other = read_raw_info(paths, ch_type)  
+    raw, info, *other = read_raw_info(paths, sensortype)  
     # Filter sensor pairs based on magnetometer or gradiometer channel suffix
-    if ch_type == 'mag':
+    if sensortype == 'mag':
         sensor_mask = corr_df['sensor_pair'].str.endswith('1')
-    elif ch_type == 'grad':
+    elif sensortype == 'grad':
         sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
     else:
-        raise ValueError(f"Unsupported ch_type: {ch_type}")
+        raise ValueError(f"Unsupported ch_type: {sensortype}")
 
     filtered_df = corr_df[sensor_mask]
     if filtered_df.empty:
-        print(f"No matching sensors for {ch_type} in {substr}-{band}")
+        print(f"No matching sensors for {sensortype} in {substr}-{band}")
 
     # Apply the mask to select rows
     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
     spearman_p = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
     significant_mask_spearman = spearman_p < 0.05  # if you want to plot without cluster permutation tests
-    print(f"{substr}-{band} ({ch_type}): {significant_mask_spearman.sum()} significant sensors")
+    print(f"{substr}-{band} ({sensortype}): {significant_mask_spearman.sum()} significant sensors")
 
     # 5. Visualize topomap with significant mask and cluster labels
     fig, ax = plt.subplots()
@@ -437,7 +437,7 @@ def plot_sensor_vol_corr(substr, band, paths, ch_type):
 
     # Prepare the data for visualisation
     """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-    if ch_type == 'grad':
+    if sensortype == 'grad':
         r_obs = (r_obs[::2] + r_obs[1::2]) / 2  
         mask = mask[::2]
         del info  # refresh info for plotting only in grad
@@ -453,17 +453,17 @@ def plot_sensor_vol_corr(substr, band, paths, ch_type):
     cbar.ax.tick_params(labelsize=10)
     cbar.set_label('Correlation Values', fontsize=14)
     ax.set_xlim(0, )  # remove the left half of topoplot
-    ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
+    ax.set_title(f'{substr}-{band} Spearman r ({sensortype})')
     plt.show()
 
 
-def plot_source_vol_corr(substr, band, paths):
-    """Plot source lat-power vs volume-lat correlation Volume Estimate"""
-    csv = op.join(paths['corr_source_dir'], f'spearman-pval_src_lat_power_vol_grad_{band}.csv')
-    df = pd.read_csv(csv, index_col=0)
-    data = df[substr].values
-    stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
-    stc.plot(subjects_dir=None, hemi='both', initial_time=0, cmap='coolwarm').show()
+# def plot_source_vol_corr(substr, band, paths):
+#     """Plot source lat-power vs volume-lat correlation Volume Estimate"""
+#     csv = op.join(paths['corr_source_dir'], f'spearman-pval_src_lat_power_vol_grad_{band}.csv')
+#     df = pd.read_csv(csv, index_col=0)
+#     data = df[substr].values
+#     stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
+#     stc.plot(subjects_dir=None, hemi='both', initial_time=0, cmap='coolwarm').show()
 
 
 def main():
@@ -471,7 +471,8 @@ def main():
     subject_id = '120469'
     band = 'Alpha'
     substr = 'Thal'
-    sensor_type = 'mag'
+    csd_method = 'multitaper'
+    space = 'vol'
 
     # 1 & 2: sensor power
     plot_sensor_power(subject_id, band, paths)
@@ -485,11 +486,15 @@ def main():
     src_fs = mne.read_source_spaces(fname_fsaverage_src)
 
     stc_grads_band, stc_mags_band = plot_source_band_power(subject_id, band, paths, src_fs)
-    plot_source_lat_power(subject_id, band, paths, src_fs)
+    plot_source_lat_power(subject_id, band, paths, src_fs, stc_grads_band, 'grad',
+                          csd_method, space, do_plot_3d=True)
+    plot_source_lat_power(subject_id, band, paths, src_fs, stc_mags_band, 'mag',
+                          csd_method, space, do_plot_3d=True)
 
     # 5 & 6: correlations
-    plot_sensor_vol_corr(substr, band, paths)
-    plot_source_vol_corr(substr, band, paths)
+    plot_sensor_vol_corr(substr, band, paths, 'grad')
+    plot_sensor_vol_corr(substr, band, paths, 'mag')
+    cg.visualising_grid_vol_correlation()  # costum script from before
 
 if __name__ == '__main__':
     main()
