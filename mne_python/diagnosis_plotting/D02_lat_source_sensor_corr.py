@@ -163,16 +163,16 @@ def plot_sensor_power(subject_id, band, paths):
 
     # Plotting
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    im, cn = mne.viz.plot_topomap(grad_power, epochs_grad.info, axes=axes[0], show=False, cmap='RdBu_r',
+    im_grad, _ = mne.viz.plot_topomap(grad_power, epochs_grad.info, axes=axes[0], show=False, cmap='RdBu_r',
                          vlim=(min(grad_power), max(grad_power)), contours=0, image_interp='nearest')
     axes[0].set_title(f'Sensor {band} Band Power (Grads)')
-    cbar = fig.colorbar(im, ax=axes[0], orientation='horizontal', location='bottom')
+    cbar = fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
     cbar.set_label('Power Values')
-    mne.viz.plot_topomap(mag_power, epochs_mag.info, axes=axes[1], show=False, cmap='RdBu_r',
+    im_mag, _ = mne.viz.plot_topomap(mag_power, epochs_mag.info, axes=axes[1], show=False, cmap='RdBu_r',
                           vlim=(min(mag_power), max(mag_power)), contours=0, image_interp='nearest')
     axes[1].set_title(f'Sensor {band} Band Power (Mags)')
-    cbar = fig.colorbar(im, ax=axes[1], orientation='horizontal', location='bottom')
+    cbar = fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
     cbar.set_label('Power Values')
     fig.suptitle(f'Subject {subject_id}', fontsize=20) # or plt.suptitle('Main title')
@@ -280,8 +280,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     stc_grads_band = stc_grads[0]
     stc_grads_band.data = mean_data_grads[:, np.newaxis] # data should have 2 dimensions
     stc_morphd_band_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_band')
-    if not op.exists(stc_morphd_band_dir):
-        os.makedirs(stc_morphd_band_dir)
+    os.makedirs(stc_morphd_band_dir, exist_ok=True)
     stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'), overwrite=True)
     
     # Prepare for plotting on fs
@@ -291,7 +290,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     src=src_fs,
     mode="stat_map",
     subjects_dir=paths["fs_sub_dir"],
-    initial_pos=initial_pos,
+    # initial_pos=initial_pos,
     verbose=True,
     )
 
@@ -307,7 +306,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
         src=src_fs,
         mode="stat_map",
         subjects_dir=paths["fs_sub_dir"],
-        initial_pos=initial_pos,
+        # initial_pos=initial_pos,
         verbose=True,
     )
     
@@ -332,7 +331,6 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
     file_paths = construct_paths(subject_id, paths, sensortype, csd_method, space)
 
     # --- Compute lateralised source power
-    #TODO: figure out why mags and grads produce the same time courses
     right_tc, left_tc, right_pos, left_pos, right_idx, left_idx, right_reg_idx, left_reg_idx = \
         compute_hemispheric_index(stc_band, src_fs)
 
@@ -381,9 +379,10 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
         subjects_dir=paths["fs_sub_dir"],
         mode='stat_map',
         colorbar=True,
-        initial_pos=initial_pos,
+        # initial_pos=initial_pos,
         verbose=True
     )
+    os.makedirs(op.join(file_paths['deriv_folder'], 'plots'), exist_ok=True)
     brain.savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{sensortype}_{band}.png")
 
     # --- Optional interactive 3D plot
@@ -457,24 +456,15 @@ def plot_sensor_vol_corr(substr, band, paths, sensortype):
     plt.show()
 
 
-# def plot_source_vol_corr(substr, band, paths):
-#     """Plot source lat-power vs volume-lat correlation Volume Estimate"""
-#     csv = op.join(paths['corr_source_dir'], f'spearman-pval_src_lat_power_vol_grad_{band}.csv')
-#     df = pd.read_csv(csv, index_col=0)
-#     data = df[substr].values
-#     stc = mne.VolSourceEstimate(data[:,None], vertices=[np.arange(len(data))], tmin=0, tstep=1, subject='fsaverage')
-#     stc.plot(subjects_dir=None, hemi='both', initial_time=0, cmap='coolwarm').show()
-
-
-def main():
+def diagnosis_plotting():
     paths = setup_paths('mac')
-    subject_id = '120469'
-    band = 'Alpha'
-    substr = 'Thal'
-    csd_method = 'multitaper'
-    space = 'vol'
+    subject_id = input("Enter subject ID (e.g., 120469)").strip()
+    substr = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    band = input("Enter band (e.g., Delta, Theta, Alph, Beta): ").strip()
+    csd_method = 'multitaper'  # these should be kept fix for now
+    space = 'vol'  # these should be kept fix for now
 
-    # 1 & 2: sensor power
+    # # # 1 & 2: sensor power
     plot_sensor_power(subject_id, band, paths)
     plot_sensor_lat_power(subject_id, band, paths)
 
@@ -482,19 +472,25 @@ def main():
     # Read forward model for volume plots
     fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
     fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
-
     src_fs = mne.read_source_spaces(fname_fsaverage_src)
 
     stc_grads_band, stc_mags_band = plot_source_band_power(subject_id, band, paths, src_fs)
     plot_source_lat_power(subject_id, band, paths, src_fs, stc_grads_band, 'grad',
                           csd_method, space, do_plot_3d=True)
+    input("Press Enter to continue to the next plot...")
+
     plot_source_lat_power(subject_id, band, paths, src_fs, stc_mags_band, 'mag',
                           csd_method, space, do_plot_3d=True)
+    input("Press Enter to continue to the next plot...")
 
-    # 5 & 6: correlations
-    plot_sensor_vol_corr(substr, band, paths, 'grad')
-    plot_sensor_vol_corr(substr, band, paths, 'mag')
-    cg.visualising_grid_vol_correlation()  # costum script from before
+    # # 5 & 6: correlations
+    # plot_sensor_vol_corr(substr, band, paths, 'grad')
+    # input("Press Enter to continue to the next plot...")
+
+    # plot_sensor_vol_corr(substr, band, paths, 'mag')
+    # input("Press Enter to continue to the next plot...")
+
+    # cg.visualising_grid_vol_correlation()  # costum script from before
 
 if __name__ == '__main__':
-    main()
+    diagnosis_plotting()

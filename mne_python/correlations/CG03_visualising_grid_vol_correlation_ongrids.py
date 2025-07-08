@@ -229,7 +229,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
             subjects_dir=paths['fs_sub_dir'],
             mode='stat_map',
             colorbar=True,
-            initial_pos=initial_pos,
+            # initial_pos=initial_pos,
             verbose=True
         )
         if save:
@@ -243,7 +243,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
         subjects_dir=paths['fs_sub_dir'],
         mode='stat_map',
         colorbar=True,
-        initial_pos=initial_pos,
+        # initial_pos=initial_pos,
         verbose=True
     )
     if save:
