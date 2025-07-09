@@ -324,6 +324,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     # z_null = np.zeros((n_permutations, n_sensors))
     rng = np.random.RandomState(42)
     permuted_max_r_dist = np.zeros(n_permutations)
+    print('Running permutation testing')
     for p in range(n_permutations):
         lv_shuff = rng.permutation(lv_vals)
 
@@ -344,20 +345,19 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             n_comp_null, labels_null = connected_components(
                 csr_matrix(sub_adj_null), directed=False, return_labels=True)
             clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-            print(f"Found {len(clusters_null)} permutated cluster(s) for permutation # ({p}):")
-
-            for cid, nodes in clusters_null.items():
-                print(f"  Cluster {cid}: indices {nodes}")
+            # print(f"Found {len(clusters_null)} permutated cluster(s) for permutation # ({p}):")
+            # for cid, nodes in clusters_null.items():
+            #     print(f"  Cluster {cid}: indices {nodes}")
             cluster_r_sums = {label: np.sum(r_null_arr[sensors]) for label, sensors in clusters_null.items()}
-            for cluster_id, r_sum in cluster_r_sums.items():
-                print(f"Cluster {cluster_id}: summed r = {r_sum:.3f}")
+            # for cluster_id, r_sum in cluster_r_sums.items():
+            #     print(f"Cluster {cluster_id}: summed r = {r_sum:.3f}")
             # find maximum summed_r in a cluster
             max_r_sum = np.max(np.abs(list(cluster_r_sums.values())))
             permuted_max_r_dist[p] = max_r_sum
-            print(f"Permutation {p}: max summed r = {max_r_sum:.3f}")
+            # print(f"Permutation {p}: max summed r = {max_r_sum:.3f}")
         else:
             permuted_max_r_dist[p] = 0  # or np.nan if you prefer
-            print(f"Permutation {p}: no significant clusters")
+            # print(f"Permutation {p}: no significant clusters")
 
     # Calculate cluster-corrected threshold (95th percentile of permuted max |r| sums)
     """Comparing observed summed rs with the permutated distribution"""
@@ -402,7 +402,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         fig, ax = plt.subplots()
 
         # Define the significant clusters
-        mask = all_sig_indices
+        del mask
         mask_params = dict(
             marker='o', markerfacecolor='w', markeredgecolor='k',
             linewidth=1, markersize=10
@@ -411,19 +411,23 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         # Prepare the data for visualisation
         """combines planar gradiometer to use mag info (to plot positive and negative values)"""
         if ch_type == 'grad':
-            r_obs = (r_obs[::2] + r_obs[1::2]) / 2  
+            r_obs = (r_obs[::2] + r_obs[1::2]) / 2    # error here
             # mask = mask[::2]  # old way
 
 
             # Convert sig_obs (indices) to boolean mask  # new way
             mask_bool = np.zeros(n_sensors, dtype=bool)
-            mask_bool[sig_obs] = True
+            mask_bool[all_sig_indices] = True
 
             # Combine mask: significant if either of the pair is significant
             mask = mask_bool[::2] | mask_bool[1::2] # end of new way
 
             del info  # refresh info for plotting only in grad
             info = other[0]  # this is from read_raw_info when running with ch_type='grad'
+        else:
+            # Create mask for mag
+            mask = np.zeros(n_sensors, dtype=bool)
+            mask[all_sig_indices] = True
 
         # Plot topomap
         im, cn = mne.viz.plot_topomap(
