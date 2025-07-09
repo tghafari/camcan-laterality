@@ -200,7 +200,7 @@ def find_custom_adjacency(info, ch_type):
     return sparse.csr_matrix(adjacency), [name for name in full_names if name in info['ch_names']]
 
 
-def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
+def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000, plot_adj=False):
     """Performs cluster-based permutation test on Spearman correlations between sensor lateralized power and subcortical volumes."""
     lv_df = pd.read_csv(paths['LV_csv'])
 
@@ -215,146 +215,194 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
     raw, info, *other = read_raw_info(paths, ch_type)  
     adjacency, _ = find_custom_adjacency(info, ch_type)
 
-    # if you want to take a look at the adjacency matrix
-    adj_dense = adjacency.toarray()
+    if plot_adj:
+        # if you want to take a look at the adjacency matrix
+        adj_dense = adjacency.toarray()
 
-    plt.figure(figsize=(8, 8))
-    plt.imshow(adj_dense, cmap='Greys', interpolation='none')
-    plt.title('Sensor Adjacency Matrix')
-    plt.xlabel('Sensor Index')
-    plt.ylabel('Sensor Index')
-    plt.colorbar(label='Connected (1) or Not (0)')
+        plt.figure(figsize=(8, 8))
+        plt.imshow(adj_dense, cmap='Greys', interpolation='none')
+        plt.title('Sensor Adjacency Matrix')
+        plt.xlabel('Sensor Index')
+        plt.ylabel('Sensor Index')
+        plt.colorbar(label='Connected (1) or Not (0)')
+        plt.show()
+
+    corr_path = op.join(paths['all_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv')
+    if not op.exists(corr_path):
+        print(f"Skipping {substr}-{band}, file not found: {corr_path}")
+        return
+
+    corr_df = pd.read_csv(corr_path)
+    
+    # Filter sensor pairs based on magnetometer or gradiometer channel suffix
+    if ch_type == 'mag':
+        sensor_mask = corr_df['sensor_pair'].str.endswith('1')
+    elif ch_type == 'grad':
+        sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
+    else:
+        raise ValueError(f"Unsupported ch_type: {ch_type}")
+
+    filtered_df = corr_df[sensor_mask]
+    if filtered_df.empty:
+        print(f"No matching sensors for {ch_type} in {substr}-{band}")
+        return
+
+    # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
+    li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
+    # Select columns matching channels in info, ensuring order matches info['ch_names']
+    selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
+    li_data = li_df[selected_cols].to_numpy()
+    n_sensors = li_data.shape[1]
+    lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
+
+    # Apply the mask to select rows
+    r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
+    p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
+    significant_obs = np.array(p_obs) < 0.05
+    sig_obs = np.where(significant_obs)[0] 
+
+    if sig_obs.size > 0:
+        sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
+        n_comp_obs, labels_obs = connected_components(
+            csr_matrix(sub_adj_obs), directed=False, return_labels=True)
+        clusters_obs = {i: sig_obs[labels_obs == i] for i in range(n_comp_obs)}
+        print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
+        for cid, nodes in clusters_obs.items():
+            print(f"  Cluster {cid}: indices {nodes}")
+
+        cluster_r_sums_obs = {label: np.sum(r_obs[sensors]) for label, sensors in clusters_obs.items()}
+        for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
+            print(f"Cluster {cluster_id_obs}: summed r = {r_sum_obs:.3f}")
+    else:
+        print(f"no significant clusters for {substr}-{band} ({ch_type})")
+
+    # Plot significant sensors before cluster permutations
+    fig, ax = plt.subplots()
+
+    # Define the significant clusters
+    mask = sig_obs
+    mask_params = dict(
+        marker='o', markerfacecolor='w', markeredgecolor='k',
+        linewidth=1, markersize=10
+    ) 
+
+    # Prepare the data for visualisation
+    """combines planar gradiometer to use mag info (to plot positive and negative values)"""
+    if ch_type == 'grad':
+        # Combine planar gradiometers: (1st + 2nd), (3rd + 4th), ...
+        r_obs = (r_obs[::2] + r_obs[1::2]) / 2
+
+        # Convert sig_obs (indices) to boolean mask
+        mask_bool = np.zeros(n_sensors, dtype=bool)
+        mask_bool[sig_obs] = True
+
+        # Combine mask: significant if either of the pair is significant
+        mask = mask_bool[::2] | mask_bool[1::2]
+
+        # Refresh info object to use mag layout for plotting
+        del info
+        info = other[0]  # grad layout
+    else:
+        # Create mask for mag
+        mask = np.zeros(n_sensors, dtype=bool)
+        mask[sig_obs] = True
+
+    # Plot topomap
+    im, cn = mne.viz.plot_topomap(
+        r_obs, info, mask=mask, mask_params=mask_params,
+        vlim=(min(r_obs), max(r_obs)), contours=0, image_interp='nearest', 
+        cmap='RdBu_r', show=False, axes=ax
+    )  
+    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
+    cbar.ax.tick_params(labelsize=10)
+    cbar.set_label('Correlation Values', fontsize=14)
+    ax.set_xlim(0, )  # remove the left half of topoplot
+    ax.set_title(f'{substr}-{band} Spearman r ({ch_type})- before cluster testing')
     plt.show()
 
-    for substr, band in product(substrs, bands):
-        corr_path = op.join(paths['all_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv')
-        if not op.exists(corr_path):
-            print(f"Skipping {substr}-{band}, file not found: {corr_path}")
-            continue
+    # 2. Build null distribution by shuffling
+    # z_null = np.zeros((n_permutations, n_sensors))
+    rng = np.random.RandomState(42)
+    permuted_max_r_dist = np.zeros(n_permutations)
+    for p in range(n_permutations):
+        lv_shuff = rng.permutation(lv_vals)
 
-        corr_df = pd.read_csv(corr_path)
-        
-        # Filter sensor pairs based on magnetometer or gradiometer channel suffix
-        if ch_type == 'mag':
-            sensor_mask = corr_df['sensor_pair'].str.endswith('1')
-        elif ch_type == 'grad':
-            sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
-        else:
-            raise ValueError(f"Unsupported ch_type: {ch_type}")
+        # make a distribution of random correlation values for all sensors
+        results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+        r_null = [res.correlation for res in results]
+        p_null = [res.pvalue for res in results]
 
-        filtered_df = corr_df[sensor_mask]
-        if filtered_df.empty:
-            print(f"No matching sensors for {ch_type} in {substr}-{band}")
-            continue
+        # find if there's any significant cluster in the null distribution
+        significant_nulls = np.array(p_null) < 0.05
+        r_null_arr = np.array(r_null)
+        r_null = r_null_arr[significant_nulls]
+        # find clusters (even one sensor in a cluster) of significant sensors
+        sig_null = np.where(significant_nulls)[0]
 
-        # Apply the mask to select rows
-        r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
-        p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
-        significant_obs = np.array(p_obs) < 0.05
-        sig_obs = np.where(significant_obs)[0] 
-        # Fisher z-transform (from r to z)
-        # z_obs = np.arctanh(r_obs)
+        if sig_null.size > 0:
+            sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+            n_comp_null, labels_null = connected_components(
+                csr_matrix(sub_adj_null), directed=False, return_labels=True)
+            clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
+            print(f"Found {len(clusters_null)} permutated cluster(s) for permutation # ({p}):")
 
-        if sig_obs.size > 0:
-            sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
-            n_comp_obs, labels_obs = connected_components(
-                csr_matrix(sub_adj_obs), directed=False, return_labels=True)
-            clusters_obs = {i: sig_obs[labels_obs == i] for i in range(n_comp_obs)}
-            print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
-            for cid, nodes in clusters_spearman.items():
+            for cid, nodes in clusters_null.items():
                 print(f"  Cluster {cid}: indices {nodes}")
-
-            cluster_r_sums_obs = {label: np.sum(r_obs[sensors]) for label, sensors in clusters_obs.items()}
-            for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
-                print(f"Cluster {cluster_id_obs}: summed r = {r_sum_obs:.3f}")
-            # compare these summed rs with the permutated distribution
+            cluster_r_sums = {label: np.sum(r_null_arr[sensors]) for label, sensors in clusters_null.items()}
+            for cluster_id, r_sum in cluster_r_sums.items():
+                print(f"Cluster {cluster_id}: summed r = {r_sum:.3f}")
+            # find maximum summed_r in a cluster
+            max_r_sum = np.max(np.abs(list(cluster_r_sums.values())))
+            permuted_max_r_dist[p] = max_r_sum
+            print(f"Permutation {p}: max summed r = {max_r_sum:.3f}")
         else:
-            print(f"no significant clusters for {substr}-{band} ({ch_type})")
+            permuted_max_r_dist[p] = 0  # or np.nan if you prefer
+            print(f"Permutation {p}: no significant clusters")
 
-        # 2. Build null distribution by shuffling
-        # Load lateralized power data for this band to calculate shuffled correlations
-        li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
-        # Select columns matching channels in info, ensuring order matches info['ch_names']
-        selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
-        li_data = li_df[selected_cols].to_numpy()
-        n_sensors = li_data.shape[1]
-        lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
-        rng = np.random.RandomState(42)
-        # z_null = np.zeros((n_permutations, n_sensors))
-        permuted_max_r_dist = np.zeros(n_permutations)
-        for p in range(n_permutations):
-            lv_shuff = rng.permutation(lv_vals)
-            # r_null = [spearmanr(lv_shuff, li_data[:, i])[0] for i in range(n_sensors)]
+    # Calculate cluster-corrected threshold (95th percentile of permuted max |r| sums)
+    """Comparing observed summed rs with the permutated distribution"""
+    cluster_threshold = np.percentile(permuted_max_r_dist, 95)
 
-            # make a distribution of random correlation values for all sensors
-            results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
-            r_null = [res.correlation for res in results]
-            p_null = [res.pvalue for res in results]
+    # Plot histogram of permuted max r sums
+    plt.figure(figsize=(10, 6))
+    plt.hist(permuted_max_r_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
+    plt.axvline(cluster_threshold, color='blue', linestyle='--', label='95th percentile (threshold)')
 
-            # find if there's any significant cluster in the null distribution
-            significant_nulls = np.array(p_null) < 0.05
-            r_null_arr = np.array(r_null)
-            r_null = r_null_arr[significant_nulls]
-            # find clusters (even one sensor in a cluster) of significant sensors
-            sig_null = np.where(significant_nulls)[0]
+    # Dictionary to store significant clusters
+    significant_clusters = {}
 
-            if sig_null.size > 0:
-                sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
-                n_comp_null, labels_null = connected_components(
-                    csr_matrix(sub_adj_null), directed=False, return_labels=True)
-                clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-                print(f"Found {len(clusters_null)} permutated cluster(s) for permutation # ({p}):")
+    # Plot observed cluster r sums
+    for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
+        abs_r_sum_obs = np.abs(r_sum_obs)
+        color = 'green' if abs_r_sum_obs > cluster_threshold else 'red'
+        plt.axvline(abs_r_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {r_sum_obs:.2f}')
+        
+        if color == 'green':
+            # Save significant cluster sensors
+            if band not in significant_clusters:
+                significant_clusters[band] = {}
+            if substr not in significant_clusters[band]:
+                significant_clusters[band][substr] = {}
+            significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
 
-                for cid, nodes in clusters_null.items():
-                    print(f"  Cluster {cid}: indices {nodes}")
-                cluster_r_sums = {label: np.sum(r_null_arr[sensors]) for label, sensors in clusters_null.items()}
-                for cluster_id, r_sum in cluster_r_sums.items():
-                    print(f"Cluster {cluster_id}: summed r = {r_sum:.3f}")
-                # find maximum summed_r in a cluster
-                max_r_sum = np.max(np.abs(list(cluster_r_sums.values())))
-                permuted_max_r_dist[p] = max_r_sum
-                print(f"Permutation {p}: max summed r = {max_r_sum:.3f}")
-            else:
-                permuted_max_r_dist[p] = 0  # or np.nan if you prefer
-                print(f"Permutation {p}: no significant clusters")
+    plt.title(f'Null Distribution of Max |r-sum|s ({substr}-{band}, {ch_type})')
+    plt.xlabel('Summed r-values in cluster')
+    plt.ylabel('Count')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
-        # Calculate cluster-corrected threshold (95th percentile of permuted max |r| sums)
-        cluster_threshold = np.percentile(permuted_max_r_dist, 95)
-
-        # Plot histogram of permuted max r sums
-        plt.figure(figsize=(10, 6))
-        plt.hist(permuted_max_r_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
-        plt.axvline(cluster_threshold, color='blue', linestyle='--', label='95th percentile (threshold)')
-
-        # Dictionary to store significant clusters
-        significant_clusters = {}
-
-        # Plot observed cluster r sums
-        for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
-            abs_r_sum_obs = np.abs(r_sum_obs)
-            color = 'green' if abs_r_sum_obs > cluster_threshold else 'red'
-            plt.axvline(abs_r_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {r_sum_obs:.2f}')
-            
-            if color == 'green':
-                # Save significant cluster sensors
-                if band not in significant_clusters:
-                    significant_clusters[band] = {}
-                if substr not in significant_clusters[band]:
-                    significant_clusters[band][substr] = {}
-                significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
-
-        plt.title(f'Null Distribution of Max |r-sum|s ({substr}-{band}, {ch_type})')
-        plt.xlabel('Summed r-values in cluster')
-        plt.ylabel('Count')
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+    if band in significant_clusters and substr in significant_clusters[band] and significant_clusters[band][substr]:
+        # Flatten all sensor indices in significant clusters for this band and substr
+        all_sig_indices = []
+        for cluster_id, indices in significant_clusters[band][substr].items():
+            all_sig_indices.extend(indices)
 
         # 5. Visualize topomap with significant mask and cluster labels
         fig, ax = plt.subplots()
 
         # Define the significant clusters
-        mask = significant_mask
+        mask = all_sig_indices
         mask_params = dict(
             marker='o', markerfacecolor='w', markeredgecolor='k',
             linewidth=1, markersize=10
@@ -364,7 +412,16 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
         """combines planar gradiometer to use mag info (to plot positive and negative values)"""
         if ch_type == 'grad':
             r_obs = (r_obs[::2] + r_obs[1::2]) / 2  
-            mask = mask[::2]
+            # mask = mask[::2]  # old way
+
+
+            # Convert sig_obs (indices) to boolean mask  # new way
+            mask_bool = np.zeros(n_sensors, dtype=bool)
+            mask_bool[sig_obs] = True
+
+            # Combine mask: significant if either of the pair is significant
+            mask = mask_bool[::2] | mask_bool[1::2] # end of new way
+
             del info  # refresh info for plotting only in grad
             info = other[0]  # this is from read_raw_info when running with ch_type='grad'
 
@@ -381,13 +438,15 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
         ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
         plt.show()
 
-def main():
+def cluster_permutation():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
     # extract_all_band_power(paths)  # only need to run once
     # save_spearman_correlations(paths)   # only need to run once
-    # run_cluster_test_from_raw_corr(paths, ch_type='mag')
-    run_cluster_test_from_raw_corr(paths, ch_type='grad')
+    substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
+    band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
+    ch_type = input('Enter sensortype (mag or grad):').strip()
+    run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000, plot_adj=False)
 
 if __name__ == "__main__":
-    main()
+    cluster_permutation()
