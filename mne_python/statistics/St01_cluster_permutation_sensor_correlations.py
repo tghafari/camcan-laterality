@@ -317,7 +317,7 @@ def run_cluster_test_from_raw_corr(paths, ch_type, n_permutations=1000):
         plt.show()
 
 def main():
-    platform = 'mac'  # or 'bluebear'
+    platform = 'bluebear'  # or 'bluebear'
     paths = setup_paths(platform)
     # extract_all_band_power(paths)  # only need to run once
     # save_spearman_correlations(paths)   # only need to run once
