@@ -710,3 +710,84 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+
+# to be used for two tailed distributions
+
+
+# 2. Build null distribution by shuffling
+rng = np.random.RandomState(42)
+max_r_sums_pos = np.zeros(n_permutations)  # to collect max positive cluster sum
+min_r_sums_neg = np.zeros(n_permutations)  # to collect min negative cluster sum
+
+print('Running permutation testing for r values...')
+for p in range(n_permutations):
+    lv_shuff = rng.permutation(lv_vals)
+
+    # compute correlation per sensor
+    results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+    r_null_arr = np.array([res.correlation for res in results])
+    p_null = np.array([res.pvalue for res in results])
+
+    significant_nulls = p_null < 0.05
+    sig_null = np.where(significant_nulls)[0]
+
+    if sig_null.size > 0:
+        sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+        n_comp_null, labels_null = connected_components(
+            csr_matrix(sub_adj_null), directed=False, return_labels=True)
+        clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
+        cluster_r_sums = [np.sum(r_null_arr[sensors]) for sensors in clusters_null.values()]
+
+        # For this permutation, store:
+        pos_sums = [s for s in cluster_r_sums if s > 0]
+        neg_sums = [s for s in cluster_r_sums if s < 0]
+
+        max_r_sums_pos[p] = np.max(pos_sums) if pos_sums else 0
+        min_r_sums_neg[p] = np.min(neg_sums) if neg_sums else 0
+    else:
+        max_r_sums_pos[p] = 0
+        min_r_sums_neg[p] = 0
+
+# Compute two-tailed thresholds
+upper_threshold = np.percentile(max_r_sums_pos, 97.5)
+lower_threshold = np.percentile(min_r_sums_neg, 2.5)
+
+# Plot both null distributions together
+plt.figure(figsize=(10, 6))
+plt.hist(min_r_sums_neg, bins=30, color='lightblue', edgecolor='black', alpha=0.6, label='Min negative cluster sums')
+plt.hist(max_r_sums_pos, bins=30, color='salmon', edgecolor='black', alpha=0.6, label='Max positive cluster sums')
+plt.axvline(lower_threshold, color='blue', linestyle='--', label='2.5th percentile (neg)')
+plt.axvline(upper_threshold, color='red', linestyle='--', label='97.5th percentile (pos)')
+
+# Dictionary to store significant clusters
+significant_clusters = {}
+
+# Plot observed cluster r sums
+for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
+    if r_sum_obs > upper_threshold:
+        color = 'green'
+        label = f'Cluster {cluster_id_obs}: {r_sum_obs:.2f}'
+    elif r_sum_obs < lower_threshold:
+        color = 'green'
+        label = f'Cluster {cluster_id_obs}: {r_sum_obs:.2f}'
+    else:
+        color = 'red'
+        label = f'Cluster {cluster_id_obs}: {r_sum_obs:.2f} (ns)'
+
+    plt.axvline(r_sum_obs, color=color, linestyle='-', label=label)
+
+    if color == 'green':
+        if band not in significant_clusters:
+            significant_clusters[band] = {}
+        if substr not in significant_clusters[band]:
+            significant_clusters[band][substr] = {}
+        significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
+
+plt.title(f'Null Distribution of Max/Min r-sums ({substr}-{band}, {ch_type})')
+plt.xlabel('Summed r-values in cluster')
+plt.ylabel('Count')
+plt.legend()
+plt.tight_layout()
+plt.show()
