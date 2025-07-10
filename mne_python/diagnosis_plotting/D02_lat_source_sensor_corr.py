@@ -284,7 +284,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'), overwrite=True)
     
     # Prepare for plotting on fs
-    initial_pos=np.array([19, -50, 29]) * 0.001
+    initial_pos = np.array([19, -10, 29]) * 0.001
     
     stc_grads_band.plot(
     src=src_fs,
@@ -306,7 +306,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
         src=src_fs,
         mode="stat_map",
         subjects_dir=paths["fs_sub_dir"],
-        # initial_pos=initial_pos,
+        initial_pos=initial_pos,
         verbose=True,
     )
     

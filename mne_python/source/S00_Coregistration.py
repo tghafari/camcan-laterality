@@ -110,7 +110,7 @@ def plot_coregistration_results(coreg, info, coreg_figname, coreg_plot_kwargs):
     fig.text(0.1, 0.1, text, fontsize=12, ha='left', va='center', color='white', bbox=dict(facecolor='black', alpha=0.5))
     fig.tight_layout()
     fig.savefig(coreg_figname, dpi=150)
-    plt.close(fig)
+    # plt.close(fig)
 
     coreg_fig.plotter.close()
 
@@ -178,9 +178,9 @@ def process_subject(subjectID, paths, coreg_type='auto', platform='mac'):
         print(f"Error processing subject {subjectID}: {e}")
 
 def main():
-    platform = 'bluebear'  # Change to 'bluebear' if running on BlueBear
-    coreg_type = 'auto'  # Change to 'manual' for manual coregistration
+    platform = 'mac'  # Change to 'bluebear' if running on BlueBear
     paths = setup_paths(platform)
+    coreg_type = 'auto'  # Change to 'manual' for manual coregistration
     good_subject_pd = load_subjects(paths['good_sub_sheet'])
 
     for subjectID in good_subject_pd.index[1:620]:
