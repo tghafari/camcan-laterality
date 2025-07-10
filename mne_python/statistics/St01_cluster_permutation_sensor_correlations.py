@@ -27,6 +27,9 @@ Requirements:
 - `info`: MNE Info object with selected channels.
 - `adjacency`: sparse adjacency matrix for sensor neighborhoods.
 
+
+NOTE THAT gradiometer topoplotting might not be complete.
+
 Written by: Tara Ghafari
 tara.ghafari@gmail.com
 """
@@ -291,10 +294,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     significant_obs = np.array(p_obs) < 0.05
     sig_obs = np.where(significant_obs)[0] 
 
-    # Also compute t-transformed values
-    n_subjects = len(lv_vals)
-    t_obs = r_to_t(r_obs, n=n_subjects)
-
     if sig_obs.size > 0:
         sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
         n_comp_obs, labels_obs = connected_components(
@@ -392,30 +391,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         else:
             permuted_max_r_dist[p] = 0  # or np.nan if you prefer
             # print(f"Permutation {p}: no significant clusters")
-    
-    # t values version
-    permuted_max_t_dist = np.zeros(n_permutations)
-    print('Running permutation testing for t-values...')
-
-    for p in range(n_permutations):
-        lv_shuff = rng.permutation(lv_vals)
-        results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
-        r_null = np.array([res.correlation for res in results])
-        t_null = r_to_t(r_null, n=n_subjects)
-        p_null = [res.pvalue for res in results]
-
-        significant_nulls = np.array(p_null) < 0.05
-        sig_null = np.where(significant_nulls)[0]
-
-        if sig_null.size > 0:
-            sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
-            n_comp_null, labels_null = connected_components(csr_matrix(sub_adj_null), directed=False, return_labels=True)
-            clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-            cluster_t_sums = {label: np.sum(t_null[sensors]) for label, sensors in clusters_null.items()}
-            max_t_sum = np.max(np.abs(list(cluster_t_sums.values())))
-            permuted_max_t_dist[p] = max_t_sum
-        else:
-            permuted_max_t_dist[p] = 0
 
     # Calculate cluster-corrected threshold (95th percentile of permuted max |r| sums)
     """Comparing observed summed rs with the permutated distribution"""
@@ -449,40 +424,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     plt.legend()
     plt.tight_layout()
     plt.show()
-
-    # t values version
-    cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_obs.items()}
-    cluster_threshold_t = np.percentile(permuted_max_t_dist, 95)
-
-    plt.figure(figsize=(10, 6))
-    plt.hist(permuted_max_t_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
-    plt.axvline(cluster_threshold_t, color='blue', linestyle='--', label='95th percentile (threshold)')
-
-    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        abs_t_sum_obs = np.abs(t_sum_obs)
-        color = 'green' if abs_t_sum_obs > cluster_threshold_t else 'red'
-        plt.axvline(abs_t_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}')
-    plt.title(f'Null Distribution of Max |t-sum|s ({substr}-{band}, {ch_type})')
-    plt.xlabel('Summed t-values in cluster')
-    plt.ylabel('Count')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-    # Dictionary to store significant clusters based on t-values
-    significant_clusters_t = {}
-
-    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        abs_t_sum_obs = np.abs(t_sum_obs)
-        if abs_t_sum_obs > cluster_threshold_t:
-            # Save significant cluster sensors
-            if band not in significant_clusters_t:
-                significant_clusters_t[band] = {}
-            if substr not in significant_clusters_t[band]:
-                significant_clusters_t[band][substr] = {}
-            significant_clusters_t[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
-            print(f"[t] Significant cluster {cluster_id_obs} for {substr}-{band}: "
-              f"sum(t) = {t_sum_obs:.2f}, sensors = {clusters_obs[cluster_id_obs].tolist()}")
 
     if band in significant_clusters and substr in significant_clusters[band] and significant_clusters[band][substr]:
         # Flatten all sensor indices in significant clusters for this band and substr
@@ -538,6 +479,69 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         ax.set_xlim(0, )  # remove the left half of topoplot
         ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
         plt.show()
+
+
+    #============ t values version ==============
+
+    # Compute t-transformed values and use that to find significant clusters
+    n_subjects = len(lv_vals)
+    t_obs = r_to_t(r_obs, n=n_subjects)
+    permuted_max_t_dist = np.zeros(n_permutations)
+    print('Running permutation testing for t-values...')
+
+    for p in range(n_permutations):
+        lv_shuff = rng.permutation(lv_vals)
+        results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+        r_null = np.array([res.correlation for res in results])
+        t_null = r_to_t(r_null, n=n_subjects)
+        p_null = [res.pvalue for res in results]
+
+        significant_nulls = np.array(p_null) < 0.05
+        sig_null = np.where(significant_nulls)[0]
+
+        if sig_null.size > 0:
+            sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+            n_comp_null, labels_null = connected_components(csr_matrix(sub_adj_null), directed=False, return_labels=True)
+            clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
+            cluster_t_sums = {label: np.sum(t_null[sensors]) for label, sensors in clusters_null.items()}
+            max_t_sum = np.max(np.abs(list(cluster_t_sums.values())))
+            permuted_max_t_dist[p] = max_t_sum
+        else:
+            permuted_max_t_dist[p] = 0
+
+    cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_obs.items()}
+    cluster_threshold_t = np.percentile(permuted_max_t_dist, 95)
+
+    plt.figure(figsize=(10, 6))
+    plt.hist(permuted_max_t_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
+    plt.axvline(cluster_threshold_t, color='blue', linestyle='--', label='95th percentile (threshold)')
+
+    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
+        abs_t_sum_obs = np.abs(t_sum_obs)
+        color = 'green' if abs_t_sum_obs > cluster_threshold_t else 'red'
+        plt.axvline(abs_t_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}')
+    plt.title(f'Null Distribution of Max |t-sum|s ({substr}-{band}, {ch_type})')
+    plt.xlabel('Summed t-values in cluster')
+    plt.ylabel('Count')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    # Dictionary to store significant clusters based on t-values
+    significant_clusters_t = {}
+
+    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
+        abs_t_sum_obs = np.abs(t_sum_obs)
+        if abs_t_sum_obs > cluster_threshold_t:
+            # Save significant cluster sensors
+            if band not in significant_clusters_t:
+                significant_clusters_t[band] = {}
+            if substr not in significant_clusters_t[band]:
+                significant_clusters_t[band][substr] = {}
+            significant_clusters_t[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
+            print(f"[t] Significant cluster {cluster_id_obs} for {substr}-{band}: "
+              f"sum(t) = {t_sum_obs:.2f}, sensors = {clusters_obs[cluster_id_obs].tolist()}")
+            
 
 def cluster_permutation():
     platform = 'mac'  # or 'bluebear'
