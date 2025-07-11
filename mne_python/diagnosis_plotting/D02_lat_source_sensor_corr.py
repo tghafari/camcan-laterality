@@ -79,7 +79,7 @@ def setup_paths(platform='mac'):
         quinna = '/rds/projects/q/quinna-camcan'
     else:
         sub2ctx = '/Volumes/jenseno-sub2ctx/camcan'
-        quinna = '/Volumes/quinna-camcan'
+        quinna = '/Volumes/quinna-camcan-1'
     
     paths = {
         'sample_meg_file': op.join(quinna, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
@@ -87,6 +87,7 @@ def setup_paths(platform='mac'):
         'sensor_layout': op.join(quinna, 'dataman/data_information/sensors_layout_names.csv'),
         'LI_dir': op.join(sub2ctx, 'derivatives/meg/sensor/lateralized_index/bands'),
         'meg_source_dir': op.join(sub2ctx, 'derivatives/meg/source/freesurfer'),
+        'sub_list': op.join(quinna, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
         'fs_sub_dir': op.join(quinna, 'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
         'all_subs_lat_src': op.join(sub2ctx, 'derivatives/meg/source/freesurfer/all_subs'),
         'corr_sensor_dir': op.join(sub2ctx, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nooutlier-psd'),
@@ -163,14 +164,16 @@ def plot_sensor_power(subject_id, band, paths):
 
     # Plotting
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    lim_grad = np.max(np.abs(grad_power))
     im_grad, _ = mne.viz.plot_topomap(grad_power, epochs_grad.info, axes=axes[0], show=False, cmap='RdBu_r',
-                         vlim=(min(grad_power), max(grad_power)), contours=0, image_interp='nearest')
+                         vlim=(-lim_grad, lim_grad), contours=0, image_interp='nearest')
     axes[0].set_title(f'Sensor {band} Band Power (Grads)')
     cbar = fig.colorbar(im_grad, ax=axes[0], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
     cbar.set_label('Power Values')
+    lim_mag = np.max(np.abs(mag_power))
     im_mag, _ = mne.viz.plot_topomap(mag_power, epochs_mag.info, axes=axes[1], show=False, cmap='RdBu_r',
-                          vlim=(min(mag_power), max(mag_power)), contours=0, image_interp='nearest')
+                          vlim=(-lim_mag, lim_mag), contours=0, image_interp='nearest')
     axes[1].set_title(f'Sensor {band} Band Power (Mags)')
     cbar = fig.colorbar(im_mag, ax=axes[1], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
@@ -219,18 +222,20 @@ def plot_sensor_lat_power(subject_id, band, paths):
     _, mag_info, *rest = read_raw_info(paths, ch_type='mag')  
 
     fig, axes = plt.subplots(1,2, figsize=(10,5))
-    mne.viz.plot_topomap(grad_vals, grad_info, axes=axes[0], show=False)
+    lim_grad = np.max(np.abs(grad_vals))
+    # mne.viz.plot_topomap(grad_vals, grad_info, axes=axes[0], show=False)
     im, cn = mne.viz.plot_topomap(grad_vals, grad_info, axes=axes[0], show=False, cmap='RdBu_r',
-                        vlim=(min(grad_vals), max(grad_vals)), contours=0, image_interp='nearest')
+                        vlim=(-lim_grad, lim_grad), contours=0, image_interp='nearest')
     axes[0].set_title(f'Sensor {band} Band Lateralised Power (Grads)')
     cbar = fig.colorbar(im, ax=axes[0], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
     cbar.set_label('Lateralised Power Values')
     axes[0].set_xlim(0, )  # remove the left half of topoplot
 
-    mne.viz.plot_topomap(mag_vals, mag_info, axes=axes[1], show=False)
+    lim_mag = np.max(np.abs(mag_vals))
+    # mne.viz.plot_topomap(mag_vals, mag_info, axes=axes[1], show=False)
     im, cn = mne.viz.plot_topomap(mag_vals, mag_info, axes=axes[1], show=False, cmap='RdBu_r',
-                        vlim=(min(mag_vals), max(mag_vals)), contours=0, image_interp='nearest')
+                        vlim=(-lim_mag, lim_mag), contours=0, image_interp='nearest')
     axes[1].set_title(f'Sensor {band} Band Lateralised Power (Mags)')
     cbar = fig.colorbar(im, ax=axes[1], orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
@@ -286,13 +291,13 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     # Prepare for plotting on fs
     initial_pos = np.array([19, -10, 29]) * 0.001
     
-    stc_grads_band.plot(
-    src=src_fs,
-    mode="stat_map",
-    subjects_dir=paths["fs_sub_dir"],
-    # initial_pos=initial_pos,
-    verbose=True,
-    )
+    # stc_grads_band.plot(
+    # src=src_fs,
+    # mode="stat_map",
+    # subjects_dir=paths["fs_sub_dir"],
+    # # initial_pos=initial_pos,
+    # verbose=True,
+    # )
 
     # Mags
     stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
@@ -306,7 +311,7 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
         src=src_fs,
         mode="stat_map",
         subjects_dir=paths["fs_sub_dir"],
-        initial_pos=initial_pos,
+        # initial_pos=initial_pos,
         verbose=True,
     )
     
@@ -392,7 +397,7 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
             subjects_dir=paths["fs_sub_dir"],
             hemi='both',
             size=(600, 600),
-            views='sagittal',
+            views='axial',
             brain_kwargs=dict(silhouette=True),
             initial_time=0.087,
             verbose=True,
@@ -401,6 +406,7 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
             src=src_fs,
             **kwargs,
         )
+
 
 def plot_sensor_vol_corr(substr, band, paths, sensortype):
     """Plot sensor lat-power vs volume-lat correlation topomap"""
@@ -457,31 +463,40 @@ def plot_sensor_vol_corr(substr, band, paths, sensortype):
 
 
 def diagnosis_plotting():
+
+    # Sanity check with random participants
+    to_tests = np.arange(0,20)
+
     paths = setup_paths('mac')
-    subject_id = input("Enter subject ID (e.g., 120469)").strip()
+    # subject_id = input("Enter subject ID (e.g., 120469)").strip()
     substr = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
     band = input("Enter band (e.g., Delta, Theta, Alph, Beta): ").strip()
     csd_method = 'multitaper'  # these should be kept fix for now
     space = 'vol'  # these should be kept fix for now
+    
+    for _ in to_tests:
+        sub_list = pd.read_csv(paths['sub_list'])
+        sub_list = sub_list.to_numpy()
+        random_subject = sub_list[np.random.randint(0, len(sub_list))][0]
+        
+        # # # 1 & 2: sensor power
+        plot_sensor_power(random_subject, band, paths)
+        plot_sensor_lat_power(random_subject, band, paths)
 
-    # # # 1 & 2: sensor power
-    plot_sensor_power(subject_id, band, paths)
-    plot_sensor_lat_power(subject_id, band, paths)
+        # 3 & 4: source power
+        # Read forward model for volume plots
+        fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
+        fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
+        src_fs = mne.read_source_spaces(fname_fsaverage_src)
 
-    # 3 & 4: source power
-    # Read forward model for volume plots
-    fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
-    fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
-    src_fs = mne.read_source_spaces(fname_fsaverage_src)
+        stc_grads_band, stc_mags_band = plot_source_band_power(random_subject, band, paths, src_fs)
+        # plot_source_lat_power(random_subject, band, paths, src_fs, stc_grads_band, 'grad',
+        #                     csd_method, space, do_plot_3d=True)
+        # input("Press Enter to continue to the next plot...")
 
-    stc_grads_band, stc_mags_band = plot_source_band_power(subject_id, band, paths, src_fs)
-    plot_source_lat_power(subject_id, band, paths, src_fs, stc_grads_band, 'grad',
-                          csd_method, space, do_plot_3d=True)
-    input("Press Enter to continue to the next plot...")
-
-    plot_source_lat_power(subject_id, band, paths, src_fs, stc_mags_band, 'mag',
-                          csd_method, space, do_plot_3d=True)
-    input("Press Enter to continue to the next plot...")
+        plot_source_lat_power(random_subject, band, paths, src_fs, stc_mags_band, 'mag',
+                            csd_method, space, do_plot_3d=True)
+        # input("Press Enter to continue to the next plot...")
 
     # # 5 & 6: correlations
     # plot_sensor_vol_corr(substr, band, paths, 'grad')
