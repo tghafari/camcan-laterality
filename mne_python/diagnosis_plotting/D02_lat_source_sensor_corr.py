@@ -498,14 +498,14 @@ def diagnosis_plotting():
                             csd_method, space, do_plot_3d=True)
         # input("Press Enter to continue to the next plot...")
 
-    # # 5 & 6: correlations
-    # plot_sensor_vol_corr(substr, band, paths, 'grad')
-    # input("Press Enter to continue to the next plot...")
+    # 5 & 6: correlations
+    plot_sensor_vol_corr(substr, band, paths, 'grad')
+    input("Press Enter to continue to the next plot...")
 
-    # plot_sensor_vol_corr(substr, band, paths, 'mag')
-    # input("Press Enter to continue to the next plot...")
+    plot_sensor_vol_corr(substr, band, paths, 'mag')
+    input("Press Enter to continue to the next plot...")
 
-    # cg.visualising_grid_vol_correlation()  # costum script from before
+    cg.visualising_grid_vol_correlation()  # costum script from before
 
 if __name__ == '__main__':
     diagnosis_plotting()

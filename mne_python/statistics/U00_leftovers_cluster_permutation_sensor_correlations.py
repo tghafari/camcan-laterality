@@ -791,3 +791,79 @@ plt.ylabel('Count')
 plt.legend()
 plt.tight_layout()
 plt.show()
+
+
+
+# ============= CLuster permutation testing that work but not needed ======================
+    # z_null = np.zeros((n_permutations, n_sensors))
+    rng = np.random.RandomState(42)
+    permuted_max_r_dist = np.zeros(n_permutations)
+    print('Running permutation testing for r values...')
+    for p in range(n_permutations):
+        lv_shuff = rng.permutation(lv_vals)
+
+        # make a distribution of random correlation values for all sensors
+        results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+        r_null = [res.correlation for res in results]
+        p_null = [res.pvalue for res in results]
+
+        # find if there's any significant cluster in the null distribution
+        significant_nulls = np.array(p_null) < 0.05
+        r_null_arr = np.array(r_null)
+        r_null = r_null_arr[significant_nulls]
+        # find clusters (even one sensor in a cluster) of significant sensors
+        sig_null = np.where(significant_nulls)[0]
+
+        if sig_null.size > 0:
+            sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+            n_comp_null, labels_null = connected_components(
+                csr_matrix(sub_adj_null), directed=False, return_labels=True)
+            clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
+            # print(f"Found {len(clusters_null)} permutated cluster(s) for permutation # ({p}):")
+            # for cid, nodes in clusters_null.items():
+            #     print(f"  Cluster {cid}: indices {nodes}")
+            cluster_r_sums = {label: np.sum(r_null_arr[sensors]) for label, sensors in clusters_null.items()}
+            # for cluster_id, r_sum in cluster_r_sums.items():
+            #     print(f"Cluster {cluster_id}: summed r = {r_sum:.3f}")
+            # find maximum summed_r in a cluster
+            max_r_sum = np.max(np.abs(list(cluster_r_sums.values())))
+            permuted_max_r_dist[p] = max_r_sum
+            # print(f"Permutation {p}: max summed r = {max_r_sum:.3f}")
+        else:
+            permuted_max_r_dist[p] = 0  # or np.nan if you prefer
+            # print(f"Permutation {p}: no significant clusters")
+
+    # Calculate cluster-corrected threshold (95th percentile of permuted max |r| sums)
+    """Comparing observed summed rs with the permutated distribution"""
+    cluster_threshold = np.percentile(permuted_max_r_dist, 95)
+
+    # Plot histogram of permuted max r sums
+    plt.figure(figsize=(10, 6))
+    plt.hist(permuted_max_r_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
+    plt.axvline(cluster_threshold, color='blue', linestyle='--', label='95th percentile (threshold)')
+
+    # Dictionary to store significant clusters
+    significant_clusters = {}
+
+    # Plot observed cluster r sums
+    for cluster_id_obs, r_sum_obs in cluster_r_sums_obs.items():
+        abs_r_sum_obs = np.abs(r_sum_obs)
+        color = 'green' if abs_r_sum_obs > cluster_threshold else 'red'
+        plt.axvline(abs_r_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {r_sum_obs:.2f}')
+        
+        if color == 'green':
+            # Save significant cluster sensors
+            if band not in significant_clusters:
+                significant_clusters[band] = {}
+            if substr not in significant_clusters[band]:
+                significant_clusters[band][substr] = {}
+            significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
+
+    plt.title(f'Null Distribution of Max |r-sum|s ({substr}-{band}, {ch_type})')
+    plt.xlabel('Summed r-values in cluster')
+    plt.ylabel('Count')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
