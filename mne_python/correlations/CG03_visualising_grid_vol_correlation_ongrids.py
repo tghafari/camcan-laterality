@@ -43,7 +43,7 @@ def setup_paths(platform='mac'):
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         output_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        rds_dir = '/Volumes/quinna-camcan'
+        rds_dir = '/Volumes/quinna-camcan-1'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         output_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
