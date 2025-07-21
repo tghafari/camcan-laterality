@@ -28,7 +28,8 @@ Requirements:
 - `adjacency`: sparse adjacency matrix for sensor neighborhoods.
 
 
-NOTE THAT gradiometer topoplotting might not be complete.
+NOTE THAT gradiometer topoplotting might not be complete-> can only work when grads are combined before
+LI is calculated.
 
 Written by: Tara Ghafari
 tara.ghafari@gmail.com
@@ -236,12 +237,6 @@ def find_custom_adjacency(info, ch_type, plot_all=False):
 def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000, plot_adj=False):
     """Performs cluster-based permutation test on Spearman correlations between sensor lateralized power and subcortical volumes."""
     lv_df = pd.read_csv(paths['LV_csv'])
-
-    # Example mapping; significant plots from before, not used now
-    # substrs_bands = [{'Thal': 'Alpha'}, {'Puta': 'Beta'}, {'Hipp': 'Delta'}]
-    
-    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
     
     # this line receives three outputs if 'grad' and two if 'mag'. 
     # info_mag for plotting is in rest tuple and later called
@@ -295,10 +290,9 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     sig_obs = np.where(significant_obs)[0] 
     
     # Compute t-transformed values and use that to find significant clusters
+    print("Plotting observed significant sensors")
     n_subjects = len(lv_vals)
     t_obs = r_to_t(r_obs, n=n_subjects)
-    permuted_max_t_dist = np.zeros(n_permutations)
-    print('Running permutation testing for t-values...')
 
     if sig_obs.size > 0:
         sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
@@ -311,7 +305,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
         cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-            print(f"Cluster {cluster_id_obs}: summed r = {t_sum_obs:.3f}")
+            print(f"Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
 
         # Plot significant sensors before cluster permutations
         fig, ax = plt.subplots()
@@ -325,7 +319,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
         # Prepare the data for visualisation
         """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-        if ch_type == 'grad':
+        if ch_type == 'grad':  # this needs more work from previous steps where we combine first and then calculate LI for grads.
             # Combine planar gradiometers: (1st + 2nd), (3rd + 4th), ...
             t_obs = (t_obs[::2] + t_obs[1::2]) / 2
 
@@ -362,9 +356,16 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     # 2. Build null distribution by shuffling
     rng = np.random.RandomState(42)
+    max_t_sums_pos = np.zeros(n_permutations)  # to collect max positive cluster sum
+    min_t_sums_neg = np.zeros(n_permutations)  # to collect min negative cluster sum
+
+    print('Running permutation testing for t values...')
     for p in range(n_permutations):
         lv_shuff = rng.permutation(lv_vals)
+
+        # compute correlation per sensor
         results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+
         r_null = np.array([res.correlation for res in results])
         t_null = r_to_t(r_null, n=n_subjects)
         p_null = [res.pvalue for res in results]
@@ -374,37 +375,73 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
         if sig_null.size > 0:
             sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
-            n_comp_null, labels_null = connected_components(csr_matrix(sub_adj_null), directed=False, return_labels=True)
+            n_comp_null, labels_null = connected_components(
+                csr_matrix(sub_adj_null), directed=False, return_labels=True)
             clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-            cluster_t_sums = {label: np.sum(t_null[sensors]) for label, sensors in clusters_null.items()}
-            max_t_sum = np.max(np.abs(list(cluster_t_sums.values())))
-            permuted_max_t_dist[p] = max_t_sum
-        else:
-            permuted_max_t_dist[p] = 0
+            cluster_t_sums = [np.sum(t_null[sensors]) for sensors in clusters_null.values()]
+        
+            # For this permutation, store:
+            pos_sums = [s for s in cluster_t_sums if s > 0]
+            neg_sums = [s for s in cluster_t_sums if s < 0]
 
-    cluster_threshold_t = np.percentile(permuted_max_t_dist, 95)
+            max_t_sums_pos[p] = np.max(pos_sums) if pos_sums else 0
+            min_t_sums_neg[p] = np.min(neg_sums) if neg_sums else 0
+
+        else:
+            max_t_sums_pos[p] = 0
+            min_t_sums_neg[p] = 0
+
+
+    # Compute two-tailed thresholds
+    upper_threshold = np.percentile(max_t_sums_pos, 95)
+    print(f'upper: {upper_threshold}')
+    lower_threshold = np.percentile(min_t_sums_neg, 5)
+    print(f'lower: {lower_threshold}')
+
 
     plt.figure(figsize=(10, 6))
-    plt.hist(permuted_max_t_dist, bins=30, alpha=0.7, color='gray', edgecolor='black')
-    plt.axvline(cluster_threshold_t, color='blue', linestyle='--', label='95th percentile (threshold)')
+    plt.hist(max_t_sums_pos, bins=30, color='salmon', edgecolor='black', alpha=0.6, label='Max positive cluster sums')
+    plt.hist(min_t_sums_neg, bins=30, color='lightblue', edgecolor='black', alpha=0.6, label='Min negative cluster sums')
+    plt.axvline(lower_threshold, color='lightblue', linestyle='--', label='2.5th percentile (neg)')
+    plt.axvline(upper_threshold, color='salmon', linestyle='--', label='97.5th percentile (pos)')
+   
+    # Dictionary to store significant clusters
+    significant_clusters = {}
 
+    # Plot observed cluster t sums
     for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        abs_t_sum_obs = np.abs(t_sum_obs)
-        color = 'green' if abs_t_sum_obs > cluster_threshold_t else 'red'
-        plt.axvline(abs_t_sum_obs, color=color, linestyle='-', label=f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}')
-    plt.title(f'Null Distribution of Max |t-sum|s ({substr}-{band}, {ch_type})')
+        if t_sum_obs > upper_threshold:
+            color = 'green'
+            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
+        elif t_sum_obs < lower_threshold:
+            color = 'green'
+            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
+        else:
+            color = 'yellow'
+            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f} (ns)'
+
+        plt.axvline(t_sum_obs, color=color, linestyle='-', label=label)
+
+        if color == 'green':
+            if band not in significant_clusters:
+                significant_clusters[band] = {}
+            if substr not in significant_clusters[band]:
+                significant_clusters[band][substr] = {}
+            significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
+
+    plt.title(f'Null Distribution of Max/Min t-sums ({substr}-{band}, {ch_type})')
     plt.xlabel('Summed t-values in cluster')
     plt.ylabel('Count')
     plt.legend()
     plt.tight_layout()
     plt.show()
 
+
     # Dictionary to store significant clusters based on t-values
     significant_clusters_t = {}
 
     for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        abs_t_sum_obs = np.abs(t_sum_obs)
-        if abs_t_sum_obs > cluster_threshold_t:
+        if t_sum_obs > upper_threshold or t_sum_obs < lower_threshold:
             # Save significant cluster sensors
             if band not in significant_clusters_t:
                 significant_clusters_t[band] = {}
@@ -478,7 +515,7 @@ def cluster_permutation():
     substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
     band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
     ch_type = input('Enter sensortype (mag or grad):').strip()
-    run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000, plot_adj=True)
+    run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
 if __name__ == "__main__":
     cluster_permutation()
