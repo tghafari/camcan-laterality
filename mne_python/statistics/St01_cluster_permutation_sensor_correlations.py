@@ -181,7 +181,7 @@ def read_raw_info(paths, ch_type):
     """Reads sensor info from a MEG file for adjacency computation.
     raw_mag.info is only for illustration purposes of grads, as planars are combined."""
 
-    raw = mne.io.read_raw_fif(paths['sample_meg_file'], verbose='ERROR')
+    raw = mne.io.read_raw_fif(paths['sample_meg_file'])
     layout = pd.read_csv(paths['sensor_layout'])
     right_sensors = layout['right_sensors'].dropna().tolist()
 
@@ -241,7 +241,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     # this line receives three outputs if 'grad' and two if 'mag'. 
     # info_mag for plotting is in rest tuple and later called
     raw, info, *other = read_raw_info(paths, ch_type)  
-    adjacency, _ = find_custom_adjacency(info, ch_type)
+    adjacency, names = find_custom_adjacency(info, ch_type)
 
     if plot_adj:
         # if you want to take a look at the adjacency matrix
@@ -285,9 +285,33 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     # Apply the mask to select rows
     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()
-    p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
-    significant_obs = np.array(p_obs) < 0.05
-    sig_obs = np.where(significant_obs)[0] 
+    
+#     # 1) Get boolean mask of significant rows in the filtered DF
+#     sig_mask = filtered_df[f'{band.lower()}_pval'].to_numpy() < 0.05
+#     # 2) Extract the corresponding sensor_pair names
+#     sig_pairs = filtered_df.loc[sig_mask, 'sensor_pair'].tolist()
+# # 0.130207 + 0.126436
+#     # 3) We need the single channel name that matches your adjacency 'names' list,
+#     #    which was built via find_custom_adjacency(info, ch_type).
+#     sig_chan_names = [pair.split('_')[1] for pair in sig_pairs]
+
+#     # 4) Now map those channel‐names into the adjacency‐matrix indices:
+#     #    (names = the list from find_custom_adjacency)
+#     sig_obs = [names.index(ch) for ch in sig_chan_names]
+#     sig_obs = np.array(sig_obs)  
+
+#     clusters_obs = {
+#         i: [sig_obs[j] for j, lab in enumerate(labels_obs) if lab == i]
+#         for i in range(n_comp_obs)
+#     }
+
+#     print(f"Found {len(clusters_obs)} observed cluster(s) for {substr}-{band} ({ch_type}):")
+#     for cid, nodes in clusters_obs.items():
+#         print(f"  Cluster {cid}: indices {nodes} → names {[names[n] for n in nodes]}")
+    
+    p_obs_t = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
+    significant_obs_t = np.array(p_obs_t) < 0.05
+    sig_obs_t = np.where(significant_obs_t)[0] 
     
     # Compute t-transformed values and use that to find significant clusters
     print("Plotting observed significant sensors")
@@ -295,13 +319,41 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     t_obs = r_to_t(r_obs, n=n_subjects)
 
     if sig_obs.size > 0:
+        
         sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
         n_comp_obs, labels_obs = connected_components(
             csr_matrix(sub_adj_obs), directed=False, return_labels=True)
-        clusters_obs = {i: sig_obs[labels_obs == i] for i in range(n_comp_obs)}
+        clusters_obs = {i: sig_obs_t[labels_obs == i] for i in range(n_comp_obs)}
+
         print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
         for cid, nodes in clusters_obs.items():
             print(f"  Cluster {cid}: indices {nodes}")
+
+################## testing the clustering ##########################
+        print("Sensor names in each cluster:")
+        for cid, sensor_inds in clusters_obs.items():
+            sensor_names = [info['ch_names'][i] for i in sensor_inds]
+            print(f"  Cluster {cid}: {sensor_names}")
+
+        channel_names = info['ch_names']
+        print(f"Sensors in clusters for {substr}-{band} ({ch_type}):")
+        for cid, sensor_inds in clusters_obs.items():
+            print(f"\nCluster {cid}:")
+            for idx in sensor_inds:
+                name = channel_names[idx]
+                # adjacency is a CSR sparse matrix: adjacency[i] is the i-th row
+                neighbour_inds = adjacency[idx].nonzero()[1]
+                neighbour_names = [channel_names[n] for n in neighbour_inds]
+                
+                print(f"  Sensor {name} (index {idx}) is connected to:")
+                for nb in neighbour_names:
+                    print(f"    • {nb}")
+
+        for i, nm in enumerate(names):
+            print(i, nm, "→ row", i, "in adjacency corresponds to channel", names[i])
+            # Look at which columns in row i are 1
+            print("Neighbors of", names[i], ":", [names[j] for j in adjacency[i].nonzero()[1]])
+##################################################################
 
         cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
@@ -311,7 +363,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         fig, ax = plt.subplots()
 
         # Define the significant clusters
-        mask = sig_obs
+        mask = sig_obs_t
         mask_params = dict(
             marker='o', markerfacecolor='w', markeredgecolor='k',
             linewidth=1, markersize=10
@@ -351,161 +403,160 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         ax.set_title(f'{substr}-{band} Spearman r ({ch_type})- before cluster testing')
         plt.show()
 
-    else:
-        print(f"no significant clusters for {substr}-{band} ({ch_type})")
+        # 2. Build null distribution by shuffling
+        rng = np.random.RandomState(42)
+        max_t_sums_pos = np.zeros(n_permutations)  # to collect max positive cluster sum
+        min_t_sums_neg = np.zeros(n_permutations)  # to collect min negative cluster sum
 
-    # 2. Build null distribution by shuffling
-    rng = np.random.RandomState(42)
-    max_t_sums_pos = np.zeros(n_permutations)  # to collect max positive cluster sum
-    min_t_sums_neg = np.zeros(n_permutations)  # to collect min negative cluster sum
+        print('Running permutation testing for t values...')
+        for p in range(n_permutations):
+            lv_shuff = rng.permutation(lv_vals)
 
-    print('Running permutation testing for t values...')
-    for p in range(n_permutations):
-        lv_shuff = rng.permutation(lv_vals)
+            # compute correlation per sensor
+            results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
 
-        # compute correlation per sensor
-        results = [spearmanr(lv_shuff, li_data[:, i]) for i in range(n_sensors)]
+            r_null = np.array([res.correlation for res in results])
+            t_null = r_to_t(r_null, n=n_subjects)
+            p_null = [res.pvalue for res in results]
 
-        r_null = np.array([res.correlation for res in results])
-        t_null = r_to_t(r_null, n=n_subjects)
-        p_null = [res.pvalue for res in results]
+            significant_nulls = np.array(p_null) < 0.05
+            sig_null = np.where(significant_nulls)[0]
 
-        significant_nulls = np.array(p_null) < 0.05
-        sig_null = np.where(significant_nulls)[0]
+            if sig_null.size > 0:
+                sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+                n_comp_null, labels_null = connected_components(
+                    csr_matrix(sub_adj_null), directed=False, return_labels=True)
+                clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
+                cluster_t_sums = [np.sum(t_null[sensors]) for sensors in clusters_null.values()]
+            
+                # For this permutation, store:
+                pos_sums = [s for s in cluster_t_sums if s > 0]
+                neg_sums = [s for s in cluster_t_sums if s < 0]
 
-        if sig_null.size > 0:
-            sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
-            n_comp_null, labels_null = connected_components(
-                csr_matrix(sub_adj_null), directed=False, return_labels=True)
-            clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-            cluster_t_sums = [np.sum(t_null[sensors]) for sensors in clusters_null.values()]
-        
-            # For this permutation, store:
-            pos_sums = [s for s in cluster_t_sums if s > 0]
-            neg_sums = [s for s in cluster_t_sums if s < 0]
+                max_t_sums_pos[p] = np.max(pos_sums) if pos_sums else 0
+                min_t_sums_neg[p] = np.min(neg_sums) if neg_sums else 0
 
-            max_t_sums_pos[p] = np.max(pos_sums) if pos_sums else 0
-            min_t_sums_neg[p] = np.min(neg_sums) if neg_sums else 0
-
-        else:
-            max_t_sums_pos[p] = 0
-            min_t_sums_neg[p] = 0
+            else:
+                max_t_sums_pos[p] = 0
+                min_t_sums_neg[p] = 0
 
 
-    # Compute two-tailed thresholds
-    upper_threshold = np.percentile(max_t_sums_pos, 95)
-    print(f'upper: {upper_threshold}')
-    lower_threshold = np.percentile(min_t_sums_neg, 5)
-    print(f'lower: {lower_threshold}')
+        # Compute two-tailed thresholds
+        upper_threshold = np.percentile(max_t_sums_pos, 95)
+        print(f'upper: {upper_threshold}')
+        lower_threshold = np.percentile(min_t_sums_neg, 5)
+        print(f'lower: {lower_threshold}')
 
 
-    plt.figure(figsize=(10, 6))
-    plt.hist(max_t_sums_pos, bins=30, color='salmon', edgecolor='black', alpha=0.6, label='Max positive cluster sums')
-    plt.hist(min_t_sums_neg, bins=30, color='lightblue', edgecolor='black', alpha=0.6, label='Min negative cluster sums')
-    plt.axvline(lower_threshold, color='lightblue', linestyle='--', label='2.5th percentile (neg)')
-    plt.axvline(upper_threshold, color='salmon', linestyle='--', label='97.5th percentile (pos)')
-   
-    # Dictionary to store significant clusters
-    significant_clusters = {}
-
-    # Plot observed cluster t sums
-    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        if t_sum_obs > upper_threshold:
-            color = 'green'
-            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
-        elif t_sum_obs < lower_threshold:
-            color = 'green'
-            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
-        else:
-            color = 'yellow'
-            label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f} (ns)'
-
-        plt.axvline(t_sum_obs, color=color, linestyle='-', label=label)
-
-        if color == 'green':
-            if band not in significant_clusters:
-                significant_clusters[band] = {}
-            if substr not in significant_clusters[band]:
-                significant_clusters[band][substr] = {}
-            significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
-
-    plt.title(f'Null Distribution of Max/Min t-sums ({substr}-{band}, {ch_type})')
-    plt.xlabel('Summed t-values in cluster')
-    plt.ylabel('Count')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-
-
-    # Dictionary to store significant clusters based on t-values
-    significant_clusters_t = {}
-
-    for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
-        if t_sum_obs > upper_threshold or t_sum_obs < lower_threshold:
-            # Save significant cluster sensors
-            if band not in significant_clusters_t:
-                significant_clusters_t[band] = {}
-            if substr not in significant_clusters_t[band]:
-                significant_clusters_t[band][substr] = {}
-            significant_clusters_t[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
-            print(f"[t] Significant cluster {cluster_id_obs} for {substr}-{band}: "
-              f"sum(t) = {t_sum_obs:.2f}, sensors = {clusters_obs[cluster_id_obs].tolist()}")
+        plt.figure(figsize=(10, 6))
+        plt.hist(max_t_sums_pos, bins=30, color='salmon', edgecolor='black', alpha=0.6, label='Max positive cluster sums')
+        plt.hist(min_t_sums_neg, bins=30, color='lightblue', edgecolor='black', alpha=0.6, label='Min negative cluster sums')
+        plt.axvline(lower_threshold, color='lightblue', linestyle='--', label='5th percentile (neg)')
+        plt.axvline(upper_threshold, color='salmon', linestyle='--', label='95th percentile (pos)')
     
-    if band in significant_clusters_t and substr in significant_clusters_t[band] and significant_clusters_t[band][substr]:
-        # Flatten all sensor indices in significant clusters for this band and substr
-        all_sig_indices = []
-        for cluster_id, indices in significant_clusters_t[band][substr].items():
-            all_sig_indices.extend(indices)
+        # Dictionary to store significant clusters
+        significant_clusters = {}
 
-        # 5. Visualize topomap with significant mask and cluster labels
-        fig, ax = plt.subplots()
+        # Plot observed cluster t sums
+        for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
+            if t_sum_obs > upper_threshold:
+                color = 'green'
+                label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
+            elif t_sum_obs < lower_threshold:
+                color = 'green'
+                label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f}'
+            else:
+                color = 'yellow'
+                label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f} (ns)'
 
-        # Define the significant clusters
-        del mask
-        mask_params = dict(
-            marker='o', markerfacecolor='w', markeredgecolor='k',
-            linewidth=1, markersize=10
-        ) 
+            plt.axvline(t_sum_obs, color=color, linestyle='-', label=label)
 
-        # Prepare the data for visualisation
-        """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-        if ch_type == 'grad':
-            # mask = mask[::2]  # old way
+            if color == 'green':
+                if band not in significant_clusters:
+                    significant_clusters[band] = {}
+                if substr not in significant_clusters[band]:
+                    significant_clusters[band][substr] = {}
+                significant_clusters[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
 
-            # Convert sig_obs (indices) to boolean mask
-            # new way
-            t_obs1 = t_obs[::2]
-            t_obs2 = t_obs[1::2]
-            min_len = min(len(t_obs1), len(t_obs2))
-            t_obs = (t_obs1[:min_len] + t_obs2[:min_len]) / 2
-
-            # Same logic for mask
-            sig_obs = np.array(sig_obs, dtype=bool)
-            mask1 = sig_obs[::2][:min_len]
-            mask2 = sig_obs[1::2][:min_len]
-            mask = mask1 | mask2
-            # end of new way
-
-            del info  # refresh info for plotting only in grad
-            info = other[0]  # this is from read_raw_info when running with ch_type='grad'
-        else:
-            # Create mask for mag
-            mask = np.zeros(n_sensors, dtype=bool)
-            mask[all_sig_indices] = True
-
-        # Plot topomap
-        im, cn = mne.viz.plot_topomap(
-            t_obs, info, mask=mask, mask_params=mask_params,
-            vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
-            cmap='RdBu_r', show=False, axes=ax
-        )  
-        cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
-        cbar.ax.tick_params(labelsize=10)
-        cbar.set_label('Correlation Values', fontsize=14)
-        ax.set_xlim(0, )  # remove the left half of topoplot
-        ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
+        plt.title(f'Null Distribution of Max/Min t-sums ({substr}-{band}, {ch_type})')
+        plt.xlabel('Summed t-values in cluster')
+        plt.ylabel('Count')
+        plt.legend()
+        plt.tight_layout()
         plt.show()
 
+
+        # Dictionary to store significant clusters based on t-values
+        significant_clusters_t = {}
+
+        for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
+            if t_sum_obs > upper_threshold or t_sum_obs < lower_threshold:
+                # Save significant cluster sensors
+                if band not in significant_clusters_t:
+                    significant_clusters_t[band] = {}
+                if substr not in significant_clusters_t[band]:
+                    significant_clusters_t[band][substr] = {}
+                significant_clusters_t[band][substr][f'cluster_{cluster_id_obs}'] = clusters_obs[cluster_id_obs].tolist()
+                print(f"[t] Significant cluster {cluster_id_obs} for {substr}-{band}: "
+                f"sum(t) = {t_sum_obs:.2f}, sensors = {clusters_obs[cluster_id_obs].tolist()}")
+        
+        if band in significant_clusters_t and substr in significant_clusters_t[band] and significant_clusters_t[band][substr]:
+            # Flatten all sensor indices in significant clusters for this band and substr
+            all_sig_indices = []
+            for cluster_id, indices in significant_clusters_t[band][substr].items():
+                all_sig_indices.extend(indices)
+
+            # 5. Visualize topomap with significant mask and cluster labels
+            fig, ax = plt.subplots()
+
+            # Define the significant clusters
+            del mask
+            mask_params = dict(
+                marker='o', markerfacecolor='w', markeredgecolor='k',
+                linewidth=1, markersize=10
+            ) 
+
+            # Prepare the data for visualisation
+            """combines planar gradiometer to use mag info (to plot positive and negative values)"""
+            if ch_type == 'grad':
+                # mask = mask[::2]  # old way
+
+                # Convert sig_obs (indices) to boolean mask
+                # new way
+                t_obs1 = t_obs[::2]
+                t_obs2 = t_obs[1::2]
+                min_len = min(len(t_obs1), len(t_obs2))
+                t_obs = (t_obs1[:min_len] + t_obs2[:min_len]) / 2
+
+                # Same logic for mask
+                sig_obs = np.array(sig_obs, dtype=bool)
+                mask1 = sig_obs[::2][:min_len]
+                mask2 = sig_obs[1::2][:min_len]
+                mask = mask1 | mask2
+                # end of new way
+
+                del info  # refresh info for plotting only in grad
+                info = other[0]  # this is from read_raw_info when running with ch_type='grad'
+            else:
+                # Create mask for mag
+                mask = np.zeros(n_sensors, dtype=bool)
+                mask[all_sig_indices] = True
+
+            # Plot topomap
+            im, cn = mne.viz.plot_topomap(
+                t_obs, info, mask=mask, mask_params=mask_params,
+                vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
+                cmap='RdBu_r', show=False, axes=ax
+            )  
+            cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
+            cbar.ax.tick_params(labelsize=10)
+            cbar.set_label('Correlation Values', fontsize=14)
+            ax.set_xlim(0, )  # remove the left half of topoplot
+            ax.set_title(f'{substr}-{band} Spearman r ({ch_type})')
+            plt.show()
+
+    else:
+        print(f"no significant clusters for {substr}-{band} ({ch_type})")
 
 def cluster_permutation():
     platform = 'mac'  # or 'bluebear'
@@ -516,6 +567,15 @@ def cluster_permutation():
     band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
     ch_type = input('Enter sensortype (mag or grad):').strip()
     run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
+
+    # or run on all
+    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
+    ch_types = ['mag']
+    for substr in substrs:
+        for band in bands:
+            for ch_type in ch_types:
+                run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
 if __name__ == "__main__":
     cluster_permutation()
