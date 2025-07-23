@@ -837,3 +837,29 @@ plt.show()
     plt.show()
 
 
+
+################## testing the clustering ##########################
+        print("Sensor names in each cluster:")
+        for cid, sensor_inds in clusters_obs.items():
+            sensor_names = [info['ch_names'][i] for i in sensor_inds]
+            print(f"  Cluster {cid}: {sensor_names}")
+
+        channel_names = info['ch_names']
+        print(f"Sensors in clusters for {substr}-{band} ({ch_type}):")
+        for cid, sensor_inds in clusters_obs.items():
+            print(f"\nCluster {cid}:")
+            for idx in sensor_inds:
+                name = channel_names[idx]
+                # adjacency is a CSR sparse matrix: adjacency[i] is the i-th row
+                neighbour_inds = adjacency[idx].nonzero()[1]
+                neighbour_names = [channel_names[n] for n in neighbour_inds]
+                
+                print(f"  Sensor {name} (index {idx}) is connected to:")
+                for nb in neighbour_names:
+                    print(f"    • {nb}")
+
+        for i, nm in enumerate(names):
+            print(i, nm, "→ row", i, "in adjacency corresponds to channel", names[i])
+            # Look at which columns in row i are 1
+            print("Neighbors of", names[i], ":", [names[j] for j in adjacency[i].nonzero()[1]])
+##################################################################

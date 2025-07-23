@@ -309,53 +309,35 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 #     for cid, nodes in clusters_obs.items():
 #         print(f"  Cluster {cid}: indices {nodes} → names {[names[n] for n in nodes]}")
     
-    p_obs_t = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
-    significant_obs_t = np.array(p_obs_t) < 0.05
-    sig_obs_t = np.where(significant_obs_t)[0] 
-    
-    # Compute t-transformed values and use that to find significant clusters
-    print("Plotting observed significant sensors")
-    n_subjects = len(lv_vals)
-    t_obs = r_to_t(r_obs, n=n_subjects)
+    p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
+    significant_obs = p_obs < 0.05
+    sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()  # this gives name of sensor pairs
+    sig_chan_names = [pair.split('_')[1] for pair in sig_pairs]  # use channel names to find the correct index in adjacency. 
+                                                                 # adjacency and filtered_df indices do not align
+    sig_obs = np.where(significant_obs)[0]  
 
     if sig_obs.size > 0:
-        
-        sub_adj_obs = adjacency[np.ix_(sig_obs, sig_obs)]
+
+        index_in_adjacency = np.array([names.index(ch) for ch in sig_chan_names])
+        sub_adj_obs = adjacency[np.ix_(index_in_adjacency, index_in_adjacency)]
         n_comp_obs, labels_obs = connected_components(
             csr_matrix(sub_adj_obs), directed=False, return_labels=True)
-        clusters_obs = {i: sig_obs_t[labels_obs == i] for i in range(n_comp_obs)}
+        clusters_obs = {i: index_in_adjacency[labels_obs == i] for i in range(n_comp_obs)}  # for the adjacency indices
+        clusters_rt_obs = {
+            i: np.array([sig_obs[idx] for idx, _ in enumerate(index_in_adjacency[np.where(labels_obs == i)[0]])])
+            for i in range(n_comp_obs)
+        }  # for the r_obs and t_obs indices (filtered_df)
 
         print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
         for cid, nodes in clusters_obs.items():
-            print(f"  Cluster {cid}: indices {nodes}")
+            print(f"  Cluster {cid}: indices {nodes} -> channels: {[names[ch] for ch in nodes]}")
+    
+        # Compute t-transformed values and use that to find significant clusters
+        print("Plotting observed significant sensors")
+        n_subjects = len(lv_vals)
+        t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to sig_obs and not adjacency
 
-################## testing the clustering ##########################
-        print("Sensor names in each cluster:")
-        for cid, sensor_inds in clusters_obs.items():
-            sensor_names = [info['ch_names'][i] for i in sensor_inds]
-            print(f"  Cluster {cid}: {sensor_names}")
-
-        channel_names = info['ch_names']
-        print(f"Sensors in clusters for {substr}-{band} ({ch_type}):")
-        for cid, sensor_inds in clusters_obs.items():
-            print(f"\nCluster {cid}:")
-            for idx in sensor_inds:
-                name = channel_names[idx]
-                # adjacency is a CSR sparse matrix: adjacency[i] is the i-th row
-                neighbour_inds = adjacency[idx].nonzero()[1]
-                neighbour_names = [channel_names[n] for n in neighbour_inds]
-                
-                print(f"  Sensor {name} (index {idx}) is connected to:")
-                for nb in neighbour_names:
-                    print(f"    • {nb}")
-
-        for i, nm in enumerate(names):
-            print(i, nm, "→ row", i, "in adjacency corresponds to channel", names[i])
-            # Look at which columns in row i are 1
-            print("Neighbors of", names[i], ":", [names[j] for j in adjacency[i].nonzero()[1]])
-##################################################################
-
-        cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_obs.items()}
+        cluster_t_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_rt_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_sums_obs.items():
             print(f"Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
 
@@ -363,7 +345,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         fig, ax = plt.subplots()
 
         # Define the significant clusters
-        mask = sig_obs_t
+        mask = sig_obs
         mask_params = dict(
             marker='o', markerfacecolor='w', markeredgecolor='k',
             linewidth=1, markersize=10
@@ -420,14 +402,24 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             p_null = [res.pvalue for res in results]
 
             significant_nulls = np.array(p_null) < 0.05
+            sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs
+            sig_chan_names_null = [pair.split('_')[1] for pair in sig_pairs_null]  # use channel names to find the correct index in adjacency. 
             sig_null = np.where(significant_nulls)[0]
 
             if sig_null.size > 0:
-                sub_adj_null = adjacency[np.ix_(sig_null, sig_null)]
+
+                index_in_adjacency_null = np.array([names.index(ch) for ch in sig_chan_names_null])
+                sub_adj_null = adjacency[np.ix_(index_in_adjacency_null, index_in_adjacency_null)]
+                print(sub_adj_null.data)
                 n_comp_null, labels_null = connected_components(
                     csr_matrix(sub_adj_null), directed=False, return_labels=True)
-                clusters_null = {i: sig_null[labels_null == i] for i in range(n_comp_null)}
-                cluster_t_sums = [np.sum(t_null[sensors]) for sensors in clusters_null.values()]
+                clusters_null = {i: index_in_adjacency_null[labels_obs == i] for i in range(n_comp_null)}  # for the adjacency indices
+                clusters_rt_null = {
+                    i: np.array([sig_null[idx] for idx, _ in enumerate(index_in_adjacency_null[np.where(labels_null == i)[0]])])
+                    for i in range(n_comp_null)
+                }  # for the r_obs and t_obs indices (filtered_df)
+
+                cluster_t_sums = [np.sum(t_null[sensors]) for sensors in clusters_rt_null.values()]
             
                 # For this permutation, store:
                 pos_sums = [s for s in cluster_t_sums if s > 0]
