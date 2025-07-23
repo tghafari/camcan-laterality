@@ -101,6 +101,14 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
     return epochspectrum
 
+def combine_planar_gradiometers(sensor_name, psd_sensor_name):
+    if sensor_name.endswith('3'):
+        if np.diff(int(sensor_name[i][-4]), int(sensor_name[i+1][-4])) == 1:
+            combined_power = np.sqrt(psd_sensor_name[i] ** 2 + psd_sensor_name[i+1] ** 2)
+    
+    return combined_power
+
+
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
         from epochspectrum (output of previous function).
