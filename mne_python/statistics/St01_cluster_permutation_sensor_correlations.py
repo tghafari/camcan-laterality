@@ -235,7 +235,10 @@ def find_custom_adjacency(info, ch_type, plot_all=False):
     return adjacency, names
 
 def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000, plot_adj=False, draw_cluster_lines=False, plot_topo_nulls=False):
-    """Performs cluster-based permutation test on Spearman correlations between sensor lateralized power and subcortical volumes."""
+    """Performs cluster-based permutation test on Spearman correlations between sensor 
+    lateralised power and subcortical volumes."""
+   
+    ############################## LOAD AND PREPARE DATA ##############################
     lv_df = pd.read_csv(paths['LV_csv'])
     
     # this line receives three outputs if 'grad' and two if 'mag'. 
@@ -288,6 +291,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
     central_sensors = ['MEG0811', 'MEG1011','MEG2121']  # should be ignored in cluster testing
     central_sensor_indices = [11, 12, 30]
+
+    ############################## OBSERVED CLUSTERS ##############################
     significant_obs = p_obs < 0.05
     sig_obs = np.where(significant_obs)[0]  
     # Keep only those indices in sig_obs that are not in central_sensor_indices
@@ -327,7 +332,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
             print(f"Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
 
-    # Plot significant sensors before cluster permutations
+    ############################## TOPOPLOT OBSERVED CLUSTERS ##############################
     fig, ax = plt.subplots()
 
     # Prepare the data for visualisation
@@ -393,7 +398,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})- before cluster testing')
     plt.show()
 
-########################## Permutation testing #####################################
+    ############################## PERMUTATION TESTING ##############################
     if sig_obs.size > 0:
         # 2. Build null distribution by shuffling
         rng = np.random.RandomState(42)
@@ -412,12 +417,13 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             p_null = [res.pvalue for res in results]
 
             significant_nulls = np.array(p_null) < 0.05
+            sig_null = np.where(significant_nulls)[0]
+            sig_null = sig_null[~np.isin(sig_null, central_sensor_indices)]
             sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs
             sig_chan_names_null = [pair.split('_')[1] for pair in sig_pairs_null]  # use channel names to find the correct index in adjacency. 
-            sig_null = np.where(significant_nulls)[0]
+            sig_chan_names_null = [ch for ch in sig_chan_names_null if ch not in central_sensors]
 
             if sig_null.size > 0:
-
                 index_in_adjacency_null = np.array([names.index(ch) for ch in sig_chan_names_null])
                 sub_adj_null = adjacency[np.ix_(index_in_adjacency_null, index_in_adjacency_null)]
                 n_comp_null, labels_null = connected_components(
@@ -428,7 +434,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                     for i in range(n_comp_null)}  # for the r_obs and t_obs indices (filtered_df)
 
                 if plot_topo_nulls:
-
                     # Compute t-transformed values and use that to find significant clusters
                     print("Plotting null significant sensors")
 
@@ -488,7 +493,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                 max_t_sums_pos[p] = 0
                 min_t_sums_neg[p] = 0
 
-
+        ############################## EVALUATE CLUSTER SIGNIFICANCE ##############################
         # Compute two-tailed thresholds
         upper_threshold = np.percentile(max_t_sums_pos, 95)
         print(f'upper: {upper_threshold}')
@@ -531,6 +536,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         plt.legend()
         plt.tight_layout()
         plt.show()
+
+        ############################## FINAL TOPOPLOT FOR SIGNIFICANT CLUSTERS ##############################
 
         # Dictionary to store significant clusters based on t-values
         significant_clusters_t = {}
