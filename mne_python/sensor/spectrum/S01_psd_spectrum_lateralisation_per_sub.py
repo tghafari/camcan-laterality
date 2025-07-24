@@ -139,13 +139,14 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> 
                 # Combine via root-sum-square
                 rss = np.sqrt(psd_data[:, i, :] ** 2 + psd_data[:, j, :] ** 2)
                 combined_psd.append(rss)
-                combined_ch_names.append(ch_name)
+                combined_ch_names.append(ch_name)  
                 combined_ch_indices.append(i)
 
                 used.update([ch_name, pair_name])
 
     # Stack combined data
     combined_psd_stckd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
+    combined_ch_names_indx = np.stack(combined_ch_names, combined_ch_indices, axis=1)
 
     # Prepare new info object
     new_info = mne.create_info(
@@ -298,6 +299,9 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
                                                                                     row['right_sensors'][0:8], 
                                                                                     row['left_sensors'][0:8])
              elif row['right_sensors'][0:8].endswith('2'):
+                 find row['right_sensors'][0:8] in combined_ch_names and find the corresponding Index
+                 then find the psd corresponding to that Index
+                 do the same thing for row['left_sensor'][0:8]
                 # find the index of the sensor with the name and fetch the data from combined_epoch...
             # Find outliers
              outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
