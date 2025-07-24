@@ -278,27 +278,41 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
-             print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
+            print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
-             if row['right_sensors'][0:8].endswith('1') and row['left_sensors'][0:8].endswith('1'):
-                psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
+            if row['right_sensors'][0:8].endswith('1') and row['left_sensors'][0:8].endswith('1'):
+               psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                     row['right_sensors'][0:8], 
                                                                                     row['left_sensors'][0:8])
-             elif row['right_sensors'][0:8].endswith('2') and row['left_sensors'][0:8].endswith('2'):                
+            elif row['right_sensors'][0:8].endswith('2') and row['left_sensors'][0:8].endswith('2'):                
                 # Find the indices for the right and left sensors
-                right_sensor_index = find_sensor_index(row['right_sensors'][0:8], combined_ch_names_indx)
-                left_sensor_index = find_sensor_index(row['left_sensors'][0:8], combined_ch_names_indx)
-                psd_right_sensor = combined_psd_stckd[:, right_sensor_index, :]
-                psd_left_sensor = combined_psd_stckd[:, left_sensor_index, :]
+               right_sensor_index = find_sensor_index(row['right_sensors'][0:8], combined_ch_names_indx)
+               left_sensor_index = find_sensor_index(row['left_sensors'][0:8], combined_ch_names_indx)
+               psd_right_sensor = combined_psd_stckd[:, right_sensor_index, :]
+               psd_left_sensor = combined_psd_stckd[:, left_sensor_index, :]
+
+            elif row['right_sensors'][0:8].endswith('3') and row['left_sensors'][0:8].endswith('3'):
+                print('Gradiometers ending in 3 have been combined with 2. Reading next sensor')
+
+
+            else:
+                # Error handling for mismatched right and left sensor ends
+                if row['right_sensors'][0:8][-1] != row['left_sensors'][0:8][-1]:
+                    raise ValueError("Wrong right-left correspondence in the sensor layout sheet. "
+                                 "Right and Left sensors must end in the same digit (e.g., both '1', '2', or '3').")
+
+                # Error handling for cases where none of the conditions match
+                raise ValueError("Sensor pair does not meet any of the conditions (right/left sensor must end in '1', '2', or '3').")
+
 
 
             # Find outliers
-             outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
+            outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
                                                           row['right_sensors'][0:8], row['left_sensors'][0:8],
                                                           subjectID, outlier_subjectID_df, 
                                                           quantile_dict_mag, quantile_dict_grad)
             
-             if not outlier:
+            if not outlier:
                 subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
                 # Remove noise bias
