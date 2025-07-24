@@ -101,12 +101,75 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
     return epochspectrum
 
-def combine_planar_gradiometers(sensor_name, psd_sensor_name):
-    if sensor_name.endswith('3'):
-        if np.diff(int(sensor_name[i][-4]), int(sensor_name[i+1][-4])) == 1:
-            combined_power = np.sqrt(psd_sensor_name[i] ** 2 + psd_sensor_name[i+1] ** 2)
+import numpy as np
+import mne
+from mne.time_frequency import EpochsSpectrum
+from copy import deepcopy
+
+def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> EpochsSpectrum:
+    """
+    Combine planar gradiometer pairs (e.g., MEG2422 + MEG2423) using root-sum-square (RSS)
+    and return a new EpochsSpectrum object with only combined planar sensors.
     
-    return combined_power
+    Parameters
+    ----------
+    epochspectrum : mne.time_frequency.EpochsSpectrum
+        Input EpochsSpectrum object (e.g., from `epochs.compute_psd()`).
+    
+    Returns
+    -------
+    combined_epochspectrum : mne.time_frequency.EpochsSpectrum
+        A new EpochsSpectrum with only combined planar sensors.
+        Each sensor name ends in '2' (from the original pair).
+    """
+    psd_data, freqs = epochspectrum.get_data(return_freqs=True)  # Shape: (n_epochs, n_sensors, n_freqs)
+    sensor_names = epochspectrum.info['ch_names']
+    info = epochspectrum.info
+
+    combined_psd = []
+    combined_ch_names = []
+    combined_ch_indices = []
+    used = set()
+
+    for i, ch_name in enumerate(sensor_names):
+        if ch_name.endswith('2') and ch_name not in used:
+            pair_name = ch_name[:-1] + '3'
+            if pair_name in sensor_names:
+                j = sensor_names.index(pair_name)
+
+                # Combine via root-sum-square
+                rss = np.sqrt(psd_data[:, i, :] ** 2 + psd_data[:, j, :] ** 2)
+                combined_psd.append(rss)
+                combined_ch_names.append(ch_name)
+                combined_ch_indices.append(i)
+
+                used.update([ch_name, pair_name])
+
+    # Stack combined data
+    combined_psd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
+
+    # Prepare new info object
+    new_info = mne.create_info(
+        ch_names=combined_ch_names,
+        sfreq=epochspectrum.info['sfreq'],
+        ch_types=['grad'] * len(combined_ch_names)
+    )
+
+    # Copy metadata from original info for each channel
+    for idx, ch_name in enumerate(combined_ch_names):
+        orig_idx = sensor_names.index(ch_name)
+        new_info['chs'][idx] = deepcopy(info['chs'][orig_idx])
+
+    # Create new EpochsSpectrum object
+    combined_epochspectrum = EpochsSpectrum(
+        info=new_info,
+        data=combined_psd,
+        freqs=freqs,
+        metadata=epochspectrum.metadata,
+        method=epochspectrum.method
+    )
+
+    return combined_epochspectrum
 
 
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
@@ -225,6 +288,7 @@ for i, subjectID in enumerate(good_subject_pd.index):
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
         epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
+        combined_spectrum = combine_planar_gradiometers_epochspectrum(epochspectrum)
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
