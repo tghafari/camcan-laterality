@@ -105,7 +105,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
     return epochspectrum
 
-def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> EpochsSpectrum:
+def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum):
     """
     Combine planar gradiometer pairs (e.g., MEG2422 + MEG2423) using root-sum-square (RSS)
     and return a new EpochsSpectrum object with only combined planar sensors.
@@ -121,9 +121,8 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> 
         A new EpochsSpectrum with only combined planar sensors.
         Each sensor name ends in '2' (from the original pair).
     """
-    psd_data, freqs = epochspectrum.get_data(return_freqs=True)  # Shape: (n_epochs, n_sensors, n_freqs)
+    psd_data, _ = epochspectrum.get_data(return_freqs=False)  # Shape: (n_epochs, n_sensors, n_freqs)
     sensor_names = epochspectrum.info['ch_names']
-    info = epochspectrum.info
 
     combined_psd = []
     combined_ch_names = []
@@ -146,31 +145,18 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> 
 
     # Stack combined data
     combined_psd_stckd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
-    combined_ch_names_indx = np.stack(combined_ch_names, combined_ch_indices, axis=1)
+    combined_ch_names_indx = np.stack([combined_ch_names, combined_ch_indices], axis=1)
 
-    # Prepare new info object
-    new_info = mne.create_info(
-        ch_names=combined_ch_names,
-        sfreq=epochspectrum.info['sfreq'],
-        ch_types=['grad'] * len(combined_ch_names)
-    )
+    return combined_psd_stckd, combined_ch_names_indx
 
-    # Copy metadata from original info for each channel
-    for idx, ch_name in enumerate(combined_ch_names):
-        orig_idx = sensor_names.index(ch_name)
-        new_info['chs'][idx] = deepcopy(info['chs'][orig_idx])
-
-    # Create new EpochsSpectrum object
-    combined_epochspectrum = EpochsSpectrum(
-        info=new_info,
-        data=combined_psd,
-        freqs=freqs,
-        metadata=epochspectrum.metadata,
-        method=epochspectrum.method
-    )
-
-    return combined_epochspectrum
-
+# Function to find the index in combined_ch_names_indx
+def find_sensor_index(sensor_name, combined_ch_names_indx):
+    """ this function finds the corresponding index to the channel name.
+    we will then use this to read psd from combined psd"""
+    for ch_name, ch_index in combined_ch_names_indx:
+        if ch_name == sensor_name:
+            return int(ch_index)
+    return None  # If not found
 
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
     """this code will pick sensor pairs for calculating lateralisation 
@@ -288,21 +274,24 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
         epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
-        combined_spectrum = combine_planar_gradiometers_epochspectrum(epochspectrum)
+        combined_psd_stckd, combined_ch_names_indx = combine_planar_gradiometers_epochspectrum(epochspectrum)
 
          # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
              print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
-             if row['right_sensors'][0:8].endswith('1'):
+             if row['right_sensors'][0:8].endswith('1') and row['left_sensors'][0:8].endswith('1'):
                 psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                     row['right_sensors'][0:8], 
                                                                                     row['left_sensors'][0:8])
-             elif row['right_sensors'][0:8].endswith('2'):
-                 find row['right_sensors'][0:8] in combined_ch_names and find the corresponding Index
-                 then find the psd corresponding to that Index
-                 do the same thing for row['left_sensor'][0:8]
-                # find the index of the sensor with the name and fetch the data from combined_epoch...
+             elif row['right_sensors'][0:8].endswith('2') and row['left_sensors'][0:8].endswith('2'):                
+                # Find the indices for the right and left sensors
+                right_sensor_index = find_sensor_index(row['right_sensors'][0:8], combined_ch_names_indx)
+                left_sensor_index = find_sensor_index(row['left_sensors'][0:8], combined_ch_names_indx)
+                psd_right_sensor = combined_psd_stckd[:, right_sensor_index, :]
+                psd_left_sensor = combined_psd_stckd[:, left_sensor_index, :]
+
+
             # Find outliers
              outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
                                                           row['right_sensors'][0:8], row['left_sensors'][0:8],
