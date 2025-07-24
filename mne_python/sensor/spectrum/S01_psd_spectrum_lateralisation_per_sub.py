@@ -39,8 +39,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import mne
+from mne.time_frequency import EpochsSpectrum
 from scipy import stats
 import json
+from copy import deepcopy
 
 
 platform = 'mac'  # are you running on bluebear or windows or mac?
@@ -49,21 +51,23 @@ test_plot = False  # do you want sanity check plots?
 
 # Define where to read and write the data
 if platform == 'bluebear':
-    rds_dir = '/rds/projects/q/quinna-camcan'
+    quinna_dir = '/rds/projects/q/quinna-camcan'
+    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
 elif platform == 'mac':
-    rds_dir = '/Volumes/quinna-camcan'
+    quinna_dir = '/Volumes/quinna-camcan'
+    sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
 
-epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
-info_dir = op.join(rds_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
+epoched_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50')
+info_dir = op.join(quinna_dir, 'dataman/data_information')
+final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
 
 # Read only data from subjects with good preprocessed data
-good_subject_pd = pd.read_csv(good_sub_sheet)
-good_subject_pd = good_subject_pd.set_index('Unnamed: 0')  # set subject id codes as the index
+final_subject_pd = pd.read_csv(final_sub_sheet)
+final_subject_ls = final_subject_pd.to_numpy().flatten().tolist()
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
@@ -100,11 +104,6 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
                                         verbose=True)
 
     return epochspectrum
-
-import numpy as np
-import mne
-from mne.time_frequency import EpochsSpectrum
-from copy import deepcopy
 
 def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> EpochsSpectrum:
     """
@@ -146,7 +145,7 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum) -> 
                 used.update([ch_name, pair_name])
 
     # Stack combined data
-    combined_psd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
+    combined_psd_stckd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
 
     # Prepare new info object
     new_info = mne.create_info(
@@ -277,7 +276,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(good_subject_pd.index):
+for i, subjectID in enumerate(final_subject_ls[:10]):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -294,9 +293,12 @@ for i, subjectID in enumerate(good_subject_pd.index):
         for _, row in sensors_layout_names_df.iterrows():
              print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
                    
-             psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
-                                                                                   row['right_sensors'][0:8], 
-                                                                                   row['left_sensors'][0:8])
+             if row['right_sensors'][0:8].endswith('1'):
+                psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
+                                                                                    row['right_sensors'][0:8], 
+                                                                                    row['left_sensors'][0:8])
+             elif row['right_sensors'][0:8].endswith('2'):
+                # find the index of the sensor with the name and fetch the data from combined_epoch...
             # Find outliers
              outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
                                                           row['right_sensors'][0:8], row['left_sensors'][0:8],
