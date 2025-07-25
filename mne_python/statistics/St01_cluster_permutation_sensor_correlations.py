@@ -416,7 +416,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             t_null = r_to_t(r_null, n=n_subjects)
             p_null = [res.pvalue for res in results]
 
-            significant_nulls = np.array(p_null) < 0.05
+            significant_nulls = np.array(p_null) < 0.05  # -> change to max stat on t use the line of code Andrew sent
             sig_null = np.where(significant_nulls)[0]
             sig_null = sig_null[~np.isin(sig_null, central_sensor_indices)]
             sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs

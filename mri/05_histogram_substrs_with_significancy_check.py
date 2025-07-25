@@ -36,13 +36,14 @@ elif platform == 'mac':
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')
+# outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')  # don't remember how the outlier was calculated for psd here
 final_sub_list_path = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and lateralised power nonoise_subtraction_abs_thresh
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')
 lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_nooutliers.csv')
 lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')
+outlier_subjectID_vol_fname = op.join(info_dir, 'outlier_subjectID_vol.csv')
 substr_vol_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
 output_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/volume-plots')
 
@@ -82,6 +83,7 @@ def find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2):
                 # Append the subject ID and structure name to the outlier DataFrame
                 outlier_subjectID_vol_df = pd.concat([outlier_subjectID_vol_df, temp_outlier_df], ignore_index=True)
                 del temp_outlier_df  # cleanup before moving on
+                outlier_subjectID_vol_df.to_csv(outlier_subjectID_vol_fname)
 
     return outlier_subjectID_vol_df
 
@@ -107,11 +109,11 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
     by shades of the colormap.
     """
     
-    if old_outliers:
+    if old_outliers:  # this is removing volume outliers (<0.01 quantile) and psd outliers that I don't remember how were calculated
         # Load volume data
         substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
         good_subjects_df = pd.read_csv(good_sub_sheet)
-        outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
+        # outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
         outlier_subjectID_vol_df = pd.DataFrame(columns=['SubjectID', 'structure'])  # initialise a dataframe for volume outliers
 
         outlier_subjectID_vol_df = find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2)
@@ -125,7 +127,7 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
         
         # Filter to include only good subjects, exclude psd and volume outliers
         substr_vol_df = substr_vol_df[substr_vol_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-        substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
+        # substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
         substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
 
         # Load lateralisation volume data and preprocess
@@ -137,7 +139,7 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
         
         # Filter to include only good subjects, exclude psd and volume outliers
         substr_lat_df = substr_lat_df[substr_lat_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-        substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
+        # substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]  # by removing these two lines I"m only removing volume outliers- will do the psd outliers in later stages
         substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
 
         # Save lateralisation index df without outliers
