@@ -90,7 +90,8 @@ elif platform == 'mac':
 # Define the directory 
 info_dir = op.join(rds_dir, 'dataman/data_information')
 deriv_dir = op.join(rds_dir, 'derivatives') 
-spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')  #psd outliers removed
+# spectra_dir probably needs to be changed to the new one with no vol or psd outlier
+spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')  #psd outliers removed 
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
 lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_nooutliers.csv')  # vol and psd outliers removed- this is old list from 05_histogram
