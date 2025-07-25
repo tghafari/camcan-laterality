@@ -60,11 +60,22 @@ elif platform == 'mac':
 epoched_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(quinna_dir, 'dataman/data_information')
 good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')  # better to use this sheet to remove outliers here from the full subject list
+volume_sheet_dir = 'derivatives/mri/lateralized_index'
+lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # list of subjects with no volume outlier
 final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')
 sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
 output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh_combnd-grads')
 
-# Read only data from subjects with good preprocessed data
+# Read only data from subjects with good preprocessed data and Remove CC prefix from good subjects and convert to strings for comparison
+good_subjects_df = pd.read_csv(good_sub_sheet)
+good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
+
+# Find subjects that are not vol outliers
+no_vol_outlier_lat_df = pd.read_csv(lat_sheet_fname_nooutlier)
+no_vol_outlier_subs_df = good_subjects_df[good_subjects_df['SubjectID'].isin(no_vol_outlier_lat_df['SubjectID'])]
+# jsut make sure this works in the script
+
+# Don't use the final list now, find outliers after combining grads
 final_subject_pd = pd.read_csv(final_sub_sheet)
 final_subject_ls = final_subject_pd.to_numpy().flatten().tolist()
 
@@ -264,7 +275,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(final_subject_ls):
+for i, subjectID in enumerate(no_vol_outlier_subs_df):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -371,9 +382,9 @@ if test_plot:
         plt.close()
 
     for _ in to_tests:
-        random_index = np.random.randint(0, len(final_subject_ls))
+        random_index = np.random.randint(0, len(no_vol_outlier_subs_df))
         # Get the subject ID at the random index
-        subjectID = final_subject_ls.iloc[random_index]['SubjectID'][2:]
+        subjectID = no_vol_outlier_subs_df.iloc[random_index]['SubjectID'][2:]
         epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
         epoched_fif = op.join(epoched_dir, epoched_fname)
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs

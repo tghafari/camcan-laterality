@@ -40,11 +40,11 @@ good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
 final_sub_list_path = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and lateralised power nonoise_subtraction_abs_thresh
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
-lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')
-lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_nooutliers.csv')
-lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')
-outlier_subjectID_vol_fname = op.join(info_dir, 'outlier_subjectID_vol.csv')
 substr_vol_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
+lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')
+lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # used in old outlier section (only volume outlier)
+lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')  # used with final list of subs
+outlier_subjectID_vol_fname = op.join(info_dir, 'outlier_subjectID_vol.csv')  # this only contains vol outliers
 output_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/volume-plots')
 
 old_outliers = False  # this ensures we use the final list of subjects rather than old outlier removal
