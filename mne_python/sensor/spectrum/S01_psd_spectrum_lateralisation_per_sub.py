@@ -44,10 +44,8 @@ from scipy import stats
 import json
 from copy import deepcopy
 
-
 platform = 'mac'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
-
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -61,9 +59,10 @@ elif platform == 'mac':
 
 epoched_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(quinna_dir, 'dataman/data_information')
+good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')  # better to use this sheet to remove outliers here from the full subject list
 final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')
-sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
+output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh_combnd-grads')
 
 # Read only data from subjects with good preprocessed data
 final_subject_pd = pd.read_csv(final_sub_sheet)
@@ -105,7 +104,7 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
     return epochspectrum
 
-def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum):
+def combine_planar_gradiometers_epochspectrum(epochspectrum):
     """
     Combine planar gradiometer pairs (e.g., MEG2422 + MEG2423) using root-sum-square (RSS)
     and return a new EpochsSpectrum object with only combined planar sensors.
@@ -121,7 +120,8 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum):
         A new EpochsSpectrum with only combined planar sensors.
         Each sensor name ends in '2' (from the original pair).
     """
-    psd_data, _ = epochspectrum.get_data(return_freqs=False)  # Shape: (n_epochs, n_sensors, n_freqs)
+    print('Combining planar gradiometers.')
+    psd_data, freqs = epochspectrum.get_data(return_freqs=True)  # Shape: (n_epochs, n_sensors, n_freqs) (1, 306, 239)
     sensor_names = epochspectrum.info['ch_names']
 
     combined_psd = []
@@ -139,7 +139,7 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum):
                 rss = np.sqrt(psd_data[:, i, :] ** 2 + psd_data[:, j, :] ** 2)
                 combined_psd.append(rss)
                 combined_ch_names.append(ch_name)  
-                combined_ch_indices.append(i)
+                combined_ch_indices.append(i)  # the index in the full channel order
 
                 used.update([ch_name, pair_name])
 
@@ -147,15 +147,16 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum: EpochsSpectrum):
     combined_psd_stckd = np.stack(combined_psd, axis=1)  # (n_epochs, n_combined_sensors, n_freqs)
     combined_ch_names_indx = np.stack([combined_ch_names, combined_ch_indices], axis=1)
 
-    return combined_psd_stckd, combined_ch_names_indx
+    return combined_psd_stckd, combined_ch_names_indx, freqs
 
 # Function to find the index in combined_ch_names_indx
 def find_sensor_index(sensor_name, combined_ch_names_indx):
     """ this function finds the corresponding index to the channel name.
     we will then use this to read psd from combined psd"""
-    for ch_name, ch_index in combined_ch_names_indx:
+    for pos_index, (ch_name, ch_index)  in enumerate(combined_ch_names_indx):
+        #  Return both the ch_index (as an integer) and the index of the ch_name in the list (pos_index)
         if ch_name == sensor_name:
-            return int(ch_index)
+            return int(ch_index), int(pos_index)
     return None  # If not found
 
 def pick_sensor_pairs_epochspectrum(epochspectrum, right_sensor, left_sensor):
@@ -263,7 +264,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(final_subject_ls[:10]):
+for i, subjectID in enumerate(final_subject_ls):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -274,43 +275,40 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
                     
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs
         epochspectrum = calculate_spectral_power(epochs, n_fft=500, fmin=1, fmax=120)   # changed n_fft to 2*info['sfreq'] which after preprocessing is 250 (not 1000Hz)
-        combined_psd_stckd, combined_ch_names_indx = combine_planar_gradiometers_epochspectrum(epochspectrum)
+        combined_psd_stckd, combined_ch_names_indx, freqs = combine_planar_gradiometers_epochspectrum(epochspectrum)
 
-         # Read sensor pairs and calculate lateralisation for each
+            # Read sensor pairs and calculate lateralisation for each
         for _, row in sensors_layout_names_df.iterrows():
             print(f'Calculating lateralisation in {row["right_sensors"][0:8]}, {row["left_sensors"][0:8]}')
-                   
+                    
             if row['right_sensors'][0:8].endswith('1') and row['left_sensors'][0:8].endswith('1'):
-               psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
+                psd_right_sensor, psd_left_sensor, freqs = pick_sensor_pairs_epochspectrum(epochspectrum, 
                                                                                     row['right_sensors'][0:8], 
                                                                                     row['left_sensors'][0:8])
             elif row['right_sensors'][0:8].endswith('2') and row['left_sensors'][0:8].endswith('2'):                
                 # Find the indices for the right and left sensors
-               right_sensor_index = find_sensor_index(row['right_sensors'][0:8], combined_ch_names_indx)
-               left_sensor_index = find_sensor_index(row['left_sensors'][0:8], combined_ch_names_indx)
-               psd_right_sensor = combined_psd_stckd[:, right_sensor_index, :]
-               psd_left_sensor = combined_psd_stckd[:, left_sensor_index, :]
+                _, right_sensor_index = find_sensor_index(row['right_sensors'][0:8], combined_ch_names_indx)
+                _, left_sensor_index = find_sensor_index(row['left_sensors'][0:8], combined_ch_names_indx)
+                psd_right_sensor = combined_psd_stckd[:, right_sensor_index, :]
+                psd_left_sensor = combined_psd_stckd[:, left_sensor_index, :]
 
             elif row['right_sensors'][0:8].endswith('3') and row['left_sensors'][0:8].endswith('3'):
                 print('Gradiometers ending in 3 have been combined with 2. Reading next sensor')
-
 
             else:
                 # Error handling for mismatched right and left sensor ends
                 if row['right_sensors'][0:8][-1] != row['left_sensors'][0:8][-1]:
                     raise ValueError("Wrong right-left correspondence in the sensor layout sheet. "
-                                 "Right and Left sensors must end in the same digit (e.g., both '1', '2', or '3').")
+                                    "Right and Left sensors must end in the same digit (e.g., both '1', '2', or '3').")
 
                 # Error handling for cases where none of the conditions match
                 raise ValueError("Sensor pair does not meet any of the conditions (right/left sensor must end in '1', '2', or '3').")
 
-
-
             # Find outliers
             outlier, outlier_subjectID_df = find_outliers(psd_right_sensor, psd_left_sensor, 
-                                                          row['right_sensors'][0:8], row['left_sensors'][0:8],
-                                                          subjectID, outlier_subjectID_df, 
-                                                          quantile_dict_mag, quantile_dict_grad)
+                                                            row['right_sensors'][0:8], row['left_sensors'][0:8],
+                                                            subjectID, outlier_subjectID_df, 
+                                                            quantile_dict_mag, quantile_dict_grad)
             
             if not outlier:
                 subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
@@ -319,7 +317,7 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
                 bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
                 # Reshape the array to have shape (473 (#freqs), 1) for stacking
-                bias_removed_lat = bias_removed_lat.reshape(-1,1)
+                bias_removed_lat = bias_removed_lat.reshape(-1, 1)
                 # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
                 stacked_sensors.append(bias_removed_lat)
 
@@ -336,7 +334,7 @@ for i, subjectID in enumerate(final_subject_ls[:10]):
         pass
 
 # Save outlier dataframe
-outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df.csv'))
+outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df_test.csv'))
 
 # Prepare for enumerate over sensor pairs - #sensor_pairs, #subs, #freqs
 all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1)) 
@@ -373,9 +371,9 @@ if test_plot:
         plt.close()
 
     for _ in to_tests:
-        random_index = np.random.randint(0, len(good_subject_pd))
+        random_index = np.random.randint(0, len(final_subject_ls))
         # Get the subject ID at the random index
-        subjectID = good_subject_pd.iloc[random_index]['SubjectID'][2:]
+        subjectID = final_subject_ls.iloc[random_index]['SubjectID'][2:]
         epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
         epoched_fif = op.join(epoched_dir, epoched_fname)
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs

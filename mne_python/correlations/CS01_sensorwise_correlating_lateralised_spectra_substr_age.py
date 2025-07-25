@@ -93,7 +93,7 @@ deriv_dir = op.join(rds_dir, 'derivatives')
 spectra_dir = op.join(rds_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')  #psd outliers removed
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
-lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_nooutliers.csv')  # vol and psd outliers removed
+lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_nooutliers.csv')  # vol and psd outliers removed- this is old list from 05_histogram
 sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
 
 # Load substr file
