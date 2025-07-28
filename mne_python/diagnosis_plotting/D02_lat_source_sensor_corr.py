@@ -53,13 +53,14 @@ import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 import mne
 from mne.datasets import fetch_fsaverage
+import nibabel
 
 # Add custom function path
 main_dir = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/programming/camcan-laterality/mne_python'
 if main_dir not in sys.path:
     sys.path.append(main_dir)
 
-from source.S04a_computing_lateralised_source_power import (
+from mne_python.source.S05_computing_lateralised_source_power import (
     compute_hemispheric_index,
     order_grid_positions,
     calculate_grid_lateralisation,
@@ -128,6 +129,7 @@ def construct_paths(subject_id, paths, sensortype, csd_method, space):
         f'lateralised_grid_{sensortype}_{csd_method}_figname': op.join(deriv_folder, 'plots', f'lateralised_grid_{sensortype}_{csd_method}'),
         'stc_VolEst_lateral_power_figname': op.join(deriv_folder, 'plots', f'stc_VolEst_lateral_power_{sensortype}_{csd_method}'),
         'stc_fsmorphd_figname': op.join(deriv_folder, 'plots', f'stc_fsmorphd_{sensortype}_{csd_method}'),
+        f'stc_to_nifti_{sensortype}': op.join(deriv_folder, 'plots', f'stc_morphd_tonifti_{sensortype}')
     }
     return file_paths
 
@@ -307,6 +309,11 @@ def plot_source_band_power(subject_id, band, paths, src_fs):
     stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
     stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'), overwrite=True)
 
+    img = stc_mags_band.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
+    # Save it as a nifti file
+    sensortype = 'mag'
+    nibabel.nifti1.save(img, op.join(paths[f'stc_to_nifti_{sensortype}'], f'_{band}.nii.gz'))
+
     stc_mags_band.plot(
         src=src_fs,
         mode="stat_map",
@@ -406,7 +413,6 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
             src=src_fs,
             **kwargs,
         )
-
 
 def plot_sensor_vol_corr(substr, band, paths, sensortype):
     """Plot sensor lat-power vs volume-lat correlation topomap"""
