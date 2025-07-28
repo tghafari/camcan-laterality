@@ -383,6 +383,10 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
     os.makedirs(op.join(file_paths['deriv_folder'], 'plots'), exist_ok=True)
     brain.savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{sensortype}_{band}.png")
 
+    # Convert to NIfTI
+    img = stc_lat.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
+    nibabel.nifti1.save(img, f'lateralised_{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}.nii.gz')
+
     # --- Optional interactive 3D plot
     if do_plot_3d:
         # Plot in 3d
