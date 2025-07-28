@@ -60,7 +60,7 @@ main_dir = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-University
 if main_dir not in sys.path:
     sys.path.append(main_dir)
 
-from mne_python.source.S05_computing_lateralised_source_power import (
+from source.S05_computing_lateralised_source_power import (
     compute_hemispheric_index,
     order_grid_positions,
     calculate_grid_lateralisation,
@@ -80,7 +80,7 @@ def setup_paths(platform='mac'):
         quinna = '/rds/projects/q/quinna-camcan'
     else:
         sub2ctx = '/Volumes/jenseno-sub2ctx/camcan'
-        quinna = '/Volumes/quinna-camcan-1'
+        quinna = '/Volumes/quinna-camcan'
     
     paths = {
         'sample_meg_file': op.join(quinna, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
@@ -247,83 +247,69 @@ def plot_sensor_lat_power(subject_id, band, paths):
     fig.suptitle(f'Subject {subject_id}', fontsize=20) # or plt.suptitle('Main title')
     plt.show()
 
-def plot_source_band_power(subject_id, band, paths, src_fs):
-    """Plot source-space band power (VolSourceEstimate) by averaging per-Hz STC files in the band."""
+def plot_source_band_power(subject_id, band, paths, src_fs, sensortype, csd_method, space):
+    """Plot source-space band power (VolSourceEstimate) for a given sensor type ('mag' or 'grad') 
+    by averaging per-Hz STC files in the specified frequency band."""
+    
+    # Validate sensor type
+    if sensortype not in ['mag', 'grad']:
+        raise ValueError(f"sensortype must be either 'mag' or 'grad', not '{sensortype}'")
+
     # Define bands
     bands = {'Delta': (1, 4), 'Theta': (4, 8), 'Alpha': (8, 14), 'Beta': (14, 40)}
     if band not in bands:
         raise ValueError(f"Unknown band {band}")
     fmin, fmax = bands[band]
 
-    # Directory containing per-Hz STC files for this subject
+    # Directory containing per-Hz STC files
     stc_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_perHz')
     if not op.isdir(stc_dir):
         raise FileNotFoundError(f"STC directory not found: {stc_dir}")
+    
+    file_paths = construct_paths(subject_id, paths, sensortype, csd_method, space)
 
-    # Gather STC files within freq range
-    stc_grad_files = []
-    stc_mag_files = []
+    # Find relevant STC files for the given sensor type
+    stc_files = []
     for fname in os.listdir(stc_dir):
-        if fname.endswith('.stc') and '_' in fname:
-            # extract frequency from filename, e.g. '_4.0-vl.stc'
-            parts = fname[:-7].split('_')
+        if fname.endswith('.stc') and '_' in fname and sensortype in fname:
             try:
-                freq = float(parts[-1])
+                freq = float(fname[:-7].split('_')[-1])
                 if fmin <= freq < fmax:
-                    if 'mag' in fname:
-                        stc_mag_files.append(op.join(stc_dir, fname))
-                    elif 'grad' in fname:
-                        stc_grad_files.append(op.join(stc_dir, fname))
+                    stc_files.append(op.join(stc_dir, fname))
             except ValueError:
                 continue
-    if not stc_grad_files or not stc_mag_files:
-        raise FileNotFoundError(f"No STC files found in {stc_dir} for band {band}")
 
-    # Read all STCs and average data
-    # Grads
-    stc_grads = [mne.read_source_estimate(fpath) for fpath in sorted(stc_grad_files)]
-    data_stack_grads = np.stack([stc.data[:, 0] for stc in stc_grads], axis=1)
-    mean_data_grads = data_stack_grads.mean(axis=1)
-    stc_grads_band = stc_grads[0]
-    stc_grads_band.data = mean_data_grads[:, np.newaxis] # data should have 2 dimensions
+    if not stc_files:
+        raise FileNotFoundError(f"No STC files found for sensor type '{sensortype}' in {stc_dir} for band {band}")
+
+    # Load and average the STC data
+    stcs = [mne.read_source_estimate(fpath) for fpath in sorted(stc_files)]
+    data_stack = np.stack([stc.data[:, 0] for stc in stcs], axis=1)
+    mean_data = data_stack.mean(axis=1)
+    stc_band = stcs[0].copy()
+    stc_band.data = mean_data[:, np.newaxis]
+
+    # Output directory
     stc_morphd_band_dir = op.join(paths['meg_source_dir'], f'sub-CC{subject_id}', 'stc_morphd_band')
     os.makedirs(stc_morphd_band_dir, exist_ok=True)
-    stc_grads_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_grad_{band}'), overwrite=True)
-    
-    # Prepare for plotting on fs
-    initial_pos = np.array([19, -10, 29]) * 0.001
-    
-    # stc_grads_band.plot(
-    # src=src_fs,
-    # mode="stat_map",
-    # subjects_dir=paths["fs_sub_dir"],
-    # # initial_pos=initial_pos,
-    # verbose=True,
-    # )
 
-    # Mags
-    stc_mags = [mne.read_source_estimate(fpath) for fpath in sorted(stc_mag_files)]
-    data_stack_mags = np.stack([stc.data[:, 0] for stc in stc_mags], axis=1)
-    mean_data_mags = data_stack_mags.mean(axis=1)
-    stc_mags_band = stc_mags[0]
-    stc_mags_band.data = mean_data_mags[:, np.newaxis] # data should have 2 dimensions
-    stc_mags_band.save(op.join(stc_morphd_band_dir,f'sub-CC{subject_id}_fsmorph_stc_multitaper_mag_{band}'), overwrite=True)
+    # Save averaged STC
+    stc_band.save(op.join(stc_morphd_band_dir, f'sub-CC{subject_id}_fsmorph_stc_multitaper_{sensortype}_{band}'),
+                  overwrite=True)
 
-    img = stc_mags_band.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
-    # Save it as a nifti file
-    sensortype = 'mag'
-    nibabel.nifti1.save(img, op.join(paths[f'stc_to_nifti_{sensortype}'], f'_{band}.nii.gz'))
+    # Convert to NIfTI
+    img = stc_band.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
+    nibabel.nifti1.save(img, f'{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}.nii.gz')
 
-    stc_mags_band.plot(
+    # Plot
+    stc_band.plot(
         src=src_fs,
         mode="stat_map",
         subjects_dir=paths["fs_sub_dir"],
-        # initial_pos=initial_pos,
         verbose=True,
     )
-    
-    return stc_grads_band, stc_mags_band
 
+    return stc_band
 
 def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
                           csd_method, space, do_plot_3d=False):
@@ -479,7 +465,7 @@ def diagnosis_plotting():
     band = input("Enter band (e.g., Delta, Theta, Alph, Beta): ").strip()
     csd_method = 'multitaper'  # these should be kept fix for now
     space = 'vol'  # these should be kept fix for now
-    
+
     for _ in to_tests:
         sub_list = pd.read_csv(paths['sub_list'])
         sub_list = sub_list.to_numpy()
@@ -495,11 +481,12 @@ def diagnosis_plotting():
         fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
         src_fs = mne.read_source_spaces(fname_fsaverage_src)
 
-        stc_grads_band, stc_mags_band = plot_source_band_power(random_subject, band, paths, src_fs)
+        # stc_grads_band = plot_source_band_power(random_subject, band, paths, src_fs, 'grad', csd_method, space)
         # plot_source_lat_power(random_subject, band, paths, src_fs, stc_grads_band, 'grad',
         #                     csd_method, space, do_plot_3d=True)
         # input("Press Enter to continue to the next plot...")
 
+        stc_mags_band = plot_source_band_power(random_subject, band, paths, src_fs, 'mag', csd_method, space)
         plot_source_lat_power(random_subject, band, paths, src_fs, stc_mags_band, 'mag',
                             csd_method, space, do_plot_3d=True)
         # input("Press Enter to continue to the next plot...")

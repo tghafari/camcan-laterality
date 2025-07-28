@@ -1,6 +1,6 @@
 """
 ===============================================
-S04a. Calculate Source Lateralisation
+S05. Calculate Source Lateralisation
 
 This script computes source lateralisation indices 
 using the formula:
