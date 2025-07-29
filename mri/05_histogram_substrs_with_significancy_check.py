@@ -35,19 +35,18 @@ elif platform == 'mac':
 
 epoched_dir = op.join(rds_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(rds_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')
-# outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')  # don't remember how the outlier was calculated for psd here
-final_sub_list_path = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and lateralised power nonoise_subtraction_abs_thresh
+good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')  # list of all subjects at the beginning
+final_sub_list_path = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and power nonoise_subtraction_abs_thresh
 
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 substr_vol_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
 lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')
 lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # used in old outlier section (only volume outlier)
-lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')  # used with final list of subs
 outlier_subjectID_vol_fname = op.join(info_dir, 'outlier_subjectID_vol.csv')  # this only contains vol outliers
+subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
 output_plot_dir = op.join(jenseno_dir, 'Projects/subcortical-structures/resting-state/results/CamCan/Results/volume-plots')
-
-old_outliers = False  # this ensures we use the final list of subjects rather than old outlier removal
+# outlier_subjectID_psd_csv = op.join(info_dir, 'outlier_subjectID_psd_df.csv')  # don't remember how the outlier was calculated for psd here
+# lat_sheet_fname_final_subs = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_final_subs.csv')  # this is not  used with old final list of subs
 
 # Define colormap and structures
 colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#ADD8E6']
@@ -68,29 +67,31 @@ def find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2):
         print(subjectID)
         # Compare each subcortical structure's volume with the quantile values
         for structure in substr_vol_df.columns[1:]:  # Skip the first column (subject_ID)
-            volume = row[structure]
-            print(volume)
-            # Ensure that q1 and q2 are used as float values for indexing
-            quant1 = quantiles_df.loc[q1, structure]
-            quant2 = quantiles_df.loc[q2, structure]
-            print([quant1, quant2])
-            # Check if the volume is an outlier
-            if volume < quant1 or volume > quant2:
-                print(f'{structure} in {subjectID} is an outlier') 
-                temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
-                                                'outlier_structure': structure},
-                                                 index=([0]))
-                # Append the subject ID and structure name to the outlier DataFrame
-                outlier_subjectID_vol_df = pd.concat([outlier_subjectID_vol_df, temp_outlier_df], ignore_index=True)
-                del temp_outlier_df  # cleanup before moving on
-                outlier_subjectID_vol_df.to_csv(outlier_subjectID_vol_fname)
+            if structure != 'BrStem /4th Ventricle':
+                print(structure)
+                volume = row[structure]
+                print(volume)
+                # Ensure that q1 and q2 are used as float values for indexing
+                quant1 = quantiles_df.loc[q1, structure]
+                quant2 = quantiles_df.loc[q2, structure]
+                print([quant1, quant2])
+                # Check if the volume is an outlier
+                if volume < quant1 or volume > quant2:
+                    print(f'{structure} in {subjectID} is an outlier') 
+                    temp_outlier_df = pd.DataFrame({'SubjectID': subjectID, 
+                                                    'outlier_structure': structure},
+                                                    index=([0]))
+                    # Append the subject ID and structure name to the outlier DataFrame
+                    outlier_subjectID_vol_df = pd.concat([outlier_subjectID_vol_df, temp_outlier_df], ignore_index=True)
+                    del temp_outlier_df  # cleanup before moving on
+                    outlier_subjectID_vol_df.to_csv(outlier_subjectID_vol_fname)
 
     return outlier_subjectID_vol_df
 
 
 # Function to plot subcortical volumes with left (L) and right (R) distinction
 def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
-                                    outlier_subjectID_psd_csv, lat_sheet_fname, final_sub_list_path, q1=0.01, q2=1, old_outliers=False):
+                                    lat_sheet_fname, q1=0.01, q2=1):
     """
     Plots histograms of subcortical volumes, with darker shades of the colormap for left (L) structures
     and lighter shades for right (R) structures.
@@ -109,70 +110,48 @@ def preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
     by shades of the colormap.
     """
     
-    if old_outliers:  # this is removing volume outliers (<0.01 quantile) and psd outliers that I don't remember how were calculated
-        # Load volume data
-        substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
-        good_subjects_df = pd.read_csv(good_sub_sheet)
-        # outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
-        outlier_subjectID_vol_df = pd.DataFrame(columns=['SubjectID', 'structure'])  # initialise a dataframe for volume outliers
+    # this is removing volume outliers (<0.01 quantile)
+    # Load volume data
+    substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
+    good_subjects_df = pd.read_csv(good_sub_sheet)
+    # outlier_subjectID_psd_df = pd.read_csv(outlier_subjectID_psd_csv)
+    outlier_subjectID_vol_df = pd.DataFrame(columns=['SubjectID', 'outlier_structure'])  # initialise a dataframe for volume outliers
 
-        outlier_subjectID_vol_df = find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2)
+    outlier_subjectID_vol_df = find_outliers(substr_vol_df, outlier_subjectID_vol_df, q1, q2)
 
-        # Remove CC prefix from good subjects and convert to strings for comparison
-        good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
-        substr_vol_df['subject_ID'] = substr_vol_df['subject_ID'].astype(str)
-        
-        # Filter out subjects with missing volume measurements and find and save q1 and q2 
-        substr_vol_df = substr_vol_df.dropna()
-        
-        # Filter to include only good subjects, exclude psd and volume outliers
-        substr_vol_df = substr_vol_df[substr_vol_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-        # substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
-        substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
+    # Remove CC prefix from good subjects and convert to strings for comparison
+    good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
+    substr_vol_df['subject_ID'] = substr_vol_df['subject_ID'].astype(str)
+    
+    # Filter out subjects with missing volume measurements and find and save q1 and q2 
+    substr_vol_df = substr_vol_df.dropna()
+    
+    # Filter to include only good subjects, exclude psd and volume outliers
+    substr_vol_df = substr_vol_df[substr_vol_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
+    # substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]
+    substr_vol_df = substr_vol_df[~substr_vol_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
 
-        # Load lateralisation volume data and preprocess
-        substr_lat_df = pd.read_csv(lat_sheet_fname)
-        substr_lat_df['subject_ID'] = substr_lat_df['subject_ID'].astype(str)
+    # Load lateralisation volume data and preprocess
+    substr_lat_df = pd.read_csv(lat_sheet_fname)
+    substr_lat_df['subject_ID'] = substr_lat_df['subject_ID'].astype(str)
 
-        # Filter out subjects with missing volume measurements and find and save q1 and q2 
-        substr_lat_df = substr_lat_df.dropna()
-        
-        # Filter to include only good subjects, exclude psd and volume outliers
-        substr_lat_df = substr_lat_df[substr_lat_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
-        # substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]  # by removing these two lines I"m only removing volume outliers- will do the psd outliers in later stages
-        substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
+    # Filter out subjects with missing volume measurements and find and save q1 and q2 
+    substr_lat_df = substr_lat_df.dropna()
+    
+    # Filter to include only good subjects, exclude psd and volume outliers
+    substr_lat_df = substr_lat_df[substr_lat_df['subject_ID'].isin(good_subjects_df['SubjectID'])]
+    # substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_psd_df['SubjectID'])]  # by removing these two lines I"m only removing volume outliers- will do the psd outliers in later stages
+    substr_lat_df = substr_lat_df[~substr_lat_df['subject_ID'].isin(outlier_subjectID_vol_df['SubjectID'])]
 
-        # Save lateralisation index df without outliers
-        substr_lat_df.to_csv(lat_sheet_fname_nooutlier)
-    else:  # this is with psd_vol new outliers
-                
-        # Load FINAL subject list
-        final_sub_df = pd.read_csv(final_sub_list_path)  # Should contain column 'subject_ID'
-        final_sub_df['subject_ID'] = final_sub_df['subject_ID'].astype(str)
-        final_sub_ids = final_sub_df['subject_ID'].tolist()
+    # Save lateralisation index df without outliers
+    substr_lat_df.to_csv(lat_sheet_fname_nooutlier)
 
-        # Load volume data
-        substr_vol_df = pd.read_csv(substr_vol_sheet_fname)
-        substr_vol_df['subject_ID'] = substr_vol_df['subject_ID'].astype(str)  # ensure subject_IDs are strings
-        substr_vol_df = substr_vol_df.dropna()
+    # Save subject list with no volume outliers
+    sublist = pd.DataFrame(columns=['SubjectID'])
+    sublist = substr_lat_df['subject_ID']
+    sublist.to_csv(subject_list_no_vol_outliers)
 
-        # Filter to FINAL subject list 
-        substr_vol_df = substr_vol_df[
-                         substr_vol_df['subject_ID'].isin(final_sub_ids)]
-        
-        # Load lateralisation index data
-        substr_lat_df = pd.read_csv(lat_sheet_fname)
-        substr_lat_df['subject_ID'] = substr_lat_df['subject_ID'].astype(str)
-        substr_lat_df = substr_lat_df.dropna()
-
-        # Filter to FINAL subject list 
-        substr_lat_df = substr_lat_df[
-            substr_lat_df['subject_ID'].isin(final_sub_ids)]
-        
-        # Save filtered lateralisation index without outliers
-        substr_lat_df.to_csv(lat_sheet_fname_final_subs, index=False)
-
-    return substr_vol_df, substr_lat_df, outlier_subjectID_vol_df
+    return substr_vol_df, substr_lat_df, outlier_subjectID_vol_df, sublist
 
 def plot_volume_histograms(structures, substr_vol_df, colormap):
     # Plotting histograms
@@ -222,7 +201,7 @@ def plot_volume_histograms(structures, substr_vol_df, colormap):
             ax_R.set_xlabel('Volume', fontsize=12, fontname='Calibri')
     
     plt.tight_layout()
-    plt.savefig(op.join(output_plot_dir, 'substr-histograms-final_subs.png'), dpi=3000)
+    plt.savefig(op.join(output_plot_dir, 'substr-histograms-subs_no-vol-outlier.png'), dpi=3000)
 
 # Checking the normality of the distributions
 def test_normality(structures, lateralization_volume):
@@ -281,7 +260,7 @@ def test_normality(structures, lateralization_volume):
         fig.delaxes(axs[i])
 
     plt.tight_layout()
-    # plt.show()
+    plt.show()
 
     return p_values_shapiro
 
@@ -381,17 +360,13 @@ def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
         fig.delaxes(axs[i])
 
     plt.tight_layout()
-    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-final_subs-nonormalcurve.png'), dpi=3000)
+    plt.savefig(op.join(output_plot_dir, 'lateralisation-histograms-final_subs_no-vol-outliers_nonormalcurve.png'), dpi=3000)
 
 (substr_vol_df, substr_lat_df, 
-   outlier_subjectID_vol_df) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet, 
-                                                              outlier_subjectID_psd_csv,lat_sheet_fname, 
-                                                              final_sub_list_path, q1=0.01, q2=1, old_outliers=old_outliers)
-# Save outlier dataframe
-if old_outliers:
-    outlier_subjectID_vol_df.to_csv(op.join(info_dir,'outlier_subjectID_vol_df.csv'))
+ outlier_subjectID_vol_df, sublist) = preprocess_subcortical_volumes(substr_vol_sheet_fname, good_sub_sheet,
+                                                                        lat_sheet_fname, q1=0.01, q2=1)
 
-# plot_volume_histograms(structures, substr_vol_df, colormap)
+plot_volume_histograms(structures, substr_vol_df, colormap)
 plot_lateralisation_volumes(substr_lat_df, structures, colormap)
 
 

@@ -44,7 +44,7 @@ from scipy import stats
 import json
 from copy import deepcopy
 
-platform = 'mac'  # are you running on bluebear or windows or mac?
+platform = 'bluebear'  # are you running on bluebear or windows or mac?
 test_plot = False  # do you want sanity check plots?
 
 # Define where to read and write the data
@@ -59,25 +59,18 @@ elif platform == 'mac':
 
 epoched_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(quinna_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')  # better to use this sheet to remove outliers here from the full subject list
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # list of subjects with no volume outlier
-final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')
+# old_final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # this is an old final, will be deleted
+final_sub_sheet = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')
+subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
 sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
-output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh_combnd-grads')
-
-# Read only data from subjects with good preprocessed data and Remove CC prefix from good subjects and convert to strings for comparison
-good_subjects_df = pd.read_csv(good_sub_sheet)
-good_subjects_df['SubjectID'] = good_subjects_df['SubjectID'].str.replace('CC', '', regex=False).astype(str)
+output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # in case we only wanted to remove vol outliers
+# output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-psd-outliers_absolute-thresh_combnd-grads')
 
 # Find subjects that are not vol outliers
 no_vol_outlier_lat_df = pd.read_csv(lat_sheet_fname_nooutlier)
-no_vol_outlier_subs_df = good_subjects_df[good_subjects_df['SubjectID'].isin(no_vol_outlier_lat_df['SubjectID'])]
-# jsut make sure this works in the script
-
-# Don't use the final list now, find outliers after combining grads
-final_subject_pd = pd.read_csv(final_sub_sheet)
-final_subject_ls = final_subject_pd.to_numpy().flatten().tolist()
+no_vol_outlier_ids = no_vol_outlier_lat_df['subject_ID'].astype(str)
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
@@ -117,7 +110,8 @@ def calculate_spectral_power(epochs, n_fft, fmin, fmax):
 
 def combine_planar_gradiometers_epochspectrum(epochspectrum):
     """
-    Combine planar gradiometer pairs (e.g., MEG2422 + MEG2423) using root-sum-square (RSS)
+    Combine planar gradiometer pairs (e.g., MEG2422 + MEG2423) using average 
+    (root-sum-square (RSS) not necessary as the power is already squared)
     and return a new EpochsSpectrum object with only combined planar sensors.
     
     Parameters
@@ -147,8 +141,9 @@ def combine_planar_gradiometers_epochspectrum(epochspectrum):
                 j = sensor_names.index(pair_name)
 
                 # Combine via root-sum-square
-                rss = np.sqrt(psd_data[:, i, :] ** 2 + psd_data[:, j, :] ** 2)
-                combined_psd.append(rss)
+                # rss = np.sqrt(psd_data[:, i, :] ** 2 + psd_data[:, j, :] ** 2)
+                avg = (psd_data[:, i, :] + psd_data[:, j, :]) / 2
+                combined_psd.append(avg)
                 combined_ch_names.append(ch_name)  
                 combined_ch_indices.append(i)  # the index in the full channel order
 
@@ -275,7 +270,7 @@ def remove_noise_bias(lateralised_power, freqs, h_fmin, h_fmax):
 sub_IDs = []
 spec_lateralisation_all_sens_all_subs = []
 
-for i, subjectID in enumerate(no_vol_outlier_subs_df):
+for i, subjectID in enumerate(no_vol_outlier_ids):
     # Read subjects one by one and calculate lateralisation index for each pair of sensor and all freqs
     epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
     epoched_fif = op.join(epoched_dir, epoched_fname)
@@ -321,18 +316,18 @@ for i, subjectID in enumerate(no_vol_outlier_subs_df):
                                                             subjectID, outlier_subjectID_df, 
                                                             quantile_dict_mag, quantile_dict_grad)
             
-            if not outlier:
-                subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
+            # if not outlier:
+            subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
-                # Remove noise bias
-                bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
+            # Remove noise bias
+            bias_removed_lat = remove_noise_bias(subtraction_sensor_pairs, freqs, h_fmin=90, h_fmax=120)
 
-                # Reshape the array to have shape (473 (#freqs), 1) for stacking
-                bias_removed_lat = bias_removed_lat.reshape(-1, 1)
-                # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
-                stacked_sensors.append(bias_removed_lat)
+            # Reshape the array to have shape (473 (#freqs), 1) for stacking
+            bias_removed_lat = bias_removed_lat.reshape(-1, 1)
+            # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
+            stacked_sensors.append(bias_removed_lat)
 
-        if sum(outlier_subjectID_df['SubjectID'].isin([subjectID])) == 0:  # remove subjects that have any outlying sensors
+        if subjectID not in outlier_subjectID_df['SubjectID'].values:  # remove subjects that have any outlying sensors
             print(f'{subjectID} is not outlier')
             # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
             spec_lateralisation_all_sens = np.hstack(stacked_sensors)
@@ -344,8 +339,10 @@ for i, subjectID in enumerate(no_vol_outlier_subs_df):
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass
 
-# Save outlier dataframe
-outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df_test.csv'))
+# Save outlier dataframe and final list of subs
+# outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df.csv'))
+sub_ID_df = pd.DataFrame(sub_IDs, columns=['subjectID'])
+# sub_ID_df.to_csv(final_sub_sheet)
 
 # Prepare for enumerate over sensor pairs - #sensor_pairs, #subs, #freqs
 all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1)) 
@@ -382,9 +379,7 @@ if test_plot:
         plt.close()
 
     for _ in to_tests:
-        random_index = np.random.randint(0, len(no_vol_outlier_subs_df))
-        # Get the subject ID at the random index
-        subjectID = no_vol_outlier_subs_df.iloc[random_index]['SubjectID'][2:]
+        subjectID = sub_ID_df.sample(1)['subjectID'].values[0] # Get a random subject ID 
         epoched_fname = 'sub-CC' + str(subjectID) + '_ses-rest_task-rest_megtransdef_epo.fif'
         epoched_fif = op.join(epoched_dir, epoched_fname)
         epochs = mne.read_epochs(epoched_fif, preload=True, verbose=True)  # one 7min50sec epochs

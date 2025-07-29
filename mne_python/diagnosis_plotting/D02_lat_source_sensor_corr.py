@@ -297,9 +297,9 @@ def plot_source_band_power(subject_id, band, paths, src_fs, sensortype, csd_meth
     stc_band.save(op.join(stc_morphd_band_dir, f'sub-CC{subject_id}_fsmorph_stc_multitaper_{sensortype}_{band}'),
                   overwrite=True)
 
-    # Convert to NIfTI
-    img = stc_band.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
-    nibabel.nifti1.save(img, f'{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}.nii.gz')
+    # Convert to NIfTI 
+    stc_band.save_as_volume(f'{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}.nii.gz',
+                            src_fs, dest='mri', mri_resolution=True, format='nifti1')
 
     # Plot
     stc_band.plot(
@@ -384,9 +384,9 @@ def plot_source_lat_power(subject_id, band, paths, src_fs, stc_band, sensortype,
     brain.savefig(f"{file_paths['stc_VolEst_lateral_power_figname']}_{sensortype}_{band}.png")
 
     # Convert to NIfTI
-    img = stc_lat.as_volume(src_fs, dest='mri', mri_resolution=True, format='nifti1')
-    nibabel.nifti1.save(img, f'lateralised_{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}.nii.gz')
-
+    stc_lat.save_as_volume(f'{op.join(file_paths[f'stc_to_nifti_{sensortype}'])}_{band}_lateralised.nii.gz',
+                            src_fs, dest='mri', mri_resolution=True, format='nifti1')
+    
     # --- Optional interactive 3D plot
     if do_plot_3d:
         # Plot in 3d
@@ -492,7 +492,7 @@ def diagnosis_plotting():
 
         stc_mags_band = plot_source_band_power(random_subject, band, paths, src_fs, 'mag', csd_method, space)
         plot_source_lat_power(random_subject, band, paths, src_fs, stc_mags_band, 'mag',
-                            csd_method, space, do_plot_3d=True)
+                            csd_method, space, do_plot_3d=False)
         # input("Press Enter to continue to the next plot...")
 
     # 5 & 6: correlations
