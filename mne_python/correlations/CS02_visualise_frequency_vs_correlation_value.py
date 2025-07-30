@@ -5,7 +5,7 @@ CS02_visualise_frequency_vs_correlation_value:
     1. navigates to correlations/sensor_pairs dir
     2. navigates to one sensor_pair folder
     3. reads csv file of correlation values
-    for all frequencies and all substr + age
+    for all frequencies and all substr 
     4. for each substr plots frequencies vs.
     correlation values
     5. draws a line under the correlation values
@@ -14,6 +14,9 @@ CS02_visualise_frequency_vs_correlation_value:
     in substr directory
     6. loops over substr
     7. loops over sensor pairs
+    
+Note: this script was only run for checks;
+I didn't use it in the main analysis pipeline.
     
 Written by Tara Ghafari
 t.ghafari@bham.ac.uk
@@ -51,7 +54,7 @@ raw = mne.io.read_raw_fif(meg_fname)
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu', 'Age']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 # Create a placeholder for correlation values of all sensor pairs
 freqs = np.arange(1, 120.5, 0.5)

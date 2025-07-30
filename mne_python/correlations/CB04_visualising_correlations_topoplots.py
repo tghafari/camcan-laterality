@@ -2,7 +2,7 @@
 
 """
 ====================================
-###### NOTE: Consider using St01 to plot sensor substr correlations than this script.#####
+###### NOTE: Consider using St01 to plot sensor substr correlations instead of this script.#####
     
 CS04_visualising_correlations_topoplots:
     this script:

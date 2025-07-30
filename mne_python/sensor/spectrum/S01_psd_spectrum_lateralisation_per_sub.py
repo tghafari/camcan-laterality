@@ -62,8 +62,9 @@ info_dir = op.join(quinna_dir, 'dataman/data_information')
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
 lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # list of subjects with no volume outlier we use this now (30/07/2025)
 # old_final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # this is an old final, will be deleted
-final_sub_sheet = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')  # list of subject with vol and psd outliers removed. not used now (30/07/2025)
-subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
+final_sub_sheet = op.join(info_dir, 'last_FINAL_sublist-vol-outliers-removed.csv')  # list of subject with vol outliers and error subjects in this script removed (30/07/2025)
+subject_list_no_vol_outliers = op.join(info_dir, 'first_FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
+missing_subs_df = op.join(info_dir, 'subjects_lost_after_S01_psd_lateralisation.csv')  # this is the list of subjects that are lost in the process of psd and lateralisation
 sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
 output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # in case we only wanted to remove vol outliers
 # output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-psd-outliers_absolute-thresh_combnd-grads')
@@ -327,13 +328,13 @@ for i, subjectID in enumerate(no_vol_outlier_ids):
             # Append the reshaped array to the list - shape #sensor_pairs, #freqs, 1
             stacked_sensors.append(bias_removed_lat)
 
-        if subjectID not in outlier_subjectID_df['SubjectID'].values:  # remove subjects that have any outlying sensors
-            print(f'{subjectID} is not outlier')
+        if subjectID not in outlier_subjectID_df['SubjectID'].values:  # remove subjects that have any outlying sensors - not doing it now (30/07/2025)
+            print(f"{subjectID} is not outlier but we don't care")
             # Horizontally stack the spec_lateralisation_all_sens - shape #freqs, #sensor_pairs
-            spec_lateralisation_all_sens = np.hstack(stacked_sensors)
-            # Append all subjects together
-            spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
-            sub_IDs.append(subjectID)
+        spec_lateralisation_all_sens = np.hstack(stacked_sensors)
+        # Append all subjects together
+        spec_lateralisation_all_sens_all_subs.append(spec_lateralisation_all_sens)  # shape = #sub, #freqs, #sensor_pairs
+        sub_IDs.append(subjectID)
 
     except:
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
@@ -342,7 +343,26 @@ for i, subjectID in enumerate(no_vol_outlier_ids):
 # Save outlier dataframe and final list of subs (if removing psd outliers)
 # outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df.csv'))
 sub_ID_df = pd.DataFrame(sub_IDs, columns=['subjectID'])
-# sub_ID_df.to_csv(final_sub_sheet)
+sub_ID_df.to_csv(final_sub_sheet)
+
+# Check which subjects have been removed from FINAL_sublist-vol-outliers-removed in this script
+# Load the two CSVs
+final_df = pd.read_csv(subject_list_no_vol_outliers)
+dblcheck_df = pd.read_csv(final_sub_sheet)
+
+# Ensure both columns are the same type (e.g., strings)
+final_subjects = final_df['subject_ID'].astype(str)
+dblcheck_subjects = dblcheck_df['subjectID'].astype(str)
+
+# Find IDs in FINAL but not in dblCheck_FINAL
+diff_ids = final_subjects[~final_subjects.isin(dblcheck_subjects)]
+
+# Optional: convert to DataFrame
+diff_df = pd.DataFrame(diff_ids)
+
+# Display or save the result
+print(diff_df)
+diff_df.to_csv(missing_subs_df, index=False)
 
 # Prepare for enumerate over sensor pairs - #sensor_pairs, #subs, #freqs
 all_freq_all_subs_transposed = np.transpose(spec_lateralisation_all_sens_all_subs, (2, 0, 1)) 

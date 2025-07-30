@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ====================================
-CS01_sensorwise_correlating_lateralised_spectra_substr_age:
+CS01_sensorwise_correlating_lateralised_spectra_substr:
     this script is in use:
     1. reads lateralised indices of one 
     pair of sensors (one csv file)
     from each frequency bin (each folder) into
     one variable called pair_lat_freq
     2. reads lateralised values of each 
-    subcortical structure into hipp/thal_lat + age
+    subcortical structure into hipp/thal_lat
     3. removes the participants without spectra
     or lateralised volume based on the subID 
     column
@@ -99,7 +99,6 @@ substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
 sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')
 spectra_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # we use vol outliers removed list now (30/07/2025)
 lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_no-vol-outliers.csv')  # vol outliers removed
-subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # list of subjects with no volume outlier we use this now (30/07/2025)
 output_corelation_fpath = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise_no-vol-outliers')
 
 # Load substr file

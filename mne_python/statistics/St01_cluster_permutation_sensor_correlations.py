@@ -39,15 +39,17 @@ import os
 import os.path as op
 import numpy as np
 import pandas as pd
-import mne
+
+import scipy as stats
 from scipy.stats import spearmanr
+from scipy import sparse
 from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import connected_components
 import matplotlib.pyplot as plt
 from itertools import product
 
+import mne
 from mne.channels import find_ch_adjacency
-from scipy import sparse
 from mne.channels import find_layout
 
 
@@ -66,15 +68,14 @@ def setup_paths(platform='mac'):
 
     paths = {
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/bands'),
-        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # outliers are smaller than 10th percentile
-        'sub_list': op.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
+        'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_no-vol-outliers.csv'),  # vol outliers (< 0.01 quantile) removed
+        'sub_list': op.join(quinna_dir, 'dataman/data_information/dblCheck_FINAL_sublist-vol-outliers-removed.csv'),  # this is just to ensure correct subjects are being used for the final analysis
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'), # for alph thal, puta beta, hipp delta
-        'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nooutlier-psd'),  # for all combinations of bands and substrs
-        'significant_cluster_perm_dir' : op.join(jenseno_dir, '/subcortical-structures/resting-state/results/CamCan/Results/Correlation_topomaps/bands/subtraction_nonoise_nooutliers-psd-clusterpermutation'),
+        'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),  # for all combinations of bands and substrs only excludeing vol outliers
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
-        'sensor_layout': op.join(quinna_dir, 'dataman/data_information/sensors_layout_names.csv'),
-        'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_nooutliers_absolute-thresh')
+        'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),  # combined grads end in '2', there is no sensor ending in '3'
+        'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # we use vol outliers removed list now (30/07/2025)
     }
     return paths
 
@@ -120,7 +121,7 @@ def extract_all_band_power(paths):
         matrix = np.stack(data, axis=1)
         df_out = pd.DataFrame(matrix, columns=label_dict[band])
         df_out.insert(0, 'subject_ID', subject_ids.values)
-        df_out.to_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'), index=False)
+        df_out.to_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'), index=False)
 
 
 def save_spearman_correlations(paths):
@@ -135,7 +136,7 @@ def save_spearman_correlations(paths):
     used_subjects = set()
 
     for band, substr in product(bands, structures):
-        band_file = op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv')
+        band_file = op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv')
         if not op.exists(band_file):
             print(f"Missing band file: {band_file}")
             continue
@@ -279,7 +280,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         return
 
     # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
-    li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise.csv'))
+    li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'))
     # Select columns matching channels in info, ensuring order matches info['ch_names']
     selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
     li_data = li_df[selected_cols].to_numpy()
@@ -293,7 +294,16 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     central_sensor_indices = [11, 12, 30]
 
     ############################## OBSERVED CLUSTERS ##############################
-    significant_obs = p_obs < 0.05
+
+    # Compute significancy threshold from t distribution 
+    # Here we use a two-tailed test, hence we need to divide alpha by 2.
+    alpha = 0.05  # we basically are using one tailed for either positve or negative (=alpha = 0.05)
+    n_subjects = len(li_df)  # in our last_FINAl list this is 532 (vol outliers and errored subjects in lateralised psd calculation are removed)
+    df = n_subjects - 1  # degrees of freedom
+    t_thresh = stats.distributions.t.ppf(1 - alpha / 2, df=df)
+    t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to r_obs and not adjacency
+
+    significant_obs = t_obs > t_thresh
     sig_obs = np.where(significant_obs)[0]  
     # Keep only those indices in sig_obs that are not in central_sensor_indices
     sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
@@ -304,8 +314,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     if sig_obs.size <= 0:
         print("No significant r values found in sensors")
-        n_subjects = len(lv_vals)
-        t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to sig_obs and not adjacency
 
     elif sig_obs.size > 0:
 
@@ -325,8 +333,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     
         # Compute t-transformed values and use that to find significant clusters
         print("Plotting observed significant sensors")
-        n_subjects = len(lv_vals)
-        t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to sig_obs and not adjacency
+        # n_subjects = len(lv_vals)
+        # t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to sig_obs and not adjacency
 
         cluster_t_rt_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_rt_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
@@ -416,7 +424,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             t_null = r_to_t(r_null, n=n_subjects)
             p_null = [res.pvalue for res in results]
 
-            significant_nulls = np.array(p_null) < 0.05  # -> change to max stat on t use the line of code Andrew sent
+            significant_nulls = np.array(t_null) > t_thresh  
             sig_null = np.where(significant_nulls)[0]
             sig_null = sig_null[~np.isin(sig_null, central_sensor_indices)]
             sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs
@@ -616,8 +624,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 def cluster_permutation():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
-    # extract_all_band_power(paths)  # only need to run once
-    # save_spearman_correlations(paths)   # only need to run once
+    extract_all_band_power(paths)  # only need to run once
+    save_spearman_correlations(paths)   # only need to run once
     substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
     band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
     ch_type = input('Enter sensortype (mag or grad):').strip()

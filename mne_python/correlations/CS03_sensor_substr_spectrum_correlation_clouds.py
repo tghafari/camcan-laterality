@@ -20,6 +20,8 @@ This code will:
     participants vs the value of volume 
     lateralisation index for all substr 
 
+Note: this script was only run for checks;
+I didn't use it in the main analysis pipeline.
 
 written by Tara Ghafari
 ==============================================
