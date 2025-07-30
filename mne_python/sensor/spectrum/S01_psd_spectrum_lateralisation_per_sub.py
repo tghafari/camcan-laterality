@@ -60,9 +60,9 @@ elif platform == 'mac':
 epoched_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50')
 info_dir = op.join(quinna_dir, 'dataman/data_information')
 volume_sheet_dir = 'derivatives/mri/lateralized_index'
-lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # list of subjects with no volume outlier
+lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # list of subjects with no volume outlier we use this now (30/07/2025)
 # old_final_sub_sheet = op.join(info_dir, 'FINAL_sublist-LV-LI-outliers-removed.csv')  # this is an old final, will be deleted
-final_sub_sheet = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')
+final_sub_sheet = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')  # list of subject with vol and psd outliers removed. not used now (30/07/2025)
 subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
 sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')  #sensor_layout_name_grad_no_central.csv
 output_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # in case we only wanted to remove vol outliers
@@ -316,7 +316,7 @@ for i, subjectID in enumerate(no_vol_outlier_ids):
                                                             subjectID, outlier_subjectID_df, 
                                                             quantile_dict_mag, quantile_dict_grad)
             
-            # if not outlier:
+            # if not outlier:  # we don't want to remove spectral outliers now (30/07/2025)
             subtraction_sensor_pairs, _, _ = calculate_spectrum_lateralisation(psd_right_sensor, psd_left_sensor)
 
             # Remove noise bias
@@ -339,7 +339,7 @@ for i, subjectID in enumerate(no_vol_outlier_ids):
         print(f'an error occured while reading subject # {subjectID} - moving on to next subject')
         pass
 
-# Save outlier dataframe and final list of subs
+# Save outlier dataframe and final list of subs (if removing psd outliers)
 # outlier_subjectID_df.to_csv(op.join(info_dir,'outlier_subjectID_psd_df.csv'))
 sub_ID_df = pd.DataFrame(sub_IDs, columns=['subjectID'])
 # sub_ID_df.to_csv(final_sub_sheet)

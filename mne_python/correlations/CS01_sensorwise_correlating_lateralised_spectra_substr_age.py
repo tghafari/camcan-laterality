@@ -79,7 +79,7 @@ def pearson_spearman_calculator(working_df, freq, substr,
 
     return pear_ls_corrs_all_freqs, pear_ls_pvals_all_freqs, spear_ls_corrs_all_freqs, spear_ls_pvals_all_freqs
 
-platform = 'bluebear'  # bluebear or mac?
+platform = 'mac'  # bluebear or mac?
 
 # Define where to read and write the data
 if platform == 'bluebear':
@@ -96,19 +96,19 @@ info_dir = op.join(quinna_dir, 'dataman/data_information')
 deriv_dir = op.join(sub2ctx_dir, 'derivatives') 
 # spectra_dir probably needs to be changed to the new one with no vol or psd outlier
 substr_dir = op.join(deriv_dir, 'mri/lateralized_index')
-spectra_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # in case we only wanted to remove vol outliers
-substr_sheet_fname = op.join(substr_dir, 'lateralization_volumes.csv')
-lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_nooutliers.csv')  # vol and psd outliers removed- this is old list from 05_histogram
-sensors_layout_sheet = op.join(info_dir, 'sensors_layout_names.csv')
-subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
+sensors_layout_sheet = op.join(info_dir, 'combined_sensors_layout_names.csv')
+spectra_dir = op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # we use vol outliers removed list now (30/07/2025)
+lat_sheet_fname_nooutlier = op.join(substr_dir, 'lateralization_volumes_no-vol-outliers.csv')  # vol outliers removed
+subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # list of subjects with no volume outlier we use this now (30/07/2025)
+output_corelation_fpath = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nonoise_no-vol-outliers')
 
 # Load substr file
-substr_lat_df = pd.read_csv(substr_sheet_fname)
+substr_lat_df = pd.read_csv(lat_sheet_fname_nooutlier)
 
 # Read sensor layout sheet
 sensors_layout_names_df = pd.read_csv(sensors_layout_sheet)
 
-substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu', 'Age']
+substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
 
 for i, row in sensors_layout_names_df.iterrows():
     print(f'Working on pair {row["left_sensors"][0:8]}, {row["right_sensors"][0:8]}')
@@ -125,13 +125,13 @@ for i, row in sensors_layout_names_df.iterrows():
                                     row["right_sensors"][0:8], 
                                     substr_lat_df)
     
-    output_corr_dir = op.join(deriv_dir, 'correlations/sensor_pairs_subtraction_nooutlier-psd',
+    output_sensor_corr_dir = op.join(output_corelation_fpath,
                                f'{row["left_sensors"][0:8]}_{row["right_sensors"][0:8]}')
-    if not op.exists(output_corr_dir):
-        os.makedirs(output_corr_dir)
+    if not op.exists(output_sensor_corr_dir):
+        os.makedirs(output_sensor_corr_dir)
  
     # Calculate correlation in each substr
-    for substr in substrs[-1]:
+    for substr in substrs:
         print(f'Working on {substr}')
 
         # Predefine lists
@@ -141,7 +141,7 @@ for i, row in sensors_layout_names_df.iterrows():
         ls_corrs_arr = []
         ls_pvals_arr = []
         
-        output_corr_substr_dir = op.join(output_corr_dir, f'{substr}')
+        output_corr_substr_dir = op.join(output_sensor_corr_dir, f'{substr}')
         if not op.exists(output_corr_substr_dir):
             os.makedirs(output_corr_substr_dir)
     
