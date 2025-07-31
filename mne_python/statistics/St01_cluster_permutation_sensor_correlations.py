@@ -305,12 +305,30 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     significant_obs = (np.array(t_obs) > abs(t_thresh)) | (np.array(t_obs) < -abs(t_thresh))
     sig_obs = np.where(significant_obs)[0]  
-    # Keep only those indices in sig_obs that are not in central_sensor_indices
-    sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
-    sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()  # this gives name of sensor pairs
-    sig_chan_names = [pair.split('_')[1] for pair in sig_pairs]  # use channel names to find the correct index in adjacency. 
-                                                                 # adjacency and filtered_df indices do not align
-    sig_chan_names = [ch for ch in sig_chan_names if ch not in central_sensors]
+    # # Keep only those indices in sig_obs that are not in central_sensor_indices
+    # sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
+    # sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()  # this gives name of sensor pairs
+    # sig_chan_names = [pair.split('_')[1] for pair in sig_pairs]  # use channel names to find the correct index in adjacency. 
+    #                                                              # adjacency and filtered_df indices do not align
+    # sig_chan_names = [ch for ch in sig_chan_names if ch not in central_sensors]
+
+    # Extract (channel_name, index) pairs in one go
+    sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()
+    chan_name_and_idx = [
+        (pair.split('_')[1], idx)
+        for pair, idx in zip(sig_pairs, sig_obs)
+    ]
+
+    # Filter out central sensors safely, preserving alignment
+    chan_name_and_idx = [
+        (ch, idx)
+        for ch, idx in chan_name_and_idx
+        if ch not in central_sensors and idx not in central_sensor_indices
+    ]
+
+    # Unpack
+    sig_chan_names = [ch for ch, _ in chan_name_and_idx]
+    sig_obs = np.array([idx for _, idx in chan_name_and_idx])
 
     if sig_obs.size <= 0:
         print("No significant r values found in sensors")
@@ -321,36 +339,50 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         sub_adj_obs = adjacency[np.ix_(index_in_adjacency, index_in_adjacency)]
         n_comp_obs, labels_obs = connected_components(
             csr_matrix(sub_adj_obs), directed=False, return_labels=True)
+        
         clusters_obs = {i: index_in_adjacency[labels_obs == i] for i in range(n_comp_obs)}  # for the adjacency indices
+        # Build a map from channel name to index in sig_null (i.e., index into filtered_df/t_null)
+        chan_to_sig_idx_obs = {
+            ch: sig_obs[i]
+                for i, ch in enumerate(sig_chan_names)
+            }  # removing the central sensors might misalign the indices
+
+        # Map clusters of adjacency indices back to filtered_df indices
         clusters_rt_obs = {
-            i: np.array([sig_obs[idx] for idx, _ in enumerate(index_in_adjacency[np.where(labels_obs == i)[0]])])
+            i: np.array([
+                chan_to_sig_idx_obs[names[idx]]
+                for idx in index_in_adjacency[np.where(labels_obs == i)[0]]
+                if names[idx] in chan_to_sig_idx_obs
+            ])
             for i in range(n_comp_obs)
         }  # for the r_obs and t_obs indices (filtered_df)
+
+        # clusters_rt_ob2 = {
+        #     i: np.array([sig_obs[idx] for idx, _ in enumerate(index_in_adjacency[np.where(labels_obs == i)[0]])])
+        #     for i in range(n_comp_obs)
+        # }  
 
         print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
         for cid, nodes in clusters_obs.items():
             print(f"  Cluster {cid}: indices {nodes} -> channels: {[names[ch] for ch in nodes]}")
-    
-        # Compute t-transformed values and use that to find significant clusters
-        print("Plotting observed significant sensors")
-        # n_subjects = len(lv_vals)
-        # t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to sig_obs and not adjacency
 
         cluster_t_rt_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_rt_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
             print(f"Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
 
-    ############################## TOPOPLOT OBSERVED CLUSTERS ##############################
-    fig, ax = plt.subplots()
-
+    ############################## TOPOPLOT OBSERVED CLUSTERS ##############################        
+    # Compute t-transformed values and use that to find significant clusters
+    print("Plotting observed significant sensors")
     # Prepare the data for visualisation
     """combines planar gradiometer to use mag info (to plot positive and negative values)"""
     if ch_type == 'grad':  
         del info
         info = other[0]  # grad layout
 
-    mask = np.zeros(n_sensors, dtype=bool)
-    mask[sig_obs] = True
+    # Safe way to ensure the indices are correct on the plot
+    mask = np.zeros(len(info['ch_names']), dtype=bool)
+    valid_sig_obs = [i for i in sig_obs if i < len(mask)]
+    mask[valid_sig_obs] = True
 
     # Define the significant clusters
     mask_params = dict(
@@ -358,6 +390,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         linewidth=1, markersize=10
     ) 
 
+    fig, ax = plt.subplots()
     # Plot topomap
     im, cn = mne.viz.plot_topomap(
         t_obs, info, mask=mask, mask_params=mask_params,
@@ -414,10 +447,23 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
             significant_nulls = (np.array(t_null) > abs(t_thresh)) | (np.array(t_null) < -abs(t_thresh))
             sig_null = np.where(significant_nulls)[0]
-            sig_null = sig_null[~np.isin(sig_null, central_sensor_indices)]
-            sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs
-            sig_chan_names_null = [pair.split('_')[1] for pair in sig_pairs_null]  # use channel names to find the correct index in adjacency. 
-            sig_chan_names_null = [ch for ch in sig_chan_names_null if ch not in central_sensors]
+            # Step 1: extract channel names with their corresponding sig_null index
+            sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()
+            chan_name_and_idx = [
+                (pair.split('_')[1], idx)
+                for pair, idx in zip(sig_pairs_null, sig_null)
+            ]
+
+            # Step 2: filter out central sensors in one step
+            chan_name_and_idx = [
+                (ch, idx)
+                for ch, idx in chan_name_and_idx
+                if ch not in central_sensors and idx not in central_sensor_indices
+            ]
+
+            # Step 3: unpack filtered lists
+            sig_chan_names_null = [ch for ch, _ in chan_name_and_idx]
+            sig_null = np.array([idx for _, idx in chan_name_and_idx])
 
             if sig_null.size > 0:
                 index_in_adjacency_null = np.array([names.index(ch) for ch in sig_chan_names_null])
@@ -425,9 +471,21 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                 n_comp_null, labels_null = connected_components(
                     csr_matrix(sub_adj_null), directed=False, return_labels=True)
                 clusters_null = {i: index_in_adjacency_null[labels_null == i] for i in range(n_comp_null)}  # for the adjacency indices
+                chan_to_sig_idx = {
+                    ch: sig_null[i]
+                    for i, ch in enumerate(sig_chan_names_null)
+                }
                 clusters_rt_null = {
-                    i: np.array([sig_null[idx] for idx, _ in enumerate(index_in_adjacency_null[np.where(labels_null == i)[0]])])
-                    for i in range(n_comp_null)}  # for the r_obs and t_obs indices (filtered_df)
+                    i: np.array([
+                        chan_to_sig_idx[names[idx]]
+                        for idx in index_in_adjacency_null[np.where(labels_null == i)[0]]
+                        if names[idx] in chan_to_sig_idx  # safety check
+                    ])
+                    for i in range(n_comp_null)
+                }
+                # clusters_rt_null2 = {
+                #     i: np.array([sig_null[idx] for idx, _ in enumerate(index_in_adjacency_null[np.where(labels_null == i)[0]])])
+                #     for i in range(n_comp_null)}  # for the r_obs and t_obs indices (filtered_df)
 
                 if plot_topo_nulls:
                     # Compute t-transformed values and use that to find significant clusters
@@ -448,8 +506,9 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                         del info
                         info = other[0]  # grad layout
 
-                    mask = np.zeros(n_sensors, dtype=bool)
-                    mask[sig_null] = True
+                    mask = np.zeros(len(info['ch_names']), dtype=bool)
+                    valid_sig_null = [i for i in sig_null if i < len(mask)]
+                    mask[valid_sig_null] = True
 
                     # Plot topomap for null distribution
                     im, cn = mne.viz.plot_topomap(
