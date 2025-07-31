@@ -305,6 +305,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     significant_obs = (np.array(t_obs) > abs(t_thresh)) | (np.array(t_obs) < -abs(t_thresh))
     sig_obs = np.where(significant_obs)[0]  
+
+    # TODO: remove here after double checking
     # # Keep only those indices in sig_obs that are not in central_sensor_indices
     # sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
     # sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()  # this gives name of sensor pairs
@@ -356,11 +358,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             ])
             for i in range(n_comp_obs)
         }  # for the r_obs and t_obs indices (filtered_df)
-
-        # clusters_rt_ob2 = {
-        #     i: np.array([sig_obs[idx] for idx, _ in enumerate(index_in_adjacency[np.where(labels_obs == i)[0]])])
-        #     for i in range(n_comp_obs)
-        # }  
 
         print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
         for cid, nodes in clusters_obs.items():
@@ -618,8 +615,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                 del info
                 info = other[0]  # grad layout
 
-            mask = np.zeros(n_sensors, dtype=bool)
-            mask[all_sig_indices] = True
+            mask = np.zeros(len(info['ch_names']), dtype=bool)
+            valid_sig_null = [i for i in sig_null if i < len(mask)]
+            mask[valid_sig_null] = True
+
+            # mask = np.zeros(n_sensors, dtype=bool)
+            # mask[all_sig_indices] = True
 
             # Plot topomap
             im, cn = mne.viz.plot_topomap(
@@ -647,14 +648,14 @@ def cluster_permutation():
     ch_type = input('Enter sensortype (mag or grad):').strip()
     run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
-    # or run on all
-    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    ch_types = ['grad']
-    for substr in substrs:
-        for band in bands:
-            for ch_type in ch_types:
-                run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
+    # # or run on all
+    # substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+    # bands = ['Delta', 'Theta', 'Alpha', 'Beta']
+    # ch_types = ['grad']
+    # for substr in substrs:
+    #     for band in bands:
+    #         for ch_type in ch_types:
+    #             run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
 if __name__ == "__main__":
     cluster_permutation()
