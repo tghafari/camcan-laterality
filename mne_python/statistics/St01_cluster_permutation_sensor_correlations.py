@@ -28,9 +28,6 @@ Requirements:
 - `adjacency`: sparse adjacency matrix for sensor neighborhoods.
 
 
-NOTE THAT gradiometer topoplotting might not be complete-> can only work when grads are combined before
-LI is calculated.
-
 Written by: Tara Ghafari
 tara.ghafari@gmail.com
 """
@@ -40,7 +37,7 @@ import os.path as op
 import numpy as np
 import pandas as pd
 
-import scipy as stats
+import scipy.stats as stats
 from scipy.stats import spearmanr
 from scipy import sparse
 from scipy.sparse import csr_matrix
@@ -269,8 +266,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     # Filter sensor pairs based on magnetometer or gradiometer channel suffix
     if ch_type == 'mag':
         sensor_mask = corr_df['sensor_pair'].str.endswith('1')
+        central_sensors = ['MEG0811', 'MEG1011','MEG2121']  # should be ignored in cluster testing
+        central_sensor_indices = [11, 12, 30]
     elif ch_type == 'grad':
-        sensor_mask = corr_df['sensor_pair'].str.endswith('2') | corr_df['sensor_pair'].str.endswith('3')
+        sensor_mask = corr_df['sensor_pair'].str.endswith('2')  # grads are combined and saved in sensors ending in '2', no sensors ending in '3'
+        central_sensors = ['MEG0812', 'MEG1012', 'MEG2122']  # should be ignored in cluster testing
+        central_sensor_indices = [48, 49, 50]
     else:
         raise ValueError(f"Unsupported ch_type: {ch_type}")
 
@@ -290,8 +291,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     # Apply the mask to select rows
     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()    
     p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
-    central_sensors = ['MEG0811', 'MEG1011','MEG2121']  # should be ignored in cluster testing
-    central_sensor_indices = [11, 12, 30]
+    
 
     ############################## OBSERVED CLUSTERS ##############################
 
@@ -303,7 +303,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     t_thresh = stats.distributions.t.ppf(1 - alpha / 2, df=df)
     t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to r_obs and not adjacency
 
-    significant_obs = t_obs > t_thresh
+    significant_obs = (np.array(t_obs) > abs(t_thresh)) | (np.array(t_obs) < -abs(t_thresh))
     sig_obs = np.where(significant_obs)[0]  
     # Keep only those indices in sig_obs that are not in central_sensor_indices
     sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
@@ -345,25 +345,13 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     # Prepare the data for visualisation
     """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-    if ch_type == 'grad':  # this needs more work from previous steps where we combine first and then calculate LI for grads.
-        # Combine planar gradiometers: (1st + 2nd), (3rd + 4th), ...
-        t_obs = (t_obs[::2] + t_obs[1::2]) / 2
-
-        # Convert sig_obs (indices) to boolean mask
-        mask_bool = np.zeros(n_sensors, dtype=bool)
-        mask_bool[sig_obs] = True
-
-        # Combine mask: significant if either of the pair is significant
-        mask = mask_bool[::2] | mask_bool[1::2]
-
-        # Refresh info object to use mag layout for plotting
+    if ch_type == 'grad':  
         del info
         info = other[0]  # grad layout
-    else:
-        # Create mask for mag
-        mask = np.zeros(n_sensors, dtype=bool)
-        mask[sig_obs] = True
-    
+
+    mask = np.zeros(n_sensors, dtype=bool)
+    mask[sig_obs] = True
+
     # Define the significant clusters
     mask_params = dict(
         marker='o', markerfacecolor='w', markeredgecolor='k',
@@ -377,7 +365,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         cmap='RdBu_r', show=False, axes=ax
     )  
 
-    if draw_cluster_lines:  # this section plots lines but not at the exact location
+    if draw_cluster_lines:  # this section plots lines but not at the exact location - TODO: needs fine tuning
         # --- Draw cluster-specific lines ---
         # Get 2D positions of all sensors
         pos = np.array([info['chs'][info['ch_names'].index(name)]['loc'][:2] for name in info['ch_names']])
@@ -424,7 +412,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             t_null = r_to_t(r_null, n=n_subjects)
             p_null = [res.pvalue for res in results]
 
-            significant_nulls = np.array(t_null) > t_thresh  
+            significant_nulls = (np.array(t_null) > abs(t_thresh)) | (np.array(t_null) < -abs(t_thresh))
             sig_null = np.where(significant_nulls)[0]
             sig_null = sig_null[~np.isin(sig_null, central_sensor_indices)]
             sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()  # this gives name of sensor pairs
@@ -457,23 +445,11 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                     # Prepare the data for visualisation
                     """combines planar gradiometer to use mag info (to plot positive and negative values)"""
                     if ch_type == 'grad':  # this needs more work from previous steps where we combine first and then calculate LI for grads.
-                        # Combine planar gradiometers: (1st + 2nd), (3rd + 4th), ...
-                        t_null = (t_null[::2] + t_null[1::2]) / 2
-
-                        # Convert sig_null (indices) to boolean mask
-                        mask_bool = np.zeros(n_sensors, dtype=bool)
-                        mask_bool[sig_null] = True
-
-                        # Combine mask: significant if either of the pair is significant
-                        mask = mask_bool[::2] | mask_bool[1::2]
-
-                        # Refresh info object to use mag layout for plotting
                         del info
                         info = other[0]  # grad layout
-                    else:
-                        # Create mask for mag
-                        mask = np.zeros(n_sensors, dtype=bool)
-                        mask[sig_null] = True
+
+                    mask = np.zeros(n_sensors, dtype=bool)
+                    mask[sig_null] = True
 
                     # Plot topomap for null distribution
                     im, cn = mne.viz.plot_topomap(
@@ -580,30 +556,11 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             # Prepare the data for visualisation
             """combines planar gradiometer to use mag info (to plot positive and negative values)"""
             if ch_type == 'grad':
-                # mask = mask[::2]  # old way
-
-                # Convert sig_obs (indices) to boolean mask
-                # new way
-                t_obs = (t_obs[::2] + t_obs[1::2]) / 2
-
-                # Convert sig_obs (indices) to boolean mask
-                mask_bool = np.zeros(n_sensors, dtype=bool)
-                mask_bool[sig_obs] = True
-
-                # Combine mask: significant if either of the pair is significant
-                mask = mask_bool[::2] | mask_bool[1::2]
-
-                # Refresh info object to use mag layout for plotting
                 del info
                 info = other[0]  # grad layout
-              # end of new way
 
-                del info  # refresh info for plotting only in grad
-                info = other[0]  # this is from read_raw_info when running with ch_type='grad'
-            else:
-                # Create mask for mag
-                mask = np.zeros(n_sensors, dtype=bool)
-                mask[all_sig_indices] = True
+            mask = np.zeros(n_sensors, dtype=bool)
+            mask[all_sig_indices] = True
 
             # Plot topomap
             im, cn = mne.viz.plot_topomap(
@@ -624,8 +581,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 def cluster_permutation():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
-    extract_all_band_power(paths)  # only need to run once
-    save_spearman_correlations(paths)   # only need to run once
+    # extract_all_band_power(paths)  # only need to run once
+    # save_spearman_correlations(paths)   # only need to run once
     substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
     band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
     ch_type = input('Enter sensortype (mag or grad):').strip()
@@ -634,7 +591,7 @@ def cluster_permutation():
     # or run on all
     substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
     bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    ch_types = ['mag']
+    ch_types = ['grad']
     for substr in substrs:
         for band in bands:
             for ch_type in ch_types:
