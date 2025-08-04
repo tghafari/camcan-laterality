@@ -282,16 +282,10 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
     li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'))
-    # Select columns matching channels in info, ensuring order matches info['ch_names']
-    selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
-    li_data = li_df[selected_cols].to_numpy()
-    n_sensors = li_data.shape[1]
-    lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
 
     # Apply the mask to select rows
     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()    
     p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
-    
 
     ############################## OBSERVED CLUSTERS ##############################
 
@@ -376,10 +370,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         del info
         info = other[0]  # grad layout
 
-    # Safe way to ensure the indices are correct on the plot
     mask = np.zeros(len(info['ch_names']), dtype=bool)
-    valid_sig_obs = [i for i in sig_obs if i < len(mask)]
-    mask[valid_sig_obs] = True
+    mask[sig_obs] = True
 
     # Define the significant clusters
     mask_params = dict(
@@ -389,8 +381,15 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     fig, ax = plt.subplots()
     # Plot topomap
+    # im, cn = mne.viz.plot_topomap(
+    #     t_obs, info, mask=mask, mask_params=mask_params, names=filtered_df['sensor_pair'],  
+    #     vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
+    #     cmap='RdBu_r', show=False, axes=ax
+    # )  
+
+    # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
     im, cn = mne.viz.plot_topomap(
-        t_obs, info, mask=mask, mask_params=mask_params,
+        data_grad, pos2d, mask=mask, mask_params=mask_params, names=grad_names,  
         vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
         cmap='RdBu_r', show=False, axes=ax
     )  
@@ -425,6 +424,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     plt.show()
 
     ############################## PERMUTATION TESTING ##############################
+    # Select columns matching channels in info, ensuring order matches info['ch_names']
+    selected_cols = [c for c in li_df.columns if c.endswith('1')] if ch_type == 'mag' else [c for c in li_df.columns if c.endswith('2') or c.endswith('3')]
+    li_data = li_df[selected_cols].to_numpy()
+    n_sensors = li_data.shape[1]
+    lv_vals = lv_df.set_index('subject_ID').loc[li_df['subject_ID']][substr].values
+
     if sig_obs.size > 0:
         # 2. Build null distribution by shuffling
         rng = np.random.RandomState(42)
