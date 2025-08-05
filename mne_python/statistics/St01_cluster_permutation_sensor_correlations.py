@@ -318,8 +318,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     if sig_obs.size <= 0:
         print("No significant r values found in sensors")
+        mask = np.zeros(len(info['ch_names']), dtype=bool)  # no masking on the topoplot
 
     elif sig_obs.size > 0:
+        # significant masks on the topoplot
+        mask = np.zeros(len(info['ch_names']), dtype=bool)
+        mask[sig_obs] = True
 
         index_in_adjacency = np.array([names.index(ch) for ch in sig_chan_names])  # info.ch_names is not in the same order as names
         sub_adj_obs = adjacency[np.ix_(index_in_adjacency, index_in_adjacency)]
@@ -359,6 +363,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     """we use the positions of channels for grads.
     using mag info messes up the index of channels and is therefore not correct."""
     if ch_type == 'grad':  
+        info_mag = other[0]
         # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
         grad_picks = mne.pick_types(info, meg='grad')
         grad_names = [info['ch_names'][p] for p in grad_picks]  # this is essentialy identical to 
@@ -372,9 +377,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     else:
         pos_info = info
 
-    mask = np.zeros(len(info['ch_names']), dtype=bool)
-    mask[sig_obs] = True
-
     # Define the significant clusters
     mask_params = dict(
         marker='o', markerfacecolor='w', markeredgecolor='k',
@@ -384,7 +386,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     fig, ax = plt.subplots()
 
     im, cn = mne.viz.plot_topomap(
-        t_obs, pos_info, mask=mask, mask_params=mask_params, names=grad_names,  
+        t_obs, pos_info, mask=mask, mask_params=mask_params, #names=grad_names,  
         vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
         cmap='RdBu_r', show=False, axes=ax
     )  
@@ -487,7 +489,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
                     # Plot topomap for null distribution
                     im, cn = mne.viz.plot_topomap(
-                        t_null, pos_info, mask=mask, mask_params=mask_params,
+                        t_null, pos_info, mask=mask, mask_params=mask_params, names=grad_names,
                         vlim=(min(t_null), max(t_null)), contours=0, image_interp='nearest', 
                         cmap='RdBu_r', show=False, axes=ax
                     )  
@@ -606,19 +608,19 @@ def cluster_permutation():
     paths = setup_paths(platform)
     # extract_all_band_power(paths)  # only need to run once
     # save_spearman_correlations(paths)   # only need to run once
-    substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
-    band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
-    ch_type = input('Enter sensortype (mag or grad):').strip()
-    run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
+    # substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
+    # band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
+    # ch_type = input('Enter sensortype (mag or grad):').strip()
+    # run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
-    # # or run on all
-    # substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-    # bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    # ch_types = ['grad']
-    # for substr in substrs:
-    #     for band in bands:
-    #         for ch_type in ch_types:
-    #             run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
+    # or run on all
+    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
+    ch_types = ['grad']
+    for substr in substrs:
+        for band in bands:
+            for ch_type in ch_types:
+                run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
 if __name__ == "__main__":
     cluster_permutation()
