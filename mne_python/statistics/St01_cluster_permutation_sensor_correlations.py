@@ -192,7 +192,7 @@ def read_raw_info(paths, ch_type):
     else:
         channels_mag = [ch for ch in right_sensors if ch.endswith('1')]
         raw_mag = raw.copy().pick('mag').pick(channels_mag)
-        channels = [ch for ch in right_sensors if not ch.endswith('1')]
+        channels = [ch for ch in right_sensors if ch.endswith('2')]
         raw.pick('grad').pick(channels)
         # bear in mind that plotting grads requires a mag info to plot positive and negative values
         # it also requires grad info for adjacency info
@@ -282,10 +282,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
     li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'))
-
-    # Apply the mask to select rows
     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()    
-    p_obs = filtered_df[f'{band.lower()}_pval'].to_numpy()  # for before cluster permutation p-values
 
     ############################## OBSERVED CLUSTERS ##############################
 
@@ -296,19 +293,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     df = n_subjects - 1  # degrees of freedom
     t_thresh = stats.distributions.t.ppf(1 - alpha / 2, df=df)
     t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to r_obs and not adjacency
+    # remember we only use adjacency indices for csr analyses, everything else uses info/filtered_df indices
 
     significant_obs = (np.array(t_obs) > abs(t_thresh)) | (np.array(t_obs) < -abs(t_thresh))
     sig_obs = np.where(significant_obs)[0]  
 
-    # TODO: remove here after double checking
-    # # Keep only those indices in sig_obs that are not in central_sensor_indices
-    # sig_obs = sig_obs[~np.isin(sig_obs, central_sensor_indices)]
-    # sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()  # this gives name of sensor pairs
-    # sig_chan_names = [pair.split('_')[1] for pair in sig_pairs]  # use channel names to find the correct index in adjacency. 
-    #                                                              # adjacency and filtered_df indices do not align
-    # sig_chan_names = [ch for ch in sig_chan_names if ch not in central_sensors]
-
-    # Extract (channel_name, index) pairs in one go
+    # Extract (channel_name, index) pairs from correct order
     sig_pairs = filtered_df.loc[significant_obs, 'sensor_pair'].tolist()
     chan_name_and_idx = [
         (pair.split('_')[1], idx)
@@ -322,7 +312,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         if ch not in central_sensors and idx not in central_sensor_indices
     ]
 
-    # Unpack
+    # Unpack - this is the final names and idx after removing central sensors
     sig_chan_names = [ch for ch, _ in chan_name_and_idx]
     sig_obs = np.array([idx for _, idx in chan_name_and_idx])
 
@@ -331,7 +321,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     elif sig_obs.size > 0:
 
-        index_in_adjacency = np.array([names.index(ch) for ch in sig_chan_names])
+        index_in_adjacency = np.array([names.index(ch) for ch in sig_chan_names])  # info.ch_names is not in the same order as names
         sub_adj_obs = adjacency[np.ix_(index_in_adjacency, index_in_adjacency)]
         n_comp_obs, labels_obs = connected_components(
             csr_matrix(sub_adj_obs), directed=False, return_labels=True)
@@ -364,11 +354,23 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     ############################## TOPOPLOT OBSERVED CLUSTERS ##############################        
     # Compute t-transformed values and use that to find significant clusters
     print("Plotting observed significant sensors")
+    
     # Prepare the data for visualisation
-    """combines planar gradiometer to use mag info (to plot positive and negative values)"""
+    """we use the positions of channels for grads.
+    using mag info messes up the index of channels and is therefore not correct."""
     if ch_type == 'grad':  
-        del info
-        info = other[0]  # grad layout
+        # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
+        grad_picks = mne.pick_types(info, meg='grad')
+        grad_names = [info['ch_names'][p] for p in grad_picks]  # this is essentialy identical to 
+                                                                #sensor_names = [pair.split('_')[1] for pair in filtered_df['sensor_pair']]
+                                                                # we are just using 'info' to be more principled so:
+                                                                # In [198]: grad_names == sensor_names
+                                                                # Out[198]: True
+
+        pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
+        pos_info = pos2d
+    else:
+        pos_info = info
 
     mask = np.zeros(len(info['ch_names']), dtype=bool)
     mask[sig_obs] = True
@@ -380,21 +382,14 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     ) 
 
     fig, ax = plt.subplots()
-    # Plot topomap
-    # im, cn = mne.viz.plot_topomap(
-    #     t_obs, info, mask=mask, mask_params=mask_params, names=filtered_df['sensor_pair'],  
-    #     vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
-    #     cmap='RdBu_r', show=False, axes=ax
-    # )  
 
-    # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
     im, cn = mne.viz.plot_topomap(
-        data_grad, pos2d, mask=mask, mask_params=mask_params, names=grad_names,  
+        t_obs, pos_info, mask=mask, mask_params=mask_params, names=grad_names,  
         vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
         cmap='RdBu_r', show=False, axes=ax
     )  
 
-    if draw_cluster_lines:  # this section plots lines but not at the exact location - TODO: needs fine tuning
+    if draw_cluster_lines:  # this section plots lines but not at the exact location - TODO: doesn't work yet
         # --- Draw cluster-specific lines ---
         # Get 2D positions of all sensors
         pos = np.array([info['chs'][info['ch_names'].index(name)]['loc'][:2] for name in info['ch_names']])
@@ -445,25 +440,19 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
             r_null = np.array([res.correlation for res in results])
             t_null = r_to_t(r_null, n=n_subjects)
-            p_null = [res.pvalue for res in results]
 
             significant_nulls = (np.array(t_null) > abs(t_thresh)) | (np.array(t_null) < -abs(t_thresh))
             sig_null = np.where(significant_nulls)[0]
-            # Step 1: extract channel names with their corresponding sig_null index
             sig_pairs_null = filtered_df.loc[significant_nulls, 'sensor_pair'].tolist()
             chan_name_and_idx = [
                 (pair.split('_')[1], idx)
                 for pair, idx in zip(sig_pairs_null, sig_null)
             ]
-
-            # Step 2: filter out central sensors in one step
             chan_name_and_idx = [
                 (ch, idx)
                 for ch, idx in chan_name_and_idx
                 if ch not in central_sensors and idx not in central_sensor_indices
             ]
-
-            # Step 3: unpack filtered lists
             sig_chan_names_null = [ch for ch, _ in chan_name_and_idx]
             sig_null = np.array([idx for _, idx in chan_name_and_idx])
 
@@ -472,22 +461,19 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                 sub_adj_null = adjacency[np.ix_(index_in_adjacency_null, index_in_adjacency_null)]
                 n_comp_null, labels_null = connected_components(
                     csr_matrix(sub_adj_null), directed=False, return_labels=True)
-                clusters_null = {i: index_in_adjacency_null[labels_null == i] for i in range(n_comp_null)}  # for the adjacency indices
-                chan_to_sig_idx = {
+                clusters_null = {i: index_in_adjacency_null[labels_null == i] for i in range(n_comp_null)}  
+                chan_to_sig_idx_null = {
                     ch: sig_null[i]
                     for i, ch in enumerate(sig_chan_names_null)
                 }
                 clusters_rt_null = {
                     i: np.array([
-                        chan_to_sig_idx[names[idx]]
+                        chan_to_sig_idx_null[names[idx]]
                         for idx in index_in_adjacency_null[np.where(labels_null == i)[0]]
-                        if names[idx] in chan_to_sig_idx  # safety check
+                        if names[idx] in chan_to_sig_idx_null  # safety check
                     ])
                     for i in range(n_comp_null)
                 }
-                # clusters_rt_null2 = {
-                #     i: np.array([sig_null[idx] for idx, _ in enumerate(index_in_adjacency_null[np.where(labels_null == i)[0]])])
-                #     for i in range(n_comp_null)}  # for the r_obs and t_obs indices (filtered_df)
 
                 if plot_topo_nulls:
                     # Compute t-transformed values and use that to find significant clusters
@@ -495,26 +481,13 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
                     # Plot significant sensors before cluster permutations
                     fig, ax = plt.subplots()
-
-                    # Define the significant clusters
-                    mask_params = dict(
-                        marker='o', markerfacecolor='w', markeredgecolor='k',
-                        linewidth=1, markersize=10
-                    ) 
-
-                    # Prepare the data for visualisation
-                    """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-                    if ch_type == 'grad':  # this needs more work from previous steps where we combine first and then calculate LI for grads.
-                        del info
-                        info = other[0]  # grad layout
-
+                    del mask  # to prevent contamination from observed masks
                     mask = np.zeros(len(info['ch_names']), dtype=bool)
-                    valid_sig_null = [i for i in sig_null if i < len(mask)]
-                    mask[valid_sig_null] = True
+                    mask[sig_null] = True
 
                     # Plot topomap for null distribution
                     im, cn = mne.viz.plot_topomap(
-                        t_null, info, mask=mask, mask_params=mask_params,
+                        t_null, pos_info, mask=mask, mask_params=mask_params,
                         vlim=(min(t_null), max(t_null)), contours=0, image_interp='nearest', 
                         cmap='RdBu_r', show=False, axes=ax
                     )  
@@ -608,28 +581,13 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             fig, ax = plt.subplots()
 
             # Define the significant clusters
-            del mask
-            mask_params = dict(
-                marker='o', markerfacecolor='w', markeredgecolor='k',
-                linewidth=1, markersize=10
-            ) 
-
-            # Prepare the data for visualisation
-            """combines planar gradiometer to use mag info (to plot positive and negative values)"""
-            if ch_type == 'grad':
-                del info
-                info = other[0]  # grad layout
-
+            del mask  # to prevent contamination from observed masks
             mask = np.zeros(len(info['ch_names']), dtype=bool)
-            valid_sig_null = [i for i in sig_null if i < len(mask)]
-            mask[valid_sig_null] = True
-
-            # mask = np.zeros(n_sensors, dtype=bool)
-            # mask[all_sig_indices] = True
+            mask[all_sig_indices] = True
 
             # Plot topomap
             im, cn = mne.viz.plot_topomap(
-                t_obs, info, mask=mask, mask_params=mask_params,
+                t_obs, pos_info, mask=mask, mask_params=mask_params,
                 vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
                 cmap='RdBu_r', show=False, axes=ax
             )  
