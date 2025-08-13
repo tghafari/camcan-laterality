@@ -66,7 +66,7 @@ def setup_paths(platform='mac'):
     paths = {
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/bands'),
         'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_no-vol-outliers.csv'),  # vol outliers (< 0.01 quantile) removed
-        'sub_list': op.join(quinna_dir, 'dataman/data_information/dblCheck_FINAL_sublist-vol-outliers-removed.csv'),  # this is just to ensure correct subjects are being used for the final analysis
+        'sub_list': op.join(quinna_dir, 'dataman/data_information/dblCheck_last_FINAL_sublist-vol-outliers-removed.csv'),  # this is just to ensure correct subjects are being used for the final analysis (last_FINAL_sublist-vol-outliers-removed.csv)
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'), # for alph thal, puta beta, hipp delta
         'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),  # for all combinations of bands and substrs only excludeing vol outliers
@@ -578,6 +578,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             all_sig_indices = []
             for cluster_id, indices in significant_clusters_t[band][substr].items():
                 all_sig_indices.extend(indices)
+                # save significant_clusters_t[band][substr] into file and use it in figure2_sensor_by_lv... script. 
 
             # 5. Visualize topomap with significant mask and cluster labels
             fig, ax = plt.subplots()
