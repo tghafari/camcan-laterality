@@ -53,11 +53,11 @@ from mne.channels import find_layout
 def setup_paths(platform='mac'):
     """Set up and return file paths based on the system platform."""
     if platform == 'bluebear':
-        quinna_dir = '/rds/projects/q/quinna-camcan/'
+        quinna_dir = '/rds/projects/q/quinna-camcan-1/'
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        quinna_dir = '/Volumes/quinna-camcan/'
+        quinna_dir = '/Volumes/quinna-camcan-1/'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
@@ -72,7 +72,8 @@ def setup_paths(platform='mac'):
         'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),  # for all combinations of bands and substrs only excludeing vol outliers
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),  # combined grads end in '2', there is no sensor ending in '3'
-        'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads')  # we use vol outliers removed list now (30/07/2025)
+        'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads'),  # we use vol outliers removed list now (30/07/2025)
+        'cluster_perm_signif_sensors': op.join(sub2ctx_dir,'derivatives/correlations/bands/bands_significant_sensors_cluster-perm'),
     }
     return paths
 
@@ -323,7 +324,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     elif sig_obs.size > 0:
         # significant masks on the topoplot
         mask = np.zeros(len(info['ch_names']), dtype=bool)
-        mask[sig_obs] = True
+        mask[sig_obs] = True  # these indices are the same as in significant_clusters_t
 
         index_in_adjacency = np.array([names.index(ch) for ch in sig_chan_names])  # info.ch_names is not in the same order as names
         sub_adj_obs = adjacency[np.ix_(index_in_adjacency, index_in_adjacency)]
@@ -338,7 +339,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             }  # removing the central sensors might misalign the indices
 
         # Map clusters of adjacency indices back to filtered_df indices
-        clusters_rt_obs = {
+        clusters_rt_obs = {  # same indices as significant_clusters_t
             i: np.array([
                 chan_to_sig_idx_obs[names[idx]]
                 for idx in index_in_adjacency[np.where(labels_obs == i)[0]]
@@ -349,11 +350,12 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
         print(f"Found {len(clusters_obs)} permutated cluster(s) for {substr}-{band} ({ch_type}):")
         for cid, nodes in clusters_obs.items():
-            print(f"  Cluster {cid}: indices {nodes} -> channels: {[names[ch] for ch in nodes]}")
+            print(f"  Cluster {cid}: indices {nodes} -> channels: {[names[ch] for ch in nodes]}")  # these indices are different from those in significant_clusters_t
+                                                                                                   # but they refer to the same channels
 
         cluster_t_rt_sums_obs = {label: np.sum(t_obs[sensors]) for label, sensors in clusters_rt_obs.items()}
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
-            print(f"Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
+            print(f"  Cluster {cluster_id_obs}: summed t = {t_sum_obs:.3f}")
 
     ############################## TOPOPLOT OBSERVED CLUSTERS ##############################        
     # Compute t-transformed values and use that to find significant clusters
@@ -558,7 +560,6 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         plt.show()
 
         ############################## FINAL TOPOPLOT FOR SIGNIFICANT CLUSTERS ##############################
-
         # Dictionary to store significant clusters based on t-values
         significant_clusters_t = {}
 
@@ -578,7 +579,30 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             all_sig_indices = []
             for cluster_id, indices in significant_clusters_t[band][substr].items():
                 all_sig_indices.extend(indices)
-                # save significant_clusters_t[band][substr] into file and use it in figure2_sensor_by_lv... script. 
+
+            # Save significant_clusters_t[band][substr] into file:
+            idx_to_chan_name = {idx: name for name, idx in chan_to_sig_idx_obs.items()}
+
+            # Flatten and prepare the data for saving
+            rows = []
+            for band_name, substr_dict in significant_clusters_t.items():
+                for substr_name, clusters in substr_dict.items():
+                    for cluster_id, sensor_indices in clusters.items():
+                        # Get corresponding sensor names
+                        sensor_names = [idx_to_chan_name.get(idx, f"Unknown_{idx}") for idx in sensor_indices]
+                        rows.append({
+                            'band': band_name,
+                            'structure': substr_name,
+                            'cluster': cluster_id,
+                            'sensors': ';'.join(map(str, sensor_indices)),       # indices
+                            'sensor_names': ';'.join(sensor_names)               # names
+                        })
+
+            # Convert to DataFrame
+            df = pd.DataFrame(rows)
+
+            # Save to CSV
+            df.to_csv(op.join(paths['cluster_perm_signif_sensors'], f'{substr}_{band}_signif_sensors_after_cluster_perm.csv'), index=False) 
 
             # 5. Visualize topomap with significant mask and cluster labels
             fig, ax = plt.subplots()
@@ -612,12 +636,12 @@ def cluster_permutation():
     # substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
     # band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
     # ch_type = input('Enter sensortype (mag or grad):').strip()
-    # run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
+    # # run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
     # or run on all
     substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
     bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    ch_types = ['grad']
+    ch_types = ['mag']
     for substr in substrs:
         for band in bands:
             for ch_type in ch_types:
