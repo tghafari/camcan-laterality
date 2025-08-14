@@ -602,7 +602,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             df = pd.DataFrame(rows)
 
             # Save to CSV
-            df.to_csv(op.join(paths['cluster_perm_signif_sensors'], f'{substr}_{band}_signif_sensors_after_cluster_perm.csv'), index=False) 
+            df.to_csv(op.join(paths['cluster_perm_signif_sensors'], f'{substr}_{band}_{ch_type}_signif_sensors_after_cluster_perm.csv'), index=False) 
 
             # 5. Visualize topomap with significant mask and cluster labels
             fig, ax = plt.subplots()
@@ -641,7 +641,7 @@ def cluster_permutation():
     # or run on all
     substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
     bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    ch_types = ['mag']
+    ch_types = ['grad', 'mag']
     for substr in substrs:
         for band in bands:
             for ch_type in ch_types:

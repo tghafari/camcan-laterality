@@ -3,6 +3,9 @@
 ==========================================
 CS05_visualise correlations in significant 
 sensor groupd over spectra
+
+NOTE: This is an old version. consider using 
+figure3_correlation_per_hz_plots.py instead
     
 Written by Tara Ghafari
 t.ghafari@bham.ac.uk

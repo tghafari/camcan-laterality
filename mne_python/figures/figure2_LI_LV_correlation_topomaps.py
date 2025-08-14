@@ -41,7 +41,7 @@ def setup_paths(platform: str = 'mac') -> dict:
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        quinna_dir = '/Volumes/quinna-camcan/'
+        quinna_dir = '/Volumes/quinna-camcan-1/'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
@@ -57,12 +57,9 @@ def setup_paths(platform: str = 'mac') -> dict:
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),
         'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads'),
-        'save_path': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN/results/Manuscript/Figures',
-        # Master CSV with significant clusters (created in previous step)
-        'cluster_perm_signif_sensors': op.join(
-            sub2ctx_dir,
-            'derivatives/correlations/bands/cluster_perm_significant_sensors.csv'
-        ),
+        'save_path': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
+        # CSVs with significant clusters (created in previous step)
+        'cluster_perm_signif_sensors': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_significant_sensors_cluster-perm'),
     }
     return paths
 
@@ -159,12 +156,14 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str, ch_t
     # --- Create 2D positions for plot_topomap ---
     # For grads, build 2D (x,y) from channel locs of the picked info object.
     if ch_type == 'grad':
+
         grad_picks = mne.pick_types(info, meg='grad', eeg=False, stim=False, exclude=[])
         # Sanity check: lengths must match data
         if len(grad_picks) != len(t_obs):
             raise RuntimeError(
                 f"Length mismatch: {len(grad_picks)} grad channels in info vs {len(t_obs)} data points in t_obs."
             )
+
         pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
         pos_info = pos2d
     else:
@@ -177,7 +176,7 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str, ch_t
         pos_info = info
 
     # --- Load significant clusters master CSV and filter for (substr, band) ---
-    signif_csv = paths['cluster_perm_signif_sensors']
+    signif_csv = op.join(paths['cluster_perm_signif_sensors'], f'{substr}_{band}_{ch_type}_signif_sensors_after_cluster_perm.csv')
     if not op.isfile(signif_csv):
         raise FileNotFoundError(
             f"Significant clusters CSV not found: {signif_csv}\n"
@@ -222,15 +221,11 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str, ch_t
 
     title = f'{substr}-{band} • t from Spearman r ({ch_type}) • after cluster permutation'
     ax.set_title(title, fontsize=12)
-
-    # Optional: You had ax.set_xlim(0,) to "remove the left half of topoplot".
-    # That can look odd depending on the head geometry; comment out by default.
-    # ax.set_xlim(0, )
-
+    ax.set_xlim(0, )  # "remove the left half of topoplot"
     fig.tight_layout()
 
     # --- Save outputs ---
-    out_dir = op.join(paths['save_path'], f'{substr}_{band}_cluster_sig_topoplots')
+    out_dir = op.join(paths['save_path'], f'{substr}_{band}_{ch_type}_cluster_sig_topoplots')
     base = f'{substr}_{band}_{ch_type}_cluster_sig_topomap'
     save_figure_all_formats(fig, out_dir, base, dpi=800)
     plt.show()
@@ -240,7 +235,7 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str, ch_t
 
 # ------------------------------- Run ------------------------------- #
 
-if __name__ == "__main__":
+def save_figure_2():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
 
@@ -262,98 +257,100 @@ if __name__ == "__main__":
 
     plot_cluster_significant_topoplots(paths, substr, band, ch_type)
 
+if __name__ == "__main__":
+    save_figure_2()
 
 
 
-platform = 'mac'  # or 'bluebear'
-paths = setup_paths(platform)
-substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
-band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
-ch_type = input('Enter sensortype (mag or grad):').strip()
+# platform = 'mac'  # or 'bluebear'
+# paths = setup_paths(platform)
+# substr = input('Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu):').strip()
+# band = input('Enter band (Delta, Theta, Alpha, Beta):').strip()
+# ch_type = input('Enter sensortype (mag or grad):').strip()
 
-def plot_cluster_significant_topoplots(paths, substr, band, ch_type):
-    raw, info, *other = read_raw_info(paths, ch_type)  
-    corr_path = op.join(paths['all_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv')
-    corr_df = pd.read_csv(corr_path)
+# def plot_cluster_significant_topoplots(paths, substr, band, ch_type):
+#     raw, info, *other = read_raw_info(paths, ch_type)  
+#     corr_path = op.join(paths['all_correlation_dir'], f'{substr}_allpairs_{band}_spearmanr.csv')
+#     corr_df = pd.read_csv(corr_path)
 
-    # Filter sensor pairs based on magnetometer or gradiometer channel suffix
-    if ch_type == 'mag':
-        sensor_mask = corr_df['sensor_pair'].str.endswith('1')
-        central_sensors = ['MEG0811', 'MEG1011','MEG2121']  # should be ignored in cluster testing
-        central_sensor_indices = [11, 12, 30]
-    elif ch_type == 'grad':
-        sensor_mask = corr_df['sensor_pair'].str.endswith('2')  # grads are combined and saved in sensors ending in '2', no sensors ending in '3'
-        central_sensors = ['MEG0812', 'MEG1012', 'MEG2122']  # should be ignored in cluster testing
-        central_sensor_indices = [48, 49, 50]
-    else:
-        raise ValueError(f"Unsupported ch_type: {ch_type}")
+#     # Filter sensor pairs based on magnetometer or gradiometer channel suffix
+#     if ch_type == 'mag':
+#         sensor_mask = corr_df['sensor_pair'].str.endswith('1')
+#         central_sensors = ['MEG0811', 'MEG1011','MEG2121']  # should be ignored in cluster testing
+#         central_sensor_indices = [11, 12, 30]
+#     elif ch_type == 'grad':
+#         sensor_mask = corr_df['sensor_pair'].str.endswith('2')  # grads are combined and saved in sensors ending in '2', no sensors ending in '3'
+#         central_sensors = ['MEG0812', 'MEG1012', 'MEG2122']  # should be ignored in cluster testing
+#         central_sensor_indices = [48, 49, 50]
+#     else:
+#         raise ValueError(f"Unsupported ch_type: {ch_type}")
 
 
-    filtered_df = corr_df[sensor_mask]
-    if filtered_df.empty:
-        print(f"No matching sensors for {ch_type} in {substr}-{band}")
-        return
+#     filtered_df = corr_df[sensor_mask]
+#     if filtered_df.empty:
+#         print(f"No matching sensors for {ch_type} in {substr}-{band}")
+#         return
 
-    # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
-    li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'))
-    r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()  
-    n_subjects = len(li_df)  # in our last_FINAl list this is 532 (vol outliers and errored subjects in lateralised psd calculation are removed)
-    t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to r_obs and not adjacency
+#     # Load lateralized power data for this band to calculate shuffled correlations and use variables for plotting
+#     li_df = pd.read_csv(op.join(paths['LI_dir'], f'{band}_lateralised_power_allsens_subtraction_nonoise_no-vol-outliers.csv'))
+#     r_obs = filtered_df[f'{band.lower()}_rval'].to_numpy()  
+#     n_subjects = len(li_df)  # in our last_FINAl list this is 532 (vol outliers and errored subjects in lateralised psd calculation are removed)
+#     t_obs = r_to_t(r_obs, n=n_subjects)  # indices here correspond to r_obs and not adjacency
 
-        # Prepare the data for visualisation
-    """we use the positions of channels for grads.
-    using mag info messes up the index of channels and is therefore not correct."""
-    if ch_type == 'grad':  
-        # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
-        grad_picks = mne.pick_types(info, meg='grad')
-        grad_names = [info['ch_names'][p] for p in grad_picks]  # this is essentialy identical to 
-                                                                #sensor_names = [pair.split('_')[1] for pair in filtered_df['sensor_pair']]
-                                                                # we are just using 'info' to be more principled so:
-                                                                # In [198]: grad_names == sensor_names
-                                                                # Out[198]: True
+#         # Prepare the data for visualisation
+#     """we use the positions of channels for grads.
+#     using mag info messes up the index of channels and is therefore not correct."""
+#     if ch_type == 'grad':  
+#         # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
+#         grad_picks = mne.pick_types(info, meg='grad')
+#         grad_names = [info['ch_names'][p] for p in grad_picks]  # this is essentialy identical to 
+#                                                                 #sensor_names = [pair.split('_')[1] for pair in filtered_df['sensor_pair']]
+#                                                                 # we are just using 'info' to be more principled so:
+#                                                                 # In [198]: grad_names == sensor_names
+#                                                                 # Out[198]: True
 
-        pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
-        pos_info = pos2d
-    else:
-        pos_info = info
+#         pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
+#         pos_info = pos2d
+#     else:
+#         pos_info = info
 
-    # Define the significant clusters
-    mask_params = dict(
-        marker='o', markerfacecolor='w', markeredgecolor='k',
-        linewidth=1, markersize=10
-    ) 
+#     # Define the significant clusters
+#     mask_params = dict(
+#         marker='o', markerfacecolor='w', markeredgecolor='k',
+#         linewidth=1, markersize=10
+#     ) 
 
-    # Load the CSV with all significant clusters
-    df = pd.read_csv(paths['cluster_perm_signif_sensors'])
+#     # Load the CSV with all significant clusters
+#     df = pd.read_csv(paths['cluster_perm_signif_sensors'])
 
-    # Filter for the specific band and structure
-    df_substr_band = df[(df['structure'] == substr) & (df['band'] == band)]
+#     # Filter for the specific band and structure
+#     df_substr_band = df[(df['structure'] == substr) & (df['band'] == band)]
 
-    # Extract all significant sensor indices for these clusters
-    # Sensors are stored as semicolon-separated strings, so split and flatten
-    sig_indices = []
-    for sensor_str in df_substr_band['sensors']:
-        sig_indices.extend(map(int, sensor_str.split(';')))
+#     # Extract all significant sensor indices for these clusters
+#     # Sensors are stored as semicolon-separated strings, so split and flatten
+#     sig_indices = []
+#     for sensor_str in df_substr_band['sensors']:
+#         sig_indices.extend(map(int, sensor_str.split(';')))
 
-    # Remove duplicates and sort
-    sig_indices = sorted(set(sig_indices))
+#     # Remove duplicates and sort
+#     sig_indices = sorted(set(sig_indices))
 
-    # 5. Visualize topomap with significant mask and cluster labels
-    fig, ax = plt.subplots()
+#     # 5. Visualize topomap with significant mask and cluster labels
+#     fig, ax = plt.subplots()
 
-    # Define the significant mask
-    mask = np.zeros(len(info['ch_names']), dtype=bool)
-    mask[sig_indices] = True  # use the filtered indices
+#     # Define the significant mask
+#     mask = np.zeros(len(info['ch_names']), dtype=bool)
+#     mask[sig_indices] = True  # use the filtered indices
 
-    # Plot topomap
-    im, cn = mne.viz.plot_topomap(
-        t_obs, pos_info, mask=mask, mask_params=mask_params,
-        vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
-        cmap='RdBu_r', show=False, axes=ax
-    )  
-    cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
-    cbar.ax.tick_params(labelsize=10)
-    cbar.set_label('Correlation Values', fontsize=14)
-    ax.set_xlim(0, )  # remove the left half of topoplot
-    ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})-after cluster permutation')
-    plt.show()
+#     # Plot topomap
+#     im, cn = mne.viz.plot_topomap(
+#         t_obs, pos_info, mask=mask, mask_params=mask_params,
+#         vlim=(min(t_obs), max(t_obs)), contours=0, image_interp='nearest', 
+#         cmap='RdBu_r', show=False, axes=ax
+#     )  
+#     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
+#     cbar.ax.tick_params(labelsize=10)
+#     cbar.set_label('Correlation Values', fontsize=14)
+#     ax.set_xlim(0, )  # remove the left half of topoplot
+#     ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})-after cluster permutation')
+#     plt.show()
