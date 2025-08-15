@@ -2,6 +2,9 @@
 ==============================================
 CG02_grid_power_substr_lat_correlation
 
+NOTE: this code needs to only use last_final_subject_list (no vol outliers)
+it is currenly using a wrong list
+
 This script calculates Spearman correlation (r and p-value) between
 lateralized MEG source power (per Hz, per grid index) and lateralization volumes
 of subcortical structures.
@@ -40,10 +43,10 @@ def setup_paths(platform='mac'):
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
     paths = {
-        'sub_list': os.path.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
+        'sub_list': os.path.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),  # TODO:this needs to change to last_FINAL_sublist-vol-outliers-removed.csv
         'len_subs': os.path.join(quinna_dir, 'dataman/data_information/source_subs'),
         'meg_source_all_subs_dir': os.path.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/all_subs'),
-        'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),
+        'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # TODO: should be replaced with lateralization_volumes_no-vol-outliers.csv'
         'output_dir': os.path.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers')
     }
 
