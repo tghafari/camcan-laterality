@@ -332,7 +332,7 @@ def plot_sensor_avg_corr_vs_freq():
     )
 
 
-# if __name__ == "__main__":
-#     # Runs the batch like your example
-#     plot_sensor_avg_corr_vs_freq()
+if __name__ == "__main__":
+    # Runs the batch like your example
+    plot_sensor_avg_corr_vs_freq()
 
