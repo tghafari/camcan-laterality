@@ -43,14 +43,14 @@ def setup_paths(platform='mac'):
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         output_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        rds_dir = '/Volumes/quinna-camcan-1'
+        rds_dir = '/Volumes/quinna-camcan'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         output_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
     paths = {
-        'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers'),
+        'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_no-vol-outliers'),
         'output_base': op.join(output_dir,'subcortical-structures/resting-state/results/CamCan/Results/src-grid-pair-freq-vol-correlation'),
         'fs_sub_dir': op.join(rds_dir,'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
     }
@@ -274,8 +274,8 @@ def visualising_grid_vol_correlation():
     do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
     do_plot_3d = do_plot_3d_input == 'y'
 
-    corr_file = op.join(paths['correlation_dir'], f'spearman-r_src_lat_power_vol_{sensor}_{freq_input}.csv')
-    pval_file = op.join(paths['correlation_dir'], f'spearman-pval_src_lat_power_vol_{sensor}_{freq_input}.csv')
+    corr_file = op.join(paths['correlation_dir'], f'FINAL_spearman-r_src_lat_power_vol_{sensor}_{freq_input}.csv')
+    pval_file = op.join(paths['correlation_dir'], f'FINAL_spearman-pval_src_lat_power_vol_{sensor}_{freq_input}.csv')
     
     if not op.exists(corr_file) or not op.exists(pval_file):
         print(f"Files not found for frequency {freq_input} and sensor {sensor}.")

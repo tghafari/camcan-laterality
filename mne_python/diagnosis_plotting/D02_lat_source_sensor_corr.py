@@ -65,7 +65,7 @@ from source.S05_computing_lateralised_source_power import (
     order_grid_positions,
     calculate_grid_lateralisation,
 )
-import correlations.CG03_visualising_grid_vol_correlation_ongrids as cg
+import correlations.FIGURE4_CG03_visualising_grid_vol_correlation_ongrids as cg
 
 
 

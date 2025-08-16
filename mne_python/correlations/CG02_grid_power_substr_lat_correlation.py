@@ -2,9 +2,6 @@
 ==============================================
 CG02_grid_power_substr_lat_correlation
 
-NOTE: this code needs to only use last_final_subject_list (no vol outliers)
-it is currenly using a wrong list
-
 This script calculates Spearman correlation (r and p-value) between
 lateralized MEG source power (per Hz, per grid index) and lateralization volumes
 of subcortical structures.
@@ -43,11 +40,11 @@ def setup_paths(platform='mac'):
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
     
     paths = {
-        'sub_list': os.path.join(quinna_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),  # TODO:this needs to change to last_FINAL_sublist-vol-outliers-removed.csv
+        'sub_list': os.path.join(quinna_dir, 'dataman/data_information/last_FINAL_sublist-vol-outliers-removed.csv'),  # we are only using no vol outliers for final analysis 16/08/2025
         'len_subs': os.path.join(quinna_dir, 'dataman/data_information/source_subs'),
         'meg_source_all_subs_dir': os.path.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer/all_subs'),
-        'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_nooutliers.csv'),  # TODO: should be replaced with lateralization_volumes_no-vol-outliers.csv'
-        'output_dir': os.path.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_nooutliers')
+        'lateralization_volumes': os.path.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_no-vol-outliers.csv'),
+        'output_dir': os.path.join(sub2ctx_dir, 'derivatives/correlations'),
     }
 
     return paths
@@ -62,7 +59,7 @@ def load_lateralization_volumes(file_path):
 
 def compute_spearman(paths, lat_src_file, lat_vols, sensor, freq):
     """Compute Spearman correlation between source data and lateralization volumes."""
-    final_sub_list = pd.read_csv(paths['sub_list'])['subject_ID'].astype(str).tolist()
+    final_sub_list = pd.read_csv(paths['sub_list'])['subjectID'].astype(str).tolist()
     lat_src_data = pd.read_csv(lat_src_file, index_col=None)
     lat_src_data.columns = lat_src_data.columns.astype(str)  # Ensure consistent dtype
 
@@ -124,12 +121,12 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
                     spearman_r, spearman_pval = compute_spearman(paths, lat_src_file, lat_vols, sensor, freq)
 
                     if spearman_r is not None:
-                        output_file = os.path.join(paths['output_dir'],
-                                                f'spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
+                        output_file = os.path.join(paths['output_dir'], 'src_lat_grid_vol_correlation_no-vol-outliers',
+                                                f'FINAL_spearman-r_src_lat_power_vol_{sensor}_{freq}.csv')
                         spearman_r.to_csv(output_file, index=False)
                     if spearman_pval is not None:
-                        output_file = os.path.join(paths['output_dir'],
-                                                f'spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
+                        output_file = os.path.join(paths['output_dir'], 'src_lat_grid_vol_correlation_no-vol-outliers',
+                                                f'FINAL_spearman-pval_src_lat_power_vol_{sensor}_{freq}.csv')
                         spearman_pval.to_csv(output_file, index=False)
 
                         print(f"Saved: {output_file}")
@@ -170,19 +167,19 @@ def process_correlations(platform='mac', sensortypes=['grad', 'mag'], spec=False
                     avg_band_data = pd.DataFrame(avg_array, columns=band_data[0].columns, index=band_data[0].index)
 
                     avg_band_file = os.path.join(paths['meg_source_all_subs_dir'],
-                                                f'all_subs_lateralised_src_power_{sensor}_{band_name}_band_avg.csv')
+                                                f'FINAL_all_subs_lateralised_src_power_{sensor}_{band_name}_band_avg.csv')
                     avg_band_data.to_csv(avg_band_file)
                     
                     # Now compute Spearman correlation
                     spearman_r, spearman_pval = compute_spearman(paths, avg_band_file, lat_vols, sensor, band_name)
 
                     if spearman_r is not None:
-                        spearman_r.to_csv(os.path.join(paths['output_dir'],
-                                                    f'spearman-r_src_lat_power_vol_{sensor}_{band_name}.csv'),
+                        spearman_r.to_csv(os.path.join(paths['output_dir'], 'src_lat_grid_vol_correlation_no-vol-outliers',
+                                                    f'FINAL_spearman-r_src_lat_power_vol_{sensor}_{band_name}.csv'),
                                         index=False)
                     if spearman_pval is not None:
-                        spearman_pval.to_csv(os.path.join(paths['output_dir'],
-                                                        f'spearman-pval_src_lat_power_vol_{sensor}_{band_name}.csv'),
+                        spearman_pval.to_csv(os.path.join(paths['output_dir'], 'src_lat_grid_vol_correlation_no-vol-outliers',
+                                                        f'FINAL_spearman-pval_src_lat_power_vol_{sensor}_{band_name}.csv'),
                                             index=False)
                 else:
                     print(f"    No data found for band {band_name}")

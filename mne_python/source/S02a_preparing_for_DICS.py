@@ -33,7 +33,6 @@ def setup_paths(platform='mac'):
         'rds_dir': rds_dir,
         'epoched_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-7min50'),
         'info_dir': op.join(rds_dir, 'dataman/data_information'),
-        'sub_list': os.path.join(rds_dir, 'dataman/data_information/FINAL_sublist-LV-LI-outliers-removed.csv'),
         'good_sub_sheet': op.join(rds_dir, 'dataman/data_information/demographics_goodPreproc_subjects.csv'),
         'meg_sensor_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/epoched-2sec'),
         'meg_source_dir': op.join(sub2ctx_dir, 'derivatives/meg/source/freesurfer')
