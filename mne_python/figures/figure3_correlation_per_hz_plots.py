@@ -40,9 +40,9 @@ def setup_paths(platform='mac'):
         jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
     elif platform == 'mac':
-        quinna_dir  = '/Volumes/quinna-camcan-1'
+        quinna_dir  = '/Volumes/quinna-camcan'
         jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
-        sub2ctx_dir = '/Volumes/jenseno-sub2ctx-1/camcan'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
@@ -50,7 +50,7 @@ def setup_paths(platform='mac'):
         'deriv_dir': op.join(sub2ctx_dir, 'derivatives'),
         # Adjust to match your data location:
         'corr_dir': op.join(sub2ctx_dir, 'derivatives', 'correlations', 'sensor_pairs_subtraction_nonoise_no-vol-outliers'),
-        'sig_csv_dir': op.join(sub2ctx_dir, 'derivatives', 'correlations', 'bands', 'bands_significant_sensors_cluster-perm'),
+        'sig_csv_dir': op.join(sub2ctx_dir, 'derivatives', 'correlations', 'sensor_bands', 'bands_significant_sensors_cluster-perm'),
         'fig_output_root': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
     }
     return paths
@@ -199,7 +199,7 @@ def average_corr_by_bin(aligned_df, bin_hz=2.0, use_centers=True):
     return avg_corr_per_bin, avg_corr_series
 
 
-def align_and_bin(series_list, bin_hz=2.0, use_centers=True):
+def align_and_bin(series_list, bin_hz=1.0, use_centers=False):
     """
     Align all pair series by inner-joining on frequency, then bin.
     Returns (aligned_df, avg_corr_per_bin_df, avg_corr_series).
@@ -211,7 +211,7 @@ def align_and_bin(series_list, bin_hz=2.0, use_centers=True):
 
 # --------------------- Plot (publication style) --------------------- #
 def plot_correlation_per_hz(avg_corr_series, substr, band, ch_type, correlation,
-                            out_dir, xlim_left=0, xlim_right=60, font_family='Arial'):
+                            out_dir, xlim_left=0, xlim_right=60.5, font_family='Arial'):
     """
     Plot correlation vs frequency (per bin), and save TIFF/PNG/SVG at 800 dpi.
     """
@@ -228,12 +228,31 @@ def plot_correlation_per_hz(avg_corr_series, substr, band, ch_type, correlation,
     # Color: RdBu-ish
     color = '#d6604d' if correlation == 'pos' else '#4393c3'
 
+    # Standard EEG/MEG band ranges (Hz)
+    band_ranges = {
+        'delta': (1, 4),
+        'theta': (4, 8),
+        'alpha': (8, 14),
+        'beta':  (14, 40),
+    }
+    band_key = str(band).strip().lower()
+    band_range = band_ranges.get(band_key, None)
+
     # Set global font family
     plt.rcParams['font.family'] = font_family
 
     fig, ax = plt.subplots(figsize=(10, 6))
+
     ax.plot(avg_corr_series.index, avg_corr_series.values, marker='o', color=color)
     ax.set_xlim(left=xlim_left, right=xlim_right)
+
+    # Highlight the band range (same color, higher transparency)
+    if band_range is not None:
+        # Clip the highlight to current x-lims so it doesn't spill over
+        x0 = max(xlim_left, band_range[0])
+        x1 = min(xlim_right, band_range[1])
+        if x1 > x0:
+            ax.axvspan(x0, x1, facecolor=color, alpha=0.15, zorder=0, edgecolor='none')
 
     ax.set_xlabel('Frequency (Hz)', fontsize=14, fontweight='bold')
     ax.set_ylabel('Average Spearman r', fontsize=14, fontweight='bold')
@@ -242,8 +261,8 @@ def plot_correlation_per_hz(avg_corr_series, substr, band, ch_type, correlation,
 
     # Bold tick labels
     ax.tick_params(axis='both', labelsize=12)
-    for tick in (ax.xaxis.get_major_ticks() + ax.yaxis.get_major_ticks()):
-        tick.label1.set_fontweight('bold')
+    # for tick in (ax.xaxis.get_major_ticks() + ax.yaxis.get_major_ticks()):
+    #     tick.label1.set_fontweight('bold')
 
     ensure_dir(out_dir)
     save_figure_all_formats(
@@ -260,8 +279,9 @@ def average_corr_batch(
     band, 
     ch_type,
     corr_sign,
-    bin_hz=2.0,
+    bin_hz,
     platform='mac', 
+    use_centers=False,
     font_family='Arial'
 ):
     """
@@ -290,7 +310,7 @@ def average_corr_batch(
 
         # 3) align & bin
         aligned_df, per_bin_df, avg_series = align_and_bin(
-            series_list, bin_hz=bin_hz)
+            series_list, bin_hz=bin_hz, use_centers=use_centers)
 
         # 4) plot & save
         out_dir = op.join(
@@ -300,7 +320,7 @@ def average_corr_batch(
         plot_correlation_per_hz(
             avg_series, substr, band, ch_type,
             correlation=corr_sign, out_dir=out_dir,
-            xlim_left=0, xlim_right=60, font_family=font_family, 
+            xlim_left=0, xlim_right=60.5, font_family=font_family, 
         )
 
         print(f"[DONE] {substr}-{band}-{ch_type}: "
@@ -313,26 +333,51 @@ def average_corr_batch(
 
 
 # ------------------------------- Entry point ------------------------------- #
-def plot_sensor_avg_corr_vs_freq():
+def plot_sensor_avg_corr_vs_freq(platform='mac'):
  
-    # Example: customize which combos to run
-    substr      = input("Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
-    band        = input("Enter band (Delta, Theta, Alpha, Beta): ").strip()
-    ch_type     = input("Enter sensortype (mag or grad): ").strip().lower()
-    correlation_sign = input(f"Is the correlation between {substr} and {band} positive (pos) or negative (neg)? ").strip().lower()
+    # # Input which combos to run
+    # substr      = input("Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    # band        = input("Enter band (Delta, Theta, Alpha, Beta): ").strip()
+    # ch_type     = input("Enter sensortype (mag or grad): ").strip().lower()
+    # correlation_sign = input(f"Is the correlation between {substr} and {band} positive (pos) or negative (neg)? ").strip().lower()
 
-    average_corr_batch(
-        substr=substr, 
-        band=band, 
-        ch_type=ch_type,
-        corr_sign=correlation_sign,
-        bin_hz=1.0,  # float      
-        platform='mac',
-        font_family='Arial'
-    )
+    # average_corr_batch(
+    #     substr=substr, 
+    #     band=band, 
+    #     ch_type=ch_type,
+    #     corr_sign=correlation_sign,
+    #     bin_hz=1.0,  # float      
+    #     platform=platform,
+    #     use_centers=False,
+    #     font_family='Arial'
+    # )
 
+    # Or run on exact (substr, band, ch_type, corr_sign) tuples
+    significant_relationships = [
+        ('Caud', 'Delta', 'grad', 'neg'),
+        ('Caud', 'Beta',  'grad', 'neg'),
+        ('Hipp', 'Delta', 'grad', 'neg'),
+        ('Pall', 'Alpha', 'grad', 'pos'),
+        ('Puta', 'Beta',  'grad', 'pos'),
+        ('Caud', 'Delta', 'mag',  'neg'),
+        ('Caud', 'Theta', 'mag',  'neg'),
+        ('Caud', 'Alpha', 'mag',  'neg'),
+        ('Caud', 'Beta',  'mag',  'neg'),
+        ('Hipp', 'Beta',  'mag',  'pos'),
+    ]
+
+    for substr, band, ch_type, corr_sign in significant_relationships:
+        average_corr_batch(
+            platform=platform,
+            substr=substr,               # list with one string
+            band=band,
+            ch_type=ch_type,
+            corr_sign=corr_sign,
+            bin_hz=1.0,
+            use_centers=False,
+            font_family='Arial'
+        )
 
 if __name__ == "__main__":
-    # Runs the batch like your example
-    plot_sensor_avg_corr_vs_freq()
+    plot_sensor_avg_corr_vs_freq(platform='mac')
 
