@@ -6,7 +6,7 @@ Script for analyzing and visualizing the correlation
 between lateralized MEG source power and subcortical volumes.
 
 This script performs the following steps:
-    1. Reads user input for frequency, sensor type, and subcortical structure.
+    1. Reads user input for frequency, channel type, and subcortical structure.
     2. Loads Spearman correlation results and significance values.
     3. Computes right hemisphere grid positions from the fsaverage source space.
     4. Plots a 3D scatter plot of correlation values with significant points highlighted.
@@ -53,9 +53,23 @@ def setup_paths(platform='mac'):
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/src_lat_grid_vol_correlation_no-vol-outliers'),
         'output_base': op.join(output_dir,'subcortical-structures/resting-state/results/CamCan/Results/src-grid-pair-freq-vol-correlation'),
         'fs_sub_dir': op.join(rds_dir,'cc700/mri/pipeline/release004/BIDS_20190411/anat'),
+        'save_path': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
     }
 
     return paths
+
+def ensure_dir(path: str) -> None:
+    """Create directory if it doesn't exist."""
+    os.makedirs(path, exist_ok=True)
+    
+def save_figure_all_formats(fig: plt.Figure, out_dir: str, basename: str, dpi: int = 800) -> None:
+    """Save figure as TIFF, PNG, and SVG with given dpi."""
+    ensure_dir(out_dir)
+    # Sanitize basename a bit
+    basename = basename.replace(' ', '_')
+    fig.savefig(op.join(out_dir, f"{basename}.tiff"), dpi=dpi, format='tiff', bbox_inches='tight')
+    fig.savefig(op.join(out_dir, f"{basename}.png"),  dpi=dpi, format='png',  bbox_inches='tight')
+    fig.savefig(op.join(out_dir, f"{basename}.svg"),              format='svg', bbox_inches='tight')
 
 def compute_hemispheric_index(src_fs):
     """
@@ -132,7 +146,6 @@ def plot_scatter(grid_positions, correlation_values, significant_mask, output_pa
     ax.set_zlabel('Z')
     plt.title('Src-Vol Spearman Correlation on Right Hemisphere Grids')
     plt.legend()
-    
     plt.show()
     if save:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -170,7 +183,7 @@ def create_volume_estimate(correlation_values, significant_mask, src_fs, right_i
     vol_mask = np.zeros((n_dipoles_in_src, n_times), dtype=bool)
     
     # For each right hemisphere vertex, find its index within full_vertno
-    """I don't know how the other method in S04 works! spent hours to figure it out!"""
+    """I don't know how the other method in S05_computing_lateralised_source_power works! spent hours to figure it out!"""
     for i, vertex in enumerate(right_indices):
         # Find the position in full_vertno where the vertex is located
         pos_index = np.where(full_vertno == vertex)[0][0]
@@ -187,7 +200,7 @@ def create_volume_estimate(correlation_values, significant_mask, src_fs, right_i
     )
     return stc, vol_mask
 
-def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, do_plot_3d=True, save=False, volume_masked=False):
+def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do_plot_3d=True, save=True, volume_masked=False):
     """
     Plot the volumetric source estimate on MRI and in 3D, highlighting significant regions.
     
@@ -201,9 +214,9 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
         Dictionary containing file paths.
     freq : str
         Frequency (e.g., '5.0').
-    sensor : str
+    ch_type : str
         Sensor type (e.g., 'grad' or 'mag').
-    structure : str
+    substr : str
         Subcortical structure name.
     do_plot_3d : bool
         If True, plot the 3D visualization.
@@ -233,7 +246,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
             verbose=True
         )
         if save:
-            mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri_sig-only.png')
+            mri_output = op.join(paths['output_base'], substr, f'src-substr-correlation_{ch_type}_{freq}_mri_sig-only.png')
             fig.savefig(mri_output)
 
     # Plot on MRI without significant masks
@@ -247,9 +260,15 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
         verbose=True
     )
     if save:
-        mri_output = op.join(paths['output_base'], structure, f'src-substr-correlation_{sensor}_{freq}_mri.png')
-        fig2.savefig(mri_output)
-    
+        # --- Save outputs ---
+        out_dir = op.join(paths['save_path'], f'{substr}_{freq}_{ch_type}_source_correlations')
+        basename = f'{substr}_{freq}_{ch_type}_src-substr-correlation'
+        save_figure_all_formats(fig2, out_dir, basename, dpi=800)
+        
+        # Convert to NIfTI
+        nifti_fname = op.join(out_dir, basename + '.nii.gz')
+        stc.save_as_volume(nifti_fname, src_fs, dest='mri', mri_resolution=True, format='nifti1')
+        
     if do_plot_3d:
         kwargs = dict(
             subjects_dir=paths['fs_sub_dir'],
@@ -265,31 +284,24 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, sensor, structure, 
             src=src_fs,
             **kwargs)
 
-def visualising_grid_vol_correlation():
-    paths = setup_paths(platform='mac')
-    # Prompt user for input
-    freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
-    structure = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
-    sensor = input("Enter sensor type (grad or mag): ").strip()
-    do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
-    do_plot_3d = do_plot_3d_input == 'y'
+def visualising_grid_vol_corr_batch(paths, ch_type, freq_input, substr, save=True, do_plot_3d=False):
 
-    corr_file = op.join(paths['correlation_dir'], f'FINAL_spearman-r_src_lat_power_vol_{sensor}_{freq_input}.csv')
-    pval_file = op.join(paths['correlation_dir'], f'FINAL_spearman-pval_src_lat_power_vol_{sensor}_{freq_input}.csv')
+    corr_file = op.join(paths['correlation_dir'], f'FINAL_spearman-r_src_lat_power_vol_{ch_type}_{freq_input}.csv')
+    pval_file = op.join(paths['correlation_dir'], f'FINAL_spearman-pval_src_lat_power_vol_{ch_type}_{freq_input}.csv')
     
     if not op.exists(corr_file) or not op.exists(pval_file):
-        print(f"Files not found for frequency {freq_input} and sensor {sensor}.")
+        print(f"Files not found for frequency {freq_input} and ch_type {ch_type}.")
         return
     
     df_corr = pd.read_csv(corr_file, index_col=None)
     df_pval = pd.read_csv(pval_file, index_col=None)
     
-    if structure not in df_corr.columns:
-        print(f"Structure {structure} not found in correlation file.")
+    if substr not in df_corr.columns:
+        print(f"Structure {substr} not found in correlation file.")
         return
     
-    correlation_values = df_corr[structure].values
-    p_values = df_pval[structure].values
+    correlation_values = df_corr[substr].values
+    p_values = df_pval[substr].values
     significant_mask = p_values < 0.05
     
     # Read fsaverage source space
@@ -300,7 +312,7 @@ def visualising_grid_vol_correlation():
     grid_positions, right_indices = compute_hemispheric_index(src_fs)
     
     # Plot scatter of correlation values
-    scatter_output = op.join(paths['output_base'], structure, f'src-correlation_{freq_input}.png')
+    scatter_output = op.join(paths['output_base'], substr, f'src-correlation_{freq_input}.png')
     os.makedirs(op.dirname(scatter_output), exist_ok=True)
     plot_scatter(grid_positions, correlation_values, significant_mask, scatter_output)
     
@@ -308,7 +320,37 @@ def visualising_grid_vol_correlation():
     stc, vol_mask = create_volume_estimate(correlation_values, significant_mask, src_fs, right_indices)
     
     # Plot volume estimate on MRI and optionally in 3D
-    plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, sensor, structure, do_plot_3d)
+    plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, ch_type, substr, save=save, do_plot_3d=do_plot_3d)
+
+
+def visualising_grid_vol_correlation():
+    paths = setup_paths(platform='mac')
+
+    # # Prompt user for input
+    # freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
+    # substr = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    # ch_type = input("Enter ch_type type (grad or mag): ").strip()
+    do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
+    do_plot_3d = do_plot_3d_input == 'y'
+    # visualising_grid_vol_corr_batch(paths, ch_type, freq_input, substr, do_plot_3d=do_plot_3d)
+
+
+    # Or run on exact (substr, band, ch_type) tuples
+    significant_relationships = [
+        ('Caud', 'Delta', 'grad'),
+        ('Caud', 'Beta',  'grad'),
+        ('Hipp', 'Delta', 'grad'),
+        ('Pall', 'Alpha', 'grad'),
+        ('Puta', 'Beta',  'grad'),
+        ('Caud', 'Delta', 'mag'),
+        ('Caud', 'Theta', 'mag'),
+        ('Caud', 'Alpha', 'mag'),
+        ('Caud', 'Beta',  'mag'),
+        ('Hipp', 'Beta',  'mag'),
+    ]
+    for substr, freq_input, ch_type in significant_relationships:
+        visualising_grid_vol_corr_batch(paths, ch_type, freq_input, substr, do_plot_3d=do_plot_3d)
+
 
 if __name__ == "__main__":
     visualising_grid_vol_correlation()

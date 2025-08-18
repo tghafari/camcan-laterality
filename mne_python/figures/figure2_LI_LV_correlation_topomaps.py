@@ -51,28 +51,27 @@ def setup_paths(platform: str = 'mac') -> dict:
     """Return project paths depending on the host platform."""
     if platform == 'bluebear':
         quinna_dir = '/rds/projects/q/quinna-camcan/'
-        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx-1/camcan'
+        sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        quinna_dir = '/Volumes/quinna-camcan-1/'
-        sub2ctx_dir = '/Volumes/jenseno-sub2ctx-1/camcan'
+        quinna_dir = '/Volumes/quinna-camcan/'
+        sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
         raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
-
+    
+    correlation_dir= op.join(sub2ctx_dir, 'derivatives/correlations/sensor_bands')
     paths = {
         'LI_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/bands'),
         'LV_csv': op.join(sub2ctx_dir, 'derivatives/mri/lateralized_index/lateralization_volumes_no-vol-outliers.csv'),
         'sub_list': op.join(quinna_dir, 'dataman/data_information/dblCheck_last_FINAL_sublist-vol-outliers-removed.csv'),
-        'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
-        'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'),
-        'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),
+        'all_correlation_dir': op.join(sub2ctx_dir, correlation_dir, 'bands_all_correlations_subtraction_nonoise_no-vol-outliers'),
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),
         'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads'),
         'save_path': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
         # CSVs with significant clusters (created in previous step)
-        'cluster_perm_signif_sensors': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_significant_sensors_cluster-perm'),
+        'cluster_perm_signif_sensors': op.join(sub2ctx_dir, correlation_dir, 'bands_significant_sensors_cluster-perm'),
     }
     return paths
 
@@ -257,23 +256,27 @@ def plot_LI_LV_corr_topomaps():
     platform = 'mac'  # or 'bluebear'
     paths = setup_paths(platform)
 
-    substr = input("Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
-    band = input("Enter band (Delta, Theta, Alpha, Beta): ").strip()
-    ch_type = input("Enter sensortype (mag or grad): ").strip().lower()
+    # substr = input("Enter substr (Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    # band = input("Enter band (Delta, Theta, Alpha, Beta): ").strip()
+    # ch_type = input("Enter sensortype (mag or grad): ").strip().lower()
+    # plot_cluster_significant_topoplots(paths, substr, band, ch_type)
 
-    # Basic validation
-    valid_sub = {'Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu'}
-    valid_band = {'Delta', 'Theta', 'Alpha', 'Beta'}
-    valid_ch = {'mag', 'grad'}
 
-    if substr not in valid_sub:
-        raise ValueError(f"Invalid substr '{substr}'. Must be one of {sorted(valid_sub)}.")
-    if band not in valid_band:
-        raise ValueError(f"Invalid band '{band}'. Must be one of {sorted(valid_band)}.")
-    if ch_type not in valid_ch:
-        raise ValueError(f"Invalid ch_type '{ch_type}'. Must be 'mag' or 'grad'.")
+    # Or run on exact (substr, band, ch_type) tuples
+    significant_relationships = [
+        ('Caud', 'Delta', 'grad'),
+        ('Caud', 'Beta',  'grad'),
+        ('Hipp', 'Delta', 'grad'),
+        ('Pall', 'Alpha', 'grad'),
+        ('Puta', 'Beta',  'grad'),
+        ('Caud', 'Delta', 'mag'),
+        ('Caud', 'Theta', 'mag'),
+        ('Caud', 'Alpha', 'mag'),
+        ('Caud', 'Beta',  'mag'),
+        ('Hipp', 'Beta',  'mag'),
+    ]
+    for substr, band, ch_type in significant_relationships:
+        plot_cluster_significant_topoplots(paths, substr, band, ch_type)
 
-    plot_cluster_significant_topoplots(paths, substr, band, ch_type)
-
-# if __name__ == "__main__":
-#     plot_LI_LV_corr_topomaps()
+if __name__ == "__main__":
+    plot_LI_LV_corr_topomaps()
