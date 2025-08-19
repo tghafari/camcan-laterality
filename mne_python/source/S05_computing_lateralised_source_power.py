@@ -102,6 +102,7 @@ def morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_met
     Returns:
     - mne.SourceEstimate: Morphed source estimate.
     """
+
     freq = float(freq)  # this is how the files are saved in S02b
     fetch_fsaverage(paths["fs_sub_dir"])  # ensure fsaverage src exists
     fname_fsaverage_src = op.join(paths["fs_sub_dir"], "fsaverage", "bem", "fsaverage-vol-5-src.fif")
@@ -193,7 +194,6 @@ def compute_hemispheric_index(stc_fsmorphed, src_fs):
     right_positions, left_positions = [], []
     right_indices, left_indices = [], []
     right_reg_indices, left_reg_indices = [], []
-    
 
     for region_idx, indices in enumerate(grid_indices[0]):  # region_idx is the index inside of that region
         pos = grid_positions[0][indices]  # only select in-use positions in the source model
@@ -232,7 +232,7 @@ def order_grid_positions(right_positions, left_positions,
     Once we find the correct order, we'll 
     reorder left_positions and right_positions along with 
     their respective left_indices and right_indices.
-    runs per freq per sensortype per scd_method
+    runs per freq per sensortype per csd_method
     """
     # Minimum euclidian distance accepted from corresponding points
     min_distance_accepted = 0.01 
@@ -474,11 +474,17 @@ def process_subject_per_hz(subjectID, paths, file_paths, sensortype, space, csd_
     # Morph to fsaverage and compute lateralisation per grid
     stc_fsmorphed, src_fs, stc_sub_freq = morph_subject_to_fsaverage(paths, file_paths, src, sensortype, freq, csd_method, plot=plot, do_plot_3d=do_plot_3d)
     
+    # Compute hemispheric index
+    """if you want to run this on unmorphed subject, replace stc_fsmorphed -> stc_sub_freq
+    and src_fs -> src
+    But bear in mind that the right and left side of the individuals' brains might 
+    not have the same number of grids"""
     (right_hemisphere_time_courses, left_hemisphere_time_courses,
     right_positions, left_positions,
     right_indices, left_indices,
     right_reg_indices, left_reg_indices) = compute_hemispheric_index(stc_fsmorphed, src_fs)
 
+    # Make sure the gird indices in right and left have the same order
     (ordered_right_positions, ordered_left_positions,
             ordered_right_indices, ordered_left_indices,
             ordered_right_region_indices, ordered_left_region_indices,

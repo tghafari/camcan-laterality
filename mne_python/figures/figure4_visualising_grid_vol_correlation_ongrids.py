@@ -183,7 +183,12 @@ def create_volume_estimate(correlation_values, significant_mask, src_fs, right_i
     vol_mask = np.zeros((n_dipoles_in_src, n_times), dtype=bool)
     
     # For each right hemisphere vertex, find its index within full_vertno
-    """I don't know how the other method in S05_computing_lateralised_source_power works! spent hours to figure it out!"""
+    """
+    Note that in S05_computing_lateralised_source_power we are findings the 
+    right and left indices and making sure they correspond to each other by 
+    checking their distance to 0. everything else in S05_computing... works
+    the same as here, inc. plotting and volume estimates.
+    """
     for i, vertex in enumerate(right_indices):
         # Find the position in full_vertno where the vertex is located
         pos_index = np.where(full_vertno == vertex)[0][0]
