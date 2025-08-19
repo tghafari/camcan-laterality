@@ -1,7 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-Plot lateralisation volume indices across participants for 7 subcortical structures.
-Saves figure as TIFF/PNG/SVG (dpi=800). Each subplot shows a Wilcoxon p-value vs 0.
+==============================================
+figure1_substr_histograms
+
+This script plots lateralisation volume indices 
+across participants for 7 subcortical structures.
+Saves figure as TIFF/PNG/SVG (dpi=800). 
+Each subplot shows a Wilcoxon p-value vs 0.
+The output figure is to be used as Figure 1 in
+the CamCAN paper.
+
+Written by Tara Ghafari
+tara.ghafari@gmail.com
+19/08/2025
+==============================================
 """
 
 import os
@@ -79,19 +91,20 @@ def load_lateralisation_dataframe() -> pd.DataFrame:
     # Filter to subjects present in sub_df
     keep_ids = set(sub_df['subjectID'].astype(str))
     df = df[df['subjectID'].astype(str).isin(keep_ids)].reset_index(drop=True)
-    
+
     return df
 
 # ----------------------- Plotting ----------------------- #
 def plot_lateralisation_volumes(df: pd.DataFrame,
                                 bins: int = 10,
-                                title: str = 'Lateralisation Volume Indices (no-vol-outliers)'):
+                                title: str = 'Lateralisation Volume of Subcortical Structures (N=532)'):
     """
     Plot histograms of lateralisation volume indices for each subcortical structure,
     annotate with Wilcoxon signed-rank p-value vs 0, and save at 800 dpi.
     """
-    # Use Arial globally
+    # Use Arial globally and decrease label-axis distance
     plt.rcParams['font.family'] = 'Arial'
+    # plt.rcParams['axes.labelpad'] = 3
 
     n_structures = len(structures)
     n_cols = 4
@@ -102,23 +115,30 @@ def plot_lateralisation_volumes(df: pd.DataFrame,
     # Styling for p-value box (as requested)
     box_props = dict(facecolor='oldlace', alpha=0.8, edgecolor='darkgoldenrod', boxstyle='round')
 
+    medians = []
+    null_hypothesis_median = 0.0
+
     for idx, structure in enumerate(structures):
         ax = axs[idx]
-        vals = pd.to_numeric(df[structure], errors='coerce').dropna().values
-        if vals.size == 0:
+        lateralisation_volume = pd.to_numeric(df[structure], errors='coerce').dropna().values
+        if lateralisation_volume.size == 0:
             ax.set_visible(False)
             continue
 
         # Histogram
-        ax.hist(vals, bins=bins, color=colormap[idx], edgecolor='white')
+        ax.hist(lateralisation_volume, bins=bins, color=colormap[idx], edgecolor='white')
 
         # Zero reference line
         ax.axvline(x=0.0, color='k', linewidth=0.8, linestyle=':')
 
+        # Compute statistics
+        median_val = np.median(lateralisation_volume)
+        medians.append(median_val)
+
         # Wilcoxon signed-rank test vs 0 (median)
         # scipy.stats.wilcoxon requires non-zero differences for the default zero_method
         # Add a tiny jitter to zero entries to avoid zero-sum issues (optional, conservative)
-        diffs = vals - 0.0
+        diffs = lateralisation_volume - null_hypothesis_median
         if np.allclose(diffs, 0.0):
             wilcox_p = 1.0  # all zeros → no evidence against 0
         else:
@@ -137,8 +157,11 @@ def plot_lateralisation_volumes(df: pd.DataFrame,
 
         # Axis labels & title (Arial, bold)
         ax.set_title(structure, fontsize=12, fontweight='bold')
-        ax.set_xlabel('Lateralisation Volume', fontsize=12, fontweight='bold')
-        ax.set_ylabel('# Subjects', fontsize=12, fontweight='bold')
+        if idx in [3, 4, 5, 6]:
+            ax.set_xlabel('Lateralisation Volume', fontsize=12, fontweight='bold')
+        if idx == 0 or idx == 4:
+            ax.yaxis.labelpad = 5
+            ax.set_ylabel('# Subjects', fontsize=12, fontweight='bold')
 
         # Ticks styling
         ax.tick_params(axis='both', which='both', length=0)
@@ -146,13 +169,7 @@ def plot_lateralisation_volumes(df: pd.DataFrame,
         ax.grid(True, axis='y', alpha=0.25)
 
     # Remove any unused axes
-    for ax in axs[len(structures):]:
-        fig.delaxes(ax)
-
-    # Also remove empty ones defensively
-    for ax in axs:
-        if not ax.has_data():
-            fig.delaxes(ax)
+    [fig.delaxes(ax) for ax in axs.flatten() if not ax.has_data()] 
 
     # Super-title
     fig.suptitle(title, fontsize=16, fontweight='bold')
@@ -160,7 +177,7 @@ def plot_lateralisation_volumes(df: pd.DataFrame,
 
     # Save
     out_dir = op.join(fig_output_root, 'Lateralisation_Volume_Histograms')
-    save_figure_all_formats(fig, out_dir, 'lateralisation-histograms-final_subs_no-vol-outliers_nonormalcurve', dpi=800)
+    save_figure_all_formats(fig, out_dir, 'lateralisation-histograms-final_subs_no-vol-outliers', dpi=800)
     plt.show()
     plt.close(fig)
 
@@ -168,137 +185,3 @@ def plot_lateralisation_volumes(df: pd.DataFrame,
 if __name__ == '__main__':
     df_lat = load_lateralisation_dataframe()
     plot_lateralisation_volumes(df_lat)
-
-
-
-# this code needs editing. use last_FINAL_sublist-vol-outliers-removed.csv 
-# to plot histograms. remove the pdf.
-
-
-import os.path as op
-import os
-
-import numpy as np
-import pandas as pd
-
-import matplotlib.pyplot as plt
-from scipy import stats
-from scipy.stats import shapiro
-
-# Define paths
-platform = 'mac'  # 'bluebear' or 'mac'?
-
-if platform == 'bluebear':
-    quinna_dir = '/rds/projects/q/quinna-camcan'
-    jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
-elif platform == 'mac':
-    quinna_dir = '/Volumes/quinna-camcan'
-    jenseno_dir = '/Volumes/jenseno-avtemporal-attention'
-    sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
-
-epoched_dir = op.join(quinna_dir, 'derivatives/meg/sensor/epoched-7min50')
-info_dir = op.join(quinna_dir, 'dataman/data_information')
-good_sub_sheet = op.join(info_dir, 'demographics_goodPreproc_subjects.csv')  # list of all subjects at the beginning
-final_sub_list_path = op.join(info_dir, 'FINAL_sublist-vol-psd-outliers-removed.csv')  # list of subjects after removing size below 10th percentile and power nonoise_subtraction_abs_thresh
-
-volume_sheet_dir = 'derivatives/mri/lateralized_index'
-sub_list= op.join(quinna_dir, 'dataman/data_information/dblCheck_last_FINAL_sublist-vol-outliers-removed.csv'),
-substr_vol_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'all_subs_substr_volumes.csv')
-lat_sheet_fname = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes.csv')  # this is lateralisation vol for all subjects that will be filtered to exclude vol outliers in this script
-lat_sheet_fname_nooutlier = op.join(sub2ctx_dir, volume_sheet_dir, 'lateralization_volumes_no-vol-outliers.csv')  # only volume outlier
-outlier_subjectID_vol_fname = op.join(info_dir, 'outlier_subjectID_vol.csv')  # this only contains vol outliers
-subject_list_no_vol_outliers = op.join(info_dir, 'FINAL_sublist-vol-outliers-removed.csv')  # in case we only wanted to exclude vol outliers
-fig_output_root= '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
-
-# Define colormap and structures
-colormap = ['#FFD700', '#8A2BE2', '#191970', '#8B0000', '#6B8E23', '#4B0082', '#ADD8E6']
-structures = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-
-# Function to filter subjects and plot lateralization histograms
-def plot_lateralisation_volumes(substr_lat_df, structures, colormap):
-    """
-    Filters subjects based on available lateralization volume measurements and good subject list,
-    then plots histograms.
-    
-    Parameters:
-    - lat_sheet_fname: str, path to the lateralization volumes CSV file
-    - good_sub_sheet: str, path to the good subject CSV file
-    - structures: list, names of the subcortical structures
-    - colormap: list, color map for plotting histograms
-    
-    This function removes subjects with missing volume measurements and ensures only subjects from the
-    good subject list are included in the analysis. Histograms are plotted for the lateralised volume of
-    each subcortical structure.
-    """
-
-    def ensure_dir(path):
-        os.makedirs(path, exist_ok=True)
-
-    def save_figure_all_formats(fig, out_dir, basename, dpi=800):
-        ensure_dir(out_dir)
-        base = basename.replace(' ', '_')
-        fig.savefig(op.join(out_dir, f"{base}.tiff"), dpi=dpi, format='tiff', bbox_inches='tight')
-        fig.savefig(op.join(out_dir, f"{base}.png"),  dpi=dpi, format='png',  bbox_inches='tight')
-        fig.savefig(op.join(out_dir, f"{base}.svg"), format='svg', bbox_inches='tight')
-
-    # Extract lateralization volumes
-    lateralization_volume = substr_lat_df.iloc[:,1:8].to_numpy()
-
-    # null hypothesis (H0) mean value
-    null_hypothesis_mean = 0.0
-    p_vals = []  # is used for both wilcox and ttest
-
-    # wilcoxon p-vals
-    null_hypothesis_median = 0.0
-
-    # Plotting histograms
-    n_structures = len(structures)
-    n_cols = 4
-    n_rows = int(np.ceil(n_structures / n_cols))
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4 * n_cols, 4 * n_rows))
-    axs = axs.flatten()
-    fig.set_figheight(6)
-    fig.set_figwidth(10)
-
-    for idx, structure in enumerate(structures):
-        # ax = axs[idx // 4, idx % 4]
-        ax = axs[idx]
-        ax.set_title(structure, fontsize=12, fontname='Calibri')
-        ax.set_xlabel('Lateralisation Volume', fontsize=12, fontname='Calibri')
-        ax.set_ylabel('# Subjects', fontsize=12, fontname='Calibri')
-        ax.axvline(x=0, color='k', linewidth=0.25, linestyle=':')
-        
-        valid_lateralization_volume = lateralization_volume[:, idx]
-        lateralization_volume_hist = np.histogram(valid_lateralization_volume, bins=10, density=False)
-
-        # one sample wilcoxon signed rank (for non normal distributions)
-        _, wilcox_p = stats.wilcoxon(valid_lateralization_volume - null_hypothesis_median,
-                                        zero_method='wilcox', correction=False)
-        p_vals.append(wilcox_p)
-
-        # Plot histogram with colors
-        x = lateralization_volume_hist[1]
-        y = lateralization_volume_hist[0]
-        ax.bar(x[:-1], y, width=np.diff(x), color=colormap[idx])
-
-        # Annotate p-value
-        ax.text(0.05, 0.95,
-                f'p-value = {p_vals[idx]:.3f}',
-                transform=ax.transAxes,
-                fontsize=9,
-                verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.6)) 
-        
-        ax.tick_params(axis='both', which='both', length=0)
-        ax.set_axisbelow(True)
-    
-    # Remove empty axes
-    for i in range(len(structures), len(axs)):
-        fig.delaxes(axs[i])
-
-    plt.tight_layout()
-
-    basename = 'lateralisation-histograms-final_subs_no-vol-outliers_nonormalcurve'
-    save_figure_all_formats(fig, fig_output_root, basename)
-                            
