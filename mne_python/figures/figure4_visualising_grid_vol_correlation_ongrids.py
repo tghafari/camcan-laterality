@@ -205,7 +205,8 @@ def create_volume_estimate(correlation_values, significant_mask, src_fs, right_i
     )
     return stc, vol_mask
 
-def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do_plot_3d=True, save=True, volume_masked=False):
+def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr,               
+                         do_plot_3d=True, save=True, volume_masked=False):
     """
     Plot the volumetric source estimate on MRI and in 3D, highlighting significant regions.
     
@@ -226,7 +227,7 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do
     do_plot_3d : bool
         If True, plot the 3D visualization.
     """
-    initial_pos = np.array([19, -50, 29]) * 0.001
+    initial_pos = np.array([22, -45, 20]) * 0.001
 
     if volume_masked:  # plot significant masks on volume?
         # Apply the mask to set non-significant values to NaN or 0 and only show significant clusters
@@ -255,7 +256,11 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do
             fig.savefig(mri_output)
 
     # Plot on MRI without significant masks
-    #TODO: clim = dict(kind='value', lims=[-0.4, 0.0, 0.4])  # or based on r values (min r to max r)
+    # Pick positive control points from the absolute values as 
+    # clim can only input positive values
+    v1, v2, v3 = np.percentile(np.abs(stc.data), [70, 90, 99])
+    clim = dict(kind='value', pos_lims=[v1, v2, v3])
+
     fig2 = stc.plot(
         src=src_fs,  # use default source
         subject='fsaverage',
@@ -263,15 +268,15 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do
         mode='stat_map',
         colorbar=True,
         clim=clim,
-        transparent=True,
-        # initial_pos=initial_pos,
+        # transparent=True,
+        initial_pos=initial_pos,
         verbose=True
     )
 
     if save:
         # --- Save outputs ---
         out_dir = op.join(paths['save_path'], f'{substr}_{freq}_{ch_type}_source_correlations')
-        basename = f'{substr}_{freq}_{ch_type}_src-substr-correlation_newclim'
+        basename = f'{substr}_{freq}_{ch_type}_src-substr-correlation'
         save_figure_all_formats(fig2, out_dir, basename, dpi=800)
         
         # Convert to NIfTI
@@ -329,16 +334,17 @@ def visualising_grid_vol_corr_batch(paths, ch_type, freq_input, substr, save=Tru
     stc, vol_mask = create_volume_estimate(correlation_values, significant_mask, src_fs, right_indices)
     
     # Plot volume estimate on MRI and optionally in 3D
-    plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, ch_type, substr, save=save, do_plot_3d=do_plot_3d)
+    plot_volume_estimate(stc, vol_mask, src_fs, paths, freq_input, ch_type, substr, save=save,  
+                         do_plot_3d=do_plot_3d)
 
 
 def visualising_grid_vol_correlation():
     paths = setup_paths(platform='mac')
 
-    # # Prompt user for input
-    # freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
-    # substr = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
-    # ch_type = input("Enter ch_type type (grad or mag): ").strip()
+    # Prompt user for input
+    freq_input = input("Enter frequency (e.g., 5.0 or Alpha): (make sure input a float number or band name)").strip()
+    substr = input("Enter subcortical structure (e.g., Thal, Caud, Puta, Pall, Hipp, Amyg, Accu): ").strip()
+    ch_type = input("Enter ch_type type (grad or mag): ").strip()
     do_plot_3d_input = input("Plot 3D visualization? (y/n): ").strip().lower()
     do_plot_3d = do_plot_3d_input == 'y'
     # visualising_grid_vol_corr_batch(paths, ch_type, freq_input, substr, do_plot_3d=do_plot_3d)

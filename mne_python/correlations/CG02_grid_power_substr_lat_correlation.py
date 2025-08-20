@@ -15,7 +15,7 @@ Steps:
 
 For band calculations we average over correlation values across
 band frequencies. 
-At no point in this pipeline the DICS or CSDs are calculated for
+At no point in the source pipeline the DICS or CSDs are calculated for
 band, all are per Hz.
 
 Output:
