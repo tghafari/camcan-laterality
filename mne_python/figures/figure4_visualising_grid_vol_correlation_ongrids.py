@@ -255,19 +255,23 @@ def plot_volume_estimate(stc, vol_mask, src_fs, paths, freq, ch_type, substr, do
             fig.savefig(mri_output)
 
     # Plot on MRI without significant masks
+    #TODO: clim = dict(kind='value', lims=[-0.4, 0.0, 0.4])  # or based on r values (min r to max r)
     fig2 = stc.plot(
         src=src_fs,  # use default source
         subject='fsaverage',
         subjects_dir=paths['fs_sub_dir'],
         mode='stat_map',
         colorbar=True,
+        clim=clim,
+        transparent=True,
         # initial_pos=initial_pos,
         verbose=True
     )
+
     if save:
         # --- Save outputs ---
         out_dir = op.join(paths['save_path'], f'{substr}_{freq}_{ch_type}_source_correlations')
-        basename = f'{substr}_{freq}_{ch_type}_src-substr-correlation'
+        basename = f'{substr}_{freq}_{ch_type}_src-substr-correlation_newclim'
         save_figure_all_formats(fig2, out_dir, basename, dpi=800)
         
         # Convert to NIfTI

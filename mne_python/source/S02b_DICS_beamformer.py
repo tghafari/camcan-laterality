@@ -11,7 +11,12 @@ Multitaper CSD and the epochs have been
 prepared in S02a and will be read in this 
 script.
 
+In this script dics is made per Hz for future
+analysis, but just for plotting purposes dics is 
+made on the average of frequencies between 1 and 60.
+
 written by Tara Ghafari
+documented more on 20/08/2025
 ==============================================
 """
 
@@ -92,7 +97,7 @@ def read_forward_rank_csd(file_paths, space='volume', csd_method='multitaper'):
     rank_grad = mne.compute_rank(grads, tol=1e-6, tol_kind='relative', proj=False)
 
     print('Reading CSD')
-    csd_mags = read_csd(file_paths[f'csd_{csd_method}_mag_fname'])
+    csd_mags = read_csd(file_paths[f'csd_{csd_method}_mag_fname'])  # this is for all frequencies
     csd_grads = read_csd(file_paths[f'csd_{csd_method}_grad_fname'])
 
     return forward, mags, grads, rank_mag, rank_grad, csd_mags, csd_grads
@@ -105,7 +110,7 @@ def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
     print("Plotting results for double-checking...")
     filters_mag = make_dics(mags.info, 
                             forward, 
-                            csd_mags.mean(), 
+                            csd_mags.mean(),  # averages across all freqs (1 tp 60Hz)
                             noise_csd=None, 
                             reg=reg, 
                             pick_ori='max-power', 
@@ -115,7 +120,7 @@ def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
                             depth=None, 
                             inversion='matrix', 
                             weight_norm="unit-noise-gain")
-    stc_mag,_ = apply_dics_csd(csd_mags.mean(), filters_mag)
+    stc_mag,_ = apply_dics_csd(csd_mags.mean(), filters_mag)  # runs on all freqs just for plotting
    
     filters_grad = make_dics(grads.info, 
                             forward, 
@@ -148,7 +153,9 @@ def plotting_stc(mags, grads, csd_mags, csd_grads, rank_mag, rank_grad,
 
 def run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads, 
              rank_mag, rank_grad, file_paths, reg=0.01, csd_method='multitaper'):
-    """Run DICS for a given subject for the given freqs (1hz by 1hz)."""
+    """Run DICS for a given subject for the given freqs (1hz by 1hz).
+    freq can change to a range if you want dics to run on the average freqs. 
+    just need to do csd_mags_freq.mean() if giving it a range"""
 
     print(f'Create DICS filters on {csd_method} csd and apply with egularisation = {reg} for {freq}Hz')
     csd_mags_freq = csd_mags.copy().pick_frequency(freq)
@@ -164,7 +171,7 @@ def run_dics_per_Hz(mags, grads, freq, forward, csd_mags, csd_grads,
                             depth=None, 
                             inversion='matrix', 
                             weight_norm="unit-noise-gain")
-    stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)
+    stc_mag_freq, freq = apply_dics_csd(csd_mags_freq, filters_mag)  # this runs per Hz
 
     csd_grads_freq = csd_grads.copy().pick_frequency(freq)
     filters_grad = make_dics(grads.info, 
