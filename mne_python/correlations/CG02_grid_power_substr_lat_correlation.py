@@ -13,6 +13,11 @@ Steps:
     4. Compute Spearman correlation (r, p-value) for each grid index.
     5. Save correlation results per Hz in a CSV file.
 
+For band calculations we average over correlation values across
+band frequencies. 
+At no point in this pipeline the DICS or CSDs are calculated for
+band, all are per Hz.
+
 Output:
 - 235 CSV files: `spearman_src_lat_power_vol_grad(or mag)_1.5.csv`
   (each containing Spearman r and p-values for all grid indices).
