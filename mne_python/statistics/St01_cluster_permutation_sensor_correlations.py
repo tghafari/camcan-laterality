@@ -1,4 +1,5 @@
 """
+===========================================================
 Unified script for computing lateralized MEG-sensor correlations with subcortical volumes,
 performing cluster-based permutation testing on sensor-level correlations,
 and visualizing significant clusters via topographic maps.
@@ -30,6 +31,7 @@ Requirements:
 
 Written by: Tara Ghafari
 tara.ghafari@gmail.com
+==============================================================
 """
 
 import os
