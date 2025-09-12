@@ -65,7 +65,7 @@ relationship (e.g., r = –0.30, p < 0.01 via permutation test).
 
 
 This script will:
-1) inputs lateralised volume of all subs
+1) inputs lateralised volume of all subs with significant findings
 2) inputs lateralised power (PLI) per band per sensor
 3) writes a function that runs CCA on one substr
 and all PLIs
