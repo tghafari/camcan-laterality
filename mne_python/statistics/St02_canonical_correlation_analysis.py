@@ -42,8 +42,8 @@ Inspect weights:
     pattern of sensors/bands most strongly associated with substr asymmetry.”
 
 Cross-validation: 
-    Do k-fold CV. Train weights on 80% of participants, predict canonical v
-    ariate scores in the 20%, compute correlation with substr LV.
+    Do k-fold CV. Train weights on 80% of participants, predict canonical
+    variate scores in the 20%, compute correlation with substr LV.
     This shows the pattern generalizes.
 
 Example of interpretation in your results context:
@@ -62,6 +62,19 @@ taken together, accounts for caudate asymmetry better than any single sensor or 
 
 The canonical correlation r tells you the overall strength of this 
 relationship (e.g., r = –0.30, p < 0.01 via permutation test).
+
+
+This script will:
+1) inputs lateralised volume of all subs
+2) inputs lateralised power (PLI) per band per sensor
+3) writes a function that runs CCA on one substr
+and all PLIs
+4) writes a function that maps the canonical weights back 
+to scalp maps for each band.
+5) writes a function that does k-fold CV. Trains weights on 
+80% of participants, predict canonical variate scores in the 20%, 
+compute correlation with substr LV.
+6) runs steps 3-6 on all subcortical structures.
 
 Explanation by ChatGPT5
 code by Tara Ghafari
