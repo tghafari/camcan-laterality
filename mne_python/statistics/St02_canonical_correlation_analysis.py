@@ -192,8 +192,9 @@ def pick_targets(lv_df: pd.DataFrame, separate_structs: list, combined_structs: 
     lv_df = _normalize_subject_id(lv_df)
     lv_df = lv_df.set_index('SubjectID')
 
-    cand_cols = [c for c in lv_df.columns[separate_structs]]
-    targets = {c: lv_df[c].astype(float) for c in cand_cols}
+    if not combined_structs:
+        substr_cols = lv_df[separate_structs]
+        targets = {c: lv_df[c].astype(float) for c in substr_cols}
 
     def zser(s: pd.Series) -> pd.Series:
         s = s.astype(float)
