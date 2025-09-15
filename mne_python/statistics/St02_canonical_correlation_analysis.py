@@ -192,21 +192,21 @@ def pick_targets(lv_df: pd.DataFrame, separate_structs: list, combined_structs: 
     lv_df = _normalize_subject_id(lv_df)
     lv_df = lv_df.set_index('SubjectID')
 
-    if not combined_structs:
-        substr_cols = lv_df[separate_structs]
-        targets = {c: lv_df[c].astype(float) for c in substr_cols}
+# if not combined_structs:
+    substr_cols = lv_df[separate_structs]
+    targets = {c: lv_df[c].astype(float) for c in substr_cols}
 
     def zser(s: pd.Series) -> pd.Series:
         s = s.astype(float)
         return (s - s.mean()) / s.std(ddof=0)
 
-    if combined_structs:
-        comb = (zser(lv_df['Caud']) + zser(lv_df['Puta'])) / 2.0
-        targets['comb_caud_put'] = zser(comb)
+# if combined_structs:
+    comb = (zser(lv_df['Caud']) + zser(lv_df['Puta'])) / 2.0
+    targets['comb_caud_put'] = zser(comb)
 
-    if combined_structs:
-        comb2 = (zser(lv_df['Caud']) + zser(lv_df['Puta']) + zser(lv_df['Pall'])) / 3.0
-        targets['comb_caud_put_gp'] = zser(comb2)
+# if combined_structs:
+    comb2 = (zser(lv_df['Caud']) + zser(lv_df['Puta']) + zser(lv_df['Pall'])) / 3.0
+    targets['comb_caud_put_gp'] = zser(comb2)
 
     return targets
 
@@ -289,7 +289,7 @@ def split_weights_by_band(x_weights: pd.Series) -> Dict[str, pd.Series]:
     return {b: pd.Series(v).sort_index() for b, v in out.items() if v}
 
 # -------------------- MAIN PIPELINE --------------------
-def main(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS):
+def run_cca_on_all(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS):
     paths = setup_paths(platform)
     print(f"[INFO] LV: {paths['LV_csv']}")
     print(f"[INFO] LI dir: {paths['LI_dir']}")
@@ -303,7 +303,7 @@ def main(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS):
     X = build_feature_matrix_all_bands(paths, sub_ids)
 
     # Build Y targets (individual LV columns + combined)
-    targets = pick_targets(lv_df, separate_structs=['Caud','Puta','Pall','Hipp'], combined_structs=False)
+    targets = pick_targets(lv_df, separate_structs=['Caud','Puta','Pall','Hipp'], combined_structs=True)
     # align all series to X index order
     X.index = pd.Index(sub_ids, name='SubjectID')
 
@@ -354,4 +354,4 @@ def main(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS):
 
 if __name__ == "__main__":
     # Set platform='bluebear' if running there
-    main(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS)
+    run_cca_on_all(platform='mac', n_perm=N_PERM, n_splits=N_SPLITS)
