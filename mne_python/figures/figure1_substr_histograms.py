@@ -33,7 +33,7 @@ if platform == 'bluebear':
 elif platform == 'mac':
     quinna_dir = '/Volumes/quinna-camcan'
     sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
-    fig_output_root = '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures'
+    fig_output_root = '/Users/taraghafari/Desktop/Desktop - Tara’s MacBook Pro/BEAR_outage/CamCAN/manuscript/Figures'
 else:
     raise ValueError("Unsupported platform. Use 'mac' or 'bluebear'.")
 
