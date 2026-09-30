@@ -59,11 +59,11 @@ run_date = '30092026'
 def setup_paths(platform='mac'):
     """Set up and return file paths based on the system platform."""
     if platform == 'bluebear':
-        quinna_dir = '/rds/projects/q/quinna-camcan-1/'
+        quinna_dir = '/rds/projects/q/quinna-camcan/'
         sub2ctx_dir = '/rds/projects/j/jenseno-sub2ctx/camcan'
         jenseno_dir = '/rds/projects/j/jenseno-avtemporal-attention/Projects/'
     elif platform == 'mac':
-        quinna_dir = '/Volumes/quinna-camcan-1/'
+        quinna_dir = '/Volumes/quinna-camcan/'
         sub2ctx_dir = '/Volumes/jenseno-sub2ctx/camcan'
         jenseno_dir = '/Volumes/jenseno-avtemporal-attention/Projects/'
     else:
