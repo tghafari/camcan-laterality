@@ -705,9 +705,13 @@ def cluster_permutation():
     # # run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
     # or run on all
-    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    ch_types = ['grad', 'mag']
+    # substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+    # bands = ['Delta', 'Theta', 'Alpha', 'Beta']
+    # ch_types = ['grad', 'mag']
+
+    substrs = ['Caud']
+    bands = ['Beta']
+    ch_types = ['grad']
     for substr in substrs:
         for band in bands:
             for ch_type in ch_types:
