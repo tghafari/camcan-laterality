@@ -75,11 +75,11 @@ def setup_paths(platform='mac'):
         'sub_list': op.join(quinna_dir, 'dataman/data_information/dblCheck_last_FINAL_sublist-vol-outliers-removed.csv'),  # this is just to ensure correct subjects are being used for the final analysis (last_FINAL_sublist-vol-outliers-removed.csv)
         'correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands_sensor_pairs_subtraction_nooutlier-psd'),
         'signif_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/bands/bands_signif_correlations_subtraction_nooutlier-psd'), # for alph thal, puta beta, hipp delta
-        'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/sensor-bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),  # for all combinations of bands and substrs only excludeing vol outliers
+        'all_correlation_dir': op.join(sub2ctx_dir, 'derivatives/correlations/sensor_bands/bands_all_correlations_subtraction_nonoise_no-vol-outliers'),  # for all combinations of bands and substrs only excludeing vol outliers
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),  # combined grads end in '2', there is no sensor ending in '3'
         'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads'),  # we use vol outliers removed list now (30/07/2025)
-        'cluster_perm_signif_sensors': op.join(sub2ctx_dir, 'derivatives/correlations/sensor-bands/bands_significant_sensors_cluster-perm'),
+        'cluster_perm_signif_sensors': op.join(sub2ctx_dir, 'derivatives/correlations/sensor_bands/bands_significant_sensors_cluster-perm'),
     }
     return paths
 
