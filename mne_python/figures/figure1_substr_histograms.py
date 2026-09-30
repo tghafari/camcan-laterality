@@ -95,91 +95,249 @@ def load_lateralisation_dataframe() -> pd.DataFrame:
     return df
 
 # ----------------------- Plotting ----------------------- #
-def plot_lateralisation_volumes(df: pd.DataFrame,
-                                bins: int = 10,
-                                title: str = 'Lateralisation Volume of Subcortical Structures (N=532)'):
+def plot_lateralisation_volumes(
+    df: pd.DataFrame,
+    bins: int = 10,
+    title: str | None = None,
+    fig_output_root: str = fig_output_root,
+    font_family: str = 'Arial'
+):
     """
-    Plot histograms of lateralisation volume indices for each subcortical structure,
-    annotate with Wilcoxon signed-rank p-value vs 0, and save at 800 dpi.
+    Plot lateralisation volume histograms for the seven subcortical structures.
+
+    Caudate, putamen, pallidum, and hippocampus are saved as separate figures.
+    Thalamus, amygdala, and nucleus accumbens are saved together in one figure.
+
+    Every histogram uses an x-axis symmetric around zero. Each panel also
+    reports a two-sided one-sample Wilcoxon signed-rank p-value against zero.
+
+    Figures are saved as TIFF, PNG, and SVG at 800 dpi.
     """
-    # Use Arial globally and decrease label-axis distance
-    plt.rcParams['font.family'] = 'Arial'
-    # plt.rcParams['axes.labelpad'] = 3
+    plt.rcParams['font.family'] = font_family
 
-    n_structures = len(structures)
-    n_cols = 4
-    n_rows = int(np.ceil(n_structures / n_cols))
-    fig, axs = plt.subplots(n_rows, n_cols, figsize=(4.0 * n_cols, 3.8 * n_rows))
-    axs = axs.flatten()
+    box_props = dict(
+        facecolor='oldlace',
+        alpha=0.8,
+        edgecolor='darkgoldenrod',
+        boxstyle='round'
+    )
 
-    # Styling for p-value box (as requested)
-    box_props = dict(facecolor='oldlace', alpha=0.8, edgecolor='darkgoldenrod', boxstyle='round')
-
-    medians = []
+    individual_structures = ['Caud', 'Puta', 'Pall', 'Hipp']
+    combined_structures = ['Thal', 'Amyg', 'Accu']
     null_hypothesis_median = 0.0
 
-    for idx, structure in enumerate(structures):
-        ax = axs[idx]
-        lateralisation_volume = pd.to_numeric(df[structure], errors='coerce').dropna().values
-        if lateralisation_volume.size == 0:
-            ax.set_visible(False)
-            continue
+    structure_to_idx = {
+        structure: structures.index(structure)
+        for structure in structures
+    }
 
-        # Histogram
-        ax.hist(lateralisation_volume, bins=bins, color=colormap[idx], edgecolor='white')
+    def get_symmetric_xlim(values):
+        """Return symmetric x-axis limits around zero with a 5% margin."""
+        max_abs = np.nanmax(np.abs(values))
+        if max_abs == 0:
+            max_abs = 1.0
+        max_abs *= 1.05
+        return -max_abs, max_abs
 
-        # Zero reference line
-        ax.axvline(x=0.0, color='k', linewidth=0.8, linestyle=':')
+    def get_wilcoxon_p(values):
+        """Compute a two-sided one-sample Wilcoxon test against zero."""
+        diffs = values - null_hypothesis_median
 
-        # Compute statistics
-        median_val = np.median(lateralisation_volume)
-        medians.append(median_val)
-
-        # Wilcoxon signed-rank test vs 0 (median)
-        # scipy.stats.wilcoxon requires non-zero differences for the default zero_method
-        # Add a tiny jitter to zero entries to avoid zero-sum issues (optional, conservative)
-        diffs = lateralisation_volume - null_hypothesis_median
         if np.allclose(diffs, 0.0):
-            wilcox_p = 1.0  # all zeros → no evidence against 0
-        else:
-            # Use 'wilcox' zero_method (drop zeros)
-            _, wilcox_p = stats.wilcoxon(diffs, zero_method='wilcox', correction=False, alternative='two-sided')
+            return 1.0
 
-        # p-value text
-        txt_wilx = f"Wilcoxon p = {wilcox_p:.3f}" if wilcox_p >= 0.001 else "Wilcoxon p < 0.001"
-        ax.text(0.05, 0.95,
-                txt_wilx,
-                transform=ax.transAxes,
-                fontsize=10,
-                verticalalignment='top',
-                bbox=box_props,
-                style='italic')
+        _, p_value = stats.wilcoxon(
+            diffs,
+            zero_method='wilcox',
+            correction=False,
+            alternative='two-sided'
+        )
+        return p_value
 
-        # Axis labels & title (Arial, bold)
-        ax.set_title(structure, fontsize=12, fontweight='bold')
-        if idx in [3, 4, 5, 6]:
-            ax.set_xlabel('Lateralisation Volume', fontsize=12, fontweight='bold')
-        if idx == 0 or idx == 4:
-            ax.yaxis.labelpad = 5
-            ax.set_ylabel('# Subjects', fontsize=12, fontweight='bold')
+    def format_p_value(p_value):
+        """Format Wilcoxon p-values for figure annotation."""
+        return (
+            f"Wilcoxon p = {p_value:.3f}"
+            if p_value >= 0.001
+            else "Wilcoxon p < 0.001"
+        )
 
-        # Ticks styling
-        ax.tick_params(axis='both', which='both', length=0)
+    def style_axis(ax, structure, values, show_ylabel=True):
+        """Apply consistent publication-style formatting."""
+        x_min, x_max = get_symmetric_xlim(values)
+        ax.set_xlim(x_min, x_max)
+
+        ax.axvline(
+            0.0,
+            color='dimgray',
+            linewidth=0.8,
+            linestyle='-'
+        )
+
+        ax.set_title(
+            structure,
+            fontsize=16,
+            fontweight='bold'
+        )
+
+        ax.set_xlabel(
+            'Lateralisation Volume',
+            fontsize=14,
+            fontweight='bold',
+            labelpad=5
+        )
+
+        if show_ylabel:
+            ax.set_ylabel(
+                '# Subjects',
+                fontsize=14,
+                fontweight='bold',
+                labelpad=5
+            )
+
+        ax.tick_params(
+            axis='both',
+            which='both',
+            length=0,
+            labelsize=12
+        )
+
         ax.set_axisbelow(True)
-        ax.grid(True, axis='y', alpha=0.25)
 
-    # Remove any unused axes
-    [fig.delaxes(ax) for ax in axs.flatten() if not ax.has_data()] 
+        ax.grid(
+            True,
+            axis='y',
+            alpha=0.25
+        )
 
-    # Super-title
-    fig.suptitle(title, fontsize=16, fontweight='bold')
-    fig.tight_layout(rect=[0, 0.02, 1, 0.98])
+    def annotate_p_value(ax, p_value):
+        """Add the Wilcoxon p-value annotation box."""
+        ax.text(
+            0.05,
+            0.95,
+            format_p_value(p_value),
+            transform=ax.transAxes,
+            fontsize=10,
+            verticalalignment='top',
+            bbox=box_props,
+            style='italic'
+        )
 
-    # Save
-    out_dir = op.join(fig_output_root, 'Lateralisation_Volume_Histograms')
-    save_figure_all_formats(fig, out_dir, 'lateralisation-histograms-final_subs_no-vol-outliers', dpi=800)
-    plt.show()
-    plt.close(fig)
+    def plot_single_structure(structure):
+        """Create and save a standalone histogram."""
+        idx = structure_to_idx[structure]
+
+        values = pd.to_numeric(
+            df[structure],
+            errors='coerce'
+        ).dropna().values
+
+        if values.size == 0:
+            print(f"[WARNING] No valid data available for {structure}.")
+            return
+
+        wilcox_p = get_wilcoxon_p(values)
+
+        fig, ax = plt.subplots(figsize=(5, 4.5))
+
+        ax.hist(
+            values,
+            bins=bins,
+            color=colormap[idx],
+            edgecolor='white'
+        )
+
+        style_axis(ax, structure, values)
+        annotate_p_value(ax, wilcox_p)
+
+        fig.tight_layout()
+
+        out_dir = op.join(
+            fig_output_root,
+            'Lateralisation_Volume_Histograms'
+        )
+        ensure_dir(out_dir)
+
+        save_figure_all_formats(
+            fig,
+            out_dir,
+            f'{structure}_lateralisation_volume_histogram',
+            dpi=800
+        )
+
+        plt.show()
+        plt.close(fig)
+
+        print(
+            f"[DONE] {structure}: N = {len(values)}, "
+            f"Wilcoxon p = {wilcox_p:.4g}"
+        )
+
+    def plot_combined_structures():
+        """Create and save the combined Thal/Amyg/Accu figure."""
+        fig, axs = plt.subplots(
+            1,
+            len(combined_structures),
+            figsize=(15, 4.5)
+        )
+
+        for plot_idx, structure in enumerate(combined_structures):
+            ax = axs[plot_idx]
+            idx = structure_to_idx[structure]
+
+            values = pd.to_numeric(
+                df[structure],
+                errors='coerce'
+            ).dropna().values
+
+            if values.size == 0:
+                ax.set_visible(False)
+                continue
+
+            wilcox_p = get_wilcoxon_p(values)
+
+            ax.hist(
+                values,
+                bins=bins,
+                color=colormap[idx],
+                edgecolor='white'
+            )
+
+            style_axis(
+                ax,
+                structure,
+                values,
+                show_ylabel=(plot_idx == 0)
+            )
+            annotate_p_value(ax, wilcox_p)
+
+        fig.tight_layout()
+
+        out_dir = op.join(
+            fig_output_root,
+            'Lateralisation_Volume_Histograms'
+        )
+        ensure_dir(out_dir)
+
+        save_figure_all_formats(
+            fig,
+            out_dir,
+            'Thal_Amyg_Accu_lateralisation_volume_histograms',
+            dpi=800
+        )
+
+        plt.show()
+        plt.close(fig)
+
+        print("[DONE] Combined figure: Thal, Amyg, Accu")
+
+    # Four individual figures.
+    for structure in individual_structures:
+        plot_single_structure(structure)
+
+    # One combined figure.
+    plot_combined_structures()
+
 
 # ----------------------- Run ----------------------- #
 if __name__ == '__main__':
