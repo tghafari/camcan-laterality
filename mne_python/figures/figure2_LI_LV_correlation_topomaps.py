@@ -43,6 +43,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import mne
+from mne.channels.layout import _find_topomap_coords
 
 
 # ----------------------------- Utilities ----------------------------- #
@@ -110,6 +111,29 @@ def read_raw_info(paths: dict, ch_type: str):
     else:
         raise ValueError("ch_type must be 'mag' or 'grad'.")
 
+
+def get_topomap_positions(paths: dict, sensor_names: list[str]) -> np.ndarray:
+    """Return accurate 2D topomap coordinates for the requested sensors.
+
+    Positions are projected from the complete MEG sensor geometry. This keeps
+    right-hemisphere sensors at their true lateral locations instead of using
+    unprojected loc[:2] values or re-centering a hemisphere-only subset.
+    """
+    raw_full = mne.io.read_raw_fif(
+        paths['sample_meg_file'], preload=False, verbose=False
+    )
+
+    missing = [ch for ch in sensor_names if ch not in raw_full.ch_names]
+    if missing:
+        raise RuntimeError(
+            "Topomap sensor(s) missing from the sample MEG file: "
+            + ", ".join(missing)
+        )
+
+    picks = [raw_full.ch_names.index(ch) for ch in sensor_names]
+    return _find_topomap_coords(raw_full.info, picks=picks, sphere=None)
+
+
 def ensure_dir(path: str) -> None:
     """Create directory if it doesn't exist."""
     os.makedirs(path, exist_ok=True)
@@ -166,27 +190,18 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str,
     n_subjects = len(li_df)
     t_obs = r_to_t(r_obs, n=n_subjects)
 
-    # --- Create 2D positions for plot_topomap ---
-    # For grads, build 2D (x,y) from channel locs of the picked info object.
-    if ch_type == 'grad':
+    # --- Create accurate 2D positions for plot_topomap ---
+    # t_obs follows filtered_df, so project those exact sensor names from the
+    # COMPLETE MEG geometry and preserve that order. This prevents right-sided
+    # sensors from appearing compressed toward the midline.
+    sensor_names = filtered_df['sensor_pair'].str.split('_').str[-1].tolist()
+    pos_info = get_topomap_positions(paths, sensor_names)
 
-        grad_picks = mne.pick_types(info, meg='grad', eeg=False, stim=False, exclude=[])
-        # Sanity check: lengths must match data
-        if len(grad_picks) != len(t_obs):
-            raise RuntimeError(
-                f"Length mismatch: {len(grad_picks)} grad channels in info vs {len(t_obs)} data points in t_obs."
-            )
-
-        pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
-        pos_info = pos2d
-    else:
-        # For mags, MNE accepts Info directly if it matches data length
-        mag_picks = mne.pick_types(info, meg='mag', eeg=False, stim=False, exclude=[])
-        if len(mag_picks) != len(t_obs):
-            raise RuntimeError(
-                f"Length mismatch: {len(mag_picks)} mag channels in info vs {len(t_obs)} data points in t_obs."
-            )
-        pos_info = info
+    if len(pos_info) != len(t_obs):
+        raise RuntimeError(
+            f"Topomap position/data mismatch: {len(pos_info)} positions for "
+            f"{len(t_obs)} t-values."
+        )
 
     # --- Load significant clusters master CSV and filter for (substr, band) ---
     signif_csv = op.join(paths['cluster_perm_signif_sensors'], f'{substr}_{band}_{ch_type}_signif_sensors_after_cluster_perm.csv')
@@ -225,7 +240,7 @@ def plot_cluster_significant_topoplots(paths: dict, substr: str, band: str,
     fig, ax = plt.subplots(figsize=(6, 5))
     im, cn = mne.viz.plot_topomap(
         t_obs, pos_info, mask=mask, mask_params=mask_params,
-        vlim=(float(np.nanmin(t_obs)), float(np.nanmax(t_obs))),
+        vlim=(-float(np.nanmax(np.abs(t_obs))), float(np.nanmax(np.abs(t_obs)))),
         contours=0, image_interp='nearest', cmap='RdBu_r', show=False, axes=ax
     )
 

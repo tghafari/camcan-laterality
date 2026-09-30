@@ -50,6 +50,7 @@ from itertools import product
 import mne
 from mne.channels import find_ch_adjacency
 from mne.channels import find_layout
+from mne.channels.layout import _find_topomap_coords
 
 
 def setup_paths(platform='mac'):
@@ -201,6 +202,36 @@ def read_raw_info(paths, ch_type):
         # it also requires grad info for adjacency info
         
         return raw, raw.info, raw_mag.info
+
+
+def get_topomap_positions(paths, sensor_names):
+    """Return accurate 2D topomap coordinates for sensor_names.
+
+    Coordinates are projected from the complete MEG sensor geometry rather than
+    from an already right-hemisphere-only Info object. This preserves each
+    sensor's location relative to the full head and prevents right-sided sensors
+    from being visually compressed toward the midline.
+
+    The returned rows follow sensor_names exactly, so they remain aligned with
+    filtered_df, t_obs and the significance mask.
+    """
+    raw_full = mne.io.read_raw_fif(
+        paths['sample_meg_file'], preload=False, verbose=False
+    )
+
+    missing = [ch for ch in sensor_names if ch not in raw_full.ch_names]
+    if missing:
+        raise RuntimeError(
+            "Topomap sensor(s) missing from the sample MEG file: "
+            + ", ".join(missing)
+        )
+
+    picks = [raw_full.ch_names.index(ch) for ch in sensor_names]
+
+    # Project the original 3-D sensor positions onto MNE's 2-D topomap
+    # coordinate system, using the full recording geometry.
+    return _find_topomap_coords(raw_full.info, picks=picks, sphere=None)
+
 
 def find_custom_adjacency(info, ch_type, plot_all=False):
     """Returns sparse adjacency matrix and channel names for selected sensor type."""
@@ -363,23 +394,19 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
     # Compute t-transformed values and use that to find significant clusters
     print("Plotting observed significant sensors")
     
-    # Prepare the data for visualisation
-    """we use the positions of channels for grads.
-    using mag info messes up the index of channels and is therefore not correct."""
-    if ch_type == 'grad':  
-        info_mag = other[0]
-        # trying out different methods to plot grads in the correct position - looks ok just needs to align to right sensor locations
-        grad_picks = mne.pick_types(info, meg='grad')
-        grad_names = [info['ch_names'][p] for p in grad_picks]  # this is essentialy identical to 
-                                                                #sensor_names = [pair.split('_')[1] for pair in filtered_df['sensor_pair']]
-                                                                # we are just using 'info' to be more principled so:
-                                                                # In [198]: grad_names == sensor_names
-                                                                # Out[198]: True
+    # Prepare accurate sensor positions for visualisation.
+    # Do not use raw loc[:2] values: MEG sensors lie on a 3-D helmet and must be
+    # projected onto MNE's 2-D topomap coordinate system. We perform that
+    # projection from the COMPLETE sensor geometry, then select the right-side
+    # sensors in the same order as filtered_df/t_obs.
+    sensor_names = filtered_df['sensor_pair'].str.split('_').str[-1].tolist()
+    pos_info = get_topomap_positions(paths, sensor_names)
 
-        pos2d = np.vstack([info['chs'][p]['loc'][:2] for p in grad_picks])
-        pos_info = pos2d
-    else:
-        pos_info = info
+    if len(pos_info) != len(t_obs):
+        raise RuntimeError(
+            f"Topomap position/data mismatch: {len(pos_info)} positions for "
+            f"{len(t_obs)} t-values."
+        )
 
     # Define the significant clusters
     mask_params = dict(
@@ -397,8 +424,9 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     if draw_cluster_lines:  # this section plots lines but not at the exact location - TODO: doesn't work yet
         # --- Draw cluster-specific lines ---
-        # Get 2D positions of all sensors
-        pos = np.array([info['chs'][info['ch_names'].index(name)]['loc'][:2] for name in info['ch_names']])
+        # Use the exact same projected positions as the topomap so the cluster
+        # lines and significant-sensor markers are spatially aligned.
+        pos = pos_info
 
         # Loop over each cluster of sig_obs indices
         for cluster_idx, sig_indices in clusters_rt_obs.items():
@@ -419,7 +447,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
     cbar.ax.tick_params(labelsize=10)
-    cbar.set_label('Correlation Values', fontsize=14)
+    cbar.set_label('t (from Spearman r)', fontsize=14)
     ax.set_xlim(0, )  # remove the left half of topoplot
     ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})- before cluster testing')
     plt.show()
@@ -493,13 +521,13 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
 
                     # Plot topomap for null distribution
                     im, cn = mne.viz.plot_topomap(
-                        t_null, pos_info, mask=mask, mask_params=mask_params, names=grad_names,
+                        t_null, pos_info, mask=mask, mask_params=mask_params,
                         vlim=(min(t_null), max(t_null)), contours=0, image_interp='nearest', 
                         cmap='RdBu_r', show=False, axes=ax
                     )  
                     cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
                     cbar.ax.tick_params(labelsize=10)
-                    cbar.set_label('Correlation Values', fontsize=14)
+                    cbar.set_label('t (from Spearman r)', fontsize=14)
                     ax.set_xlim(0, )  # remove the left half of topoplot
                     ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})- null distribution')
                     plt.show()
@@ -540,26 +568,36 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         # permutation. The '+1' correction prevents p-values of exactly zero.  
         n_perm = len(max_t_sums_pos)
 
-        # Plot observed cluster t sums
+        # Calculate an empirical permutation p-value for every observed cluster.
+        # Positive clusters are compared with the null distribution of maximum
+        # positive cluster sums; negative clusters are compared with the null
+        # distribution of minimum negative cluster sums. The +1 correction
+        # prevents an empirical p-value of exactly zero.
+        cluster_p_values = {}
+
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
-            if t_sum_obs > upper_threshold:
-                color = 'green'
-                # Empirical p-value:
-                # proportion of null maximum cluster statistics greater than or equal
-                # to the observed positive cluster statistic.
-                p_val = (np.sum(max_t_sums_pos >= t_sum_obs) + 1) / (n_perm + 1)
-                p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
-                label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
-            elif t_sum_obs < lower_threshold:
-                color = 'green'
-                p_val = (np.sum(min_t_sums_neg <= t_sum_obs) + 1) / (n_perm + 1)
-                p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
-                label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
-               
-            # Non-significant cluster
+            if t_sum_obs >= 0:
+                p_val = (
+                    np.sum(max_t_sums_pos >= t_sum_obs) + 1
+                ) / (n_perm + 1)
             else:
-                color = 'yellow'
-                label = f'Cluster {cluster_id_obs}: {t_sum_obs:.2f} (ns)'
+                p_val = (
+                    np.sum(min_t_sums_neg <= t_sum_obs) + 1
+                ) / (n_perm + 1)
+
+            cluster_p_values[cluster_id_obs] = p_val
+            is_significant = (
+                t_sum_obs > upper_threshold or t_sum_obs < lower_threshold
+            )
+            color = 'green' if is_significant else 'yellow'
+            p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "< 0.001"
+
+            # The line remains at the observed summed-t cluster statistic because
+            # that is the x-axis of the permutation histogram; its legend now
+            # reports the corresponding empirical p-value.
+            label = f'Cluster {cluster_id_obs}: p = {p_txt}'
+            if not is_significant:
+                label += ' (ns)'
 
             plt.axvline(t_sum_obs, color=color, linestyle='-', label=label)
 
@@ -613,7 +651,8 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
                             'structure': substr_name,
                             'cluster': cluster_id,
                             'sensors': ';'.join(map(str, sensor_indices)),       # indices
-                            'sensor_names': ';'.join(sensor_names)               # names
+                            'sensor_names': ';'.join(sensor_names),              # names
+                            'cluster_p_value': cluster_p_values[int(cluster_id.split('_')[-1])]
                         })
 
             # Convert to DataFrame
@@ -638,7 +677,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             )  
             cbar = fig.colorbar(im, ax=ax, orientation='horizontal', location='bottom')
             cbar.ax.tick_params(labelsize=10)
-            cbar.set_label('Correlation Values', fontsize=14)
+            cbar.set_label('t (from Spearman r)', fontsize=14)
             ax.set_xlim(0, )  # remove the left half of topoplot
             ax.set_title(f'{substr}-{band} t transformed Spearman r ({ch_type})-after cluster permutation')
             plt.show()
