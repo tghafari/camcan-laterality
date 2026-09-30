@@ -52,10 +52,6 @@ from mne.channels import find_ch_adjacency
 from mne.channels import find_layout
 from mne.channels.layout import _find_topomap_coords
 
-# Analysis-run date used to version output files and prevent overwriting previous results.
-run_date = '30092026'
-
-
 def setup_paths(platform='mac'):
     """Set up and return file paths based on the system platform."""
     if platform == 'bluebear':
@@ -665,7 +661,7 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
             df.to_csv(
                 op.join(
                     paths['cluster_perm_signif_sensors'],
-                    f'{substr}_{band}_{ch_type}_signif_sensors_after_cluster_perm-{run_date}.csv'
+                    f'{substr}_{band}_{ch_type}_signif_sensors_after_cluster_perm.csv'
                 ),
                 index=False
             ) 
@@ -705,13 +701,10 @@ def cluster_permutation():
     # # run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=1000)
 
     # or run on all
-    # substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
-    # bands = ['Delta', 'Theta', 'Alpha', 'Beta']
-    # ch_types = ['grad', 'mag']
+    substrs = ['Thal', 'Caud', 'Puta', 'Pall', 'Hipp', 'Amyg', 'Accu']
+    bands = ['Delta', 'Theta', 'Alpha', 'Beta']
+    ch_types = ['grad', 'mag']
 
-    substrs = ['Caud']
-    bands = ['Beta']
-    ch_types = ['grad']
     for substr in substrs:
         for band in bands:
             for ch_type in ch_types:
