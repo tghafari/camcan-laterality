@@ -544,17 +544,17 @@ def run_cluster_test_from_raw_corr(paths, substr, band, ch_type, n_permutations=
         for cluster_id_obs, t_sum_obs in cluster_t_rt_sums_obs.items():
             if t_sum_obs > upper_threshold:
                 color = 'green'
-                 # Empirical p-value:
-                 # proportion of null maximum cluster statistics greater than or equal
-                 # to the observed positive cluster statistic.
-                 p_val = (np.sum(max_t_sums_pos >= t_sum_obs) + 1) / (n_perm + 1)
-                 p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
-                 label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
+                # Empirical p-value:
+                # proportion of null maximum cluster statistics greater than or equal
+                # to the observed positive cluster statistic.
+                p_val = (np.sum(max_t_sums_pos >= t_sum_obs) + 1) / (n_perm + 1)
+                p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
+                label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
             elif t_sum_obs < lower_threshold:
-                 color = 'green'
-                 p_val = (np.sum(min_t_sums_neg <= t_sum_obs) + 1) / (n_perm + 1)
-                 p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
-                 label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
+                color = 'green'
+                p_val = (np.sum(min_t_sums_neg <= t_sum_obs) + 1) / (n_perm + 1)
+                p_txt = f"{p_val:.3f}" if p_val >= 0.001 else "<0.001"
+                label = f'Cluster {cluster_id_obs}: p {p_txt}, t = {t_sum_obs:.2f}'
                
             # Non-significant cluster
             else:
