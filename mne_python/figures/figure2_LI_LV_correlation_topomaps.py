@@ -70,7 +70,7 @@ def setup_paths(platform: str = 'mac') -> dict:
         'sample_meg_file': op.join(quinna_dir, 'cc700/meg/pipeline/release005/BIDSsep/derivatives_rest/aa/AA_movecomp/aamod_meg_maxfilt_00002/sub-CC110033/mf2pt2_sub-CC110033_ses-rest_task-rest_meg.fif'),
         'sensor_layout': op.join(quinna_dir, 'dataman/data_information/combined_sensors_layout_names.csv'),
         'spectra_dir': op.join(sub2ctx_dir, 'derivatives/meg/sensor/lateralized_index/all_sensors_all_subs_all_freqs_subtraction_nonoise_no-vol-outliers_combnd-grads'),
-        'save_path': '/Users/t.ghafari@bham.ac.uk/Library/CloudStorage/OneDrive-UniversityofBirmingham/Desktop/BEAR_outage/CamCAN-results/Manuscript/Figures',
+        'save_path': '/Users/taraghafari/Desktop/Desktop - Tara’s MacBook Pro/BEAR_outage/CamCAN/manuscript/Figures',
         # CSVs with significant clusters (created in previous step)
         'cluster_perm_signif_sensors': op.join(sub2ctx_dir, correlation_dir, 'bands_significant_sensors_cluster-perm'),
     }
