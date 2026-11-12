@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Q01: Diagnose the subjects lost during S01 PSD/lateralisation processing.
+"""
+================================================================
+Q01: Diagnose the subjects lost during S01 PSD/lateralisation processing.
 
 Reads the lost-subject CSV from the mounted quinna-camcan share, runs the
 same Welch PSD and channel-pair checks as S01, and records the first failure
@@ -10,6 +12,7 @@ Run:
     python mne_python/sensor/quality_control/Q01_psd_based_bad_subs.py --platform mac
 
 The smb:// URL must be mounted as a local filesystem path first.
+============================================================
 """
 import argparse
 import logging
@@ -27,7 +30,7 @@ def setup_paths(platform):
         quinna_dir = "/rds/projects/q/quinna-camcan"
         sub2ctx_dir = "/rds/projects/j/jenseno-sub2ctx/camcan"
     elif platform == "mac":
-        quinna_dir = "/Volumes/quinna-camcan-1"
+        quinna_dir = "/Volumes/quinna-camcan"
         sub2ctx_dir = "/Volumes/jenseno-sub2ctx/camcan"
     else:
         raise ValueError("platform must be 'mac' or 'bluebear'")
@@ -69,8 +72,18 @@ def check_subject(subject_id, paths, layout, n_fft=500):
     stage = "check_epochs_file"
     metrics = {"SubjectID": subject_id, "epochs_file": epoch_path}
     try:
+        if not op.isdir(paths["epochs_dir"]):
+            raise NotADirectoryError(
+                f"Epochs directory is inaccessible or does not exist: "
+                f"{paths['epochs_dir']}. Check the SMB mount."
+            )
+
         if not op.isfile(epoch_path):
-            raise FileNotFoundError(epoch_path)
+            raise FileNotFoundError(
+                f"Subject FIF file not found at: {epoch_path}. "
+                f"The epochs directory is accessible, but this exact filename "
+                f"was not found."
+            )
 
         stage = "read_epochs"
         epochs = mne.read_epochs(epoch_path, preload=True, verbose="ERROR")
@@ -188,9 +201,6 @@ def main(platform="bluebear", output_dir=None):
     result_df = pd.DataFrame(results)
     result_path = op.join(paths["output_dir"], "Q01_subject_qc_results.csv")
     result_df.to_csv(result_path, index=False)
-    result_df.loc[result_df.status == "FAIL"].to_csv(
-        op.join(paths["output_dir"], "Q01_failed_subjects.csv"), index=False
-    )
     print("\nStatus counts:\n", result_df["status"].value_counts().to_string())
     print("\nFailure stages:\n", result_df.loc[result_df.status == "FAIL", "failed_stage"].value_counts().to_string())
     print(f"Saved QC results to {result_path}")
