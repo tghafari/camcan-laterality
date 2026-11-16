@@ -26,7 +26,7 @@ import pandas as pd
 
 def roots(platform):
     if platform == "mac":
-        return "/Volumes/quinna-camcan-1", "/Volumes/jenseno-sub2ctx/camcan"
+        return "/Volumes/quinna-camcan", "/Volumes/jenseno-sub2ctx/camcan"
     if platform == "bluebear":
         return "/rds/projects/q/quinna-camcan", "/rds/projects/j/jenseno-sub2ctx/camcan"
     raise ValueError(platform)
